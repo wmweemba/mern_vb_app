@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - N/A
 
+### Frontend (mern-vb-frontend)
+
+#### Added
+- Authentication context store (`src/store/auth.js`) with login, logout, token management, and Axios interceptor for secure API requests.
+- Login page (`src/pages/Login.jsx`) with form, error handling, and integration with auth context.
+- Role-based routing in `src/App.jsx` using React Router, with automatic redirection to dashboards based on user role (admin, treasurer, loan officer, member).
+- Dashboard stubs for each user role.
+
 ## [0.1.0] - 2025-07-03
 
 ### Added
