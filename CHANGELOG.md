@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Role-based routing in `src/App.jsx` using React Router, with automatic redirection to dashboards based on user role (admin, treasurer, loan officer, member).
 - Dashboard stubs for each user role.
 
+### Backend
+- Updated backend server to use direct require for auth routes: `app.use('/api/auth', require('./routes/auth'))` in server.js for improved clarity and hot-reload compatibility.
+
+### Frontend
+- Added Vite dev server proxy configuration to vite.config.js to forward /api requests to backend (fixes 404 on API calls during development).
+- Renamed auth context file to auth.jsx for JSX compatibility.
+- Fixed missing dependencies for export features: ensure jspdf-autotable, xlsx, and jspdf are installed.
+
 ## [0.1.0] - 2025-07-03
 
 ### Added
