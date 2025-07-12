@@ -162,3 +162,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `json2csv` to backend dependencies.
 - Implement frontend integration for savings and threshold features.
 - Expand reporting and analytics capabilities.
+
+## [0.5.0] - 2025-07-12
+
+### Added
+- Modern, mobile-first admin dashboard with card-based layout for main admin actions (Loans, Savings, Thresholds, Reports), each with icons, descriptions, and navigation buttons.
+- Sticky, centered navbar at the top of the UI, visible across all authenticated screens, with four main navigation items (Dashboard, Loans, Savings, Reports) and a logout button on the far right.
+
+### Changed
+- All main content and navigation are now horizontally centered using responsive containers for a consistent, mobile-first user experience.
+- Updated layout to wrap all authenticated routes in a layout component that includes the navbar.
+
+### Technical Details
+- Utilized `react-icons` for modern iconography in dashboard cards and navbar.
+- Used existing Card and Button UI components for consistent styling.
+- Navbar and dashboard are fully responsive and visually aligned with modern UX best practices.

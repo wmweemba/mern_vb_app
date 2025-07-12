@@ -7,6 +7,15 @@ import Loans from './pages/Loans';
 import Savings from './pages/Savings';
 import Thresholds from './pages/Thresholds';
 import Reports from './pages/Reports';
+import Navbar from './components/layout/Navbar';
+
+// Layout with Navbar
+const Layout = ({ children }) => (
+  <div className="min-h-screen flex flex-col bg-background">
+    <Navbar />
+    <main className="flex-1 w-full mx-auto">{children}</main>
+  </div>
+);
 
 // Role-based dashboard stubs
 const AdminDashboard = () => <Dashboard title="Admin Dashboard" />;
@@ -51,14 +60,16 @@ function AppRoutes() {
       dashboard = <div>Unknown role</div>;
   }
   return (
-    <Routes>
-      <Route path="/dashboard" element={dashboard} />
-      <Route path="/loans" element={<Loans />} />
-      <Route path="/savings" element={<Savings />} />
-      <Route path="/thresholds" element={<Thresholds />} />
-      <Route path="/reports" element={<Reports />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <Layout>
+      <Routes>
+        <Route path="/dashboard" element={dashboard} />
+        <Route path="/loans" element={<Loans />} />
+        <Route path="/savings" element={<Savings />} />
+        <Route path="/thresholds" element={<Thresholds />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Layout>
   );
 }
 
