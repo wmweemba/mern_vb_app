@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import BankBalanceCard from '../components/ui/BankBalanceCard';
+import DashboardStatsCard from '../components/ui/DashboardStatsCard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 import { FaUsers, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSlidersH } from 'react-icons/fa';
+import axios from 'axios';
 
 const adminActions = [
   {
@@ -53,14 +55,43 @@ const AdminActions = () => (
   </div>
 );
 
-const Dashboard = ({ title }) => (
-  <div className="p-4 flex flex-col items-center min-h-screen bg-background">
-    <h1 className="text-2xl font-bold mb-4 text-center">{title || 'Dashboard'}</h1>
-    <div className="mb-4 w-full max-w-md flex justify-center">
-      <BankBalanceCard />
+const Dashboard = ({ title }) => {
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await axios.get('/api/savings/dashboard');
+        setStats(res.data);
+      } catch (err) {
+        setError('Failed to load dashboard stats');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  return (
+    <div className="p-4 flex flex-col items-center min-h-screen bg-background">
+      <h1 className="text-2xl font-bold mb-4 text-center">{title || 'Dashboard'}</h1>
+      {loading ? (
+        <div className="mb-4 text-gray-500">Loading stats...</div>
+      ) : error ? (
+        <div className="mb-4 text-red-500">{error}</div>
+      ) : (
+        <DashboardStatsCard stats={stats} />
+      )}
+      <div className="mb-4 w-full max-w-md flex justify-center">
+        <BankBalanceCard />
+      </div>
+      <AdminActions />
     </div>
-    <AdminActions />
-  </div>
-);
+  );
+};
 
 export default Dashboard; 

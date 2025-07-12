@@ -2,6 +2,7 @@ const Loan = require('../models/Loan');
 const calculateLoanSchedule = require('../utils/loanCalculator');
 const { Parser } = require('json2csv');
 const { logTransaction } = require('./transactionController');
+const { updateBankBalance } = require('./bankBalanceController');
 
 exports.createLoan = async (req, res) => {
   const { userId, amount } = req.body;
@@ -25,7 +26,7 @@ exports.createLoan = async (req, res) => {
       referenceId: loan._id,
       note: `Loan of K${amount} created.`
     });
-    
+    await updateBankBalance(-amount); // Debit the bank balance
     res.status(201).json(loan);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create loan', details: err.message });

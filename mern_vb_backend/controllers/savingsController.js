@@ -1,5 +1,8 @@
-const Saving = require('../models/Saving');
+const Saving = require('../models/Savings');
+const Loan = require('../models/Loans');
 const { logTransaction } = require('./transactionController');
+const { updateBankBalance } = require('./bankBalanceController');
+const { Parser } = require('json2csv');
 
 exports.createSaving = async (req, res) => {
   const { userId, month, amount, date } = req.body;
@@ -31,6 +34,7 @@ exports.createSaving = async (req, res) => {
       referenceId: saving._id,
       note: `Savings of K${amount} for month ${month}.`
     });
+    await updateBankBalance(amount); // Credit the bank balance
     res.status(201).json(saving);
   } catch (err) {
     res.status(500).json({ error: 'Failed to save contribution', details: err.message });
@@ -43,5 +47,67 @@ exports.getSavingsByUser = async (req, res) => {
     res.json(savings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch savings' });
+  }
+};
+
+exports.getDashboardStats = async (req, res) => {
+  try {
+    // Total Saved and Interest on Savings
+    const savingsAgg = await Saving.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalSaved: { $sum: '$amount' },
+          totalInterestSavings: { $sum: '$interestEarned' }
+        }
+      }
+    ]);
+    const totalSaved = savingsAgg[0]?.totalSaved || 0;
+    const totalInterestSavings = savingsAgg[0]?.totalInterestSavings || 0;
+
+    // Total Loaned and Interest on Loans
+    const loans = await Loan.find();
+    let totalLoaned = 0;
+    let totalInterestLoans = 0;
+    loans.forEach(loan => {
+      totalLoaned += loan.amount;
+      if (Array.isArray(loan.installments)) {
+        totalInterestLoans += loan.installments.reduce((sum, inst) => sum + (inst.interest || 0), 0);
+      }
+    });
+
+    res.json({
+      totalSaved,
+      totalLoaned,
+      totalInterestSavings,
+      totalInterestLoans
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch dashboard stats', details: err.message });
+  }
+};
+
+exports.exportSavingsReport = async (req, res) => {
+  try {
+    const savings = await Saving.find().populate('userId', 'username name email');
+    const data = savings.map(s => ({
+      Username: s.userId.username,
+      Name: s.userId.name,
+      Email: s.userId.email,
+      Amount: s.amount,
+      Month: s.month,
+      Date: s.date,
+      Fine: s.fine,
+      InterestEarned: s.interestEarned
+    }));
+
+    const parser = new Parser();
+    const csv = parser.parse(data);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('savings_report.csv');
+    return res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export savings report', details: err.message });
   }
 };

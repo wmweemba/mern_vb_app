@@ -12,6 +12,10 @@ app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', userRoutes);
+app.use('/api/bank-balance', require('./routes/bankBalance'));
+app.use('/api/payments', require('./routes/payment'));
+app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/savings', require('./routes/savings'));
 
 const clientOptions = {
   serverApi: {

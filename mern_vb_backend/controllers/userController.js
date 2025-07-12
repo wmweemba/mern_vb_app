@@ -30,3 +30,25 @@ exports.deleteUser = async (req, res) => {
     res.status(400).json({ error: 'Failed to delete user' });
   }
 };
+
+exports.changePassword = async (req, res) => {
+  const { id } = req.params;
+  const { oldPassword, newPassword } = req.body;
+  try {
+    // Only allow self or admin
+    if (req.user.id !== id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (req.user.role !== 'admin') {
+      const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+      if (!isMatch) return res.status(401).json({ error: 'Old password incorrect' });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change password', details: err.message });
+  }
+};

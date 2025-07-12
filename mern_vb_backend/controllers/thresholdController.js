@@ -1,5 +1,5 @@
 const Threshold = require('../models/Threshold');
-const Loan = require('../models/Loan');
+const Loan = require('../models/Loans');
 const User = require('../models/User');
 const { Parser } = require('json2csv');
 

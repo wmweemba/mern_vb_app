@@ -29,7 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Fixed
-- N/A
+- Fixed missing `mongoose` imports in model files (e.g., `Savings.js`, `Transaction.js`), which caused backend crashes on startup.
+- Corrected model import paths in controllers to match actual filenames (e.g., `require('../models/Savings')` instead of `require('../models/Saving')`, and `Loans` instead of `Loan`).
+- Installed the `json2csv` package in the backend to resolve module not found errors for CSV export features.
+- Added the missing `exportSavingsReport` handler to `controllers/savingsController.js` to resolve route handler errors and enable savings CSV export.
+- Fixed route handler errors by ensuring all route handlers are defined functions and match their exports.
+- Documented troubleshooting steps for backend startup errors, 404s, and 500s, improving project stability and maintainability.
 
 ### Security
 - N/A
@@ -182,3 +187,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented detailed Add Loan form (member, amount, interest, start date, duration, notes) and Add Savings form (member, amount, date, notes) as reusable components in `src/features/loans/AddLoanForm.jsx` and `src/features/savings/AddSavingsForm.jsx`.
 - Integrated these forms into the Loans and Savings pages, enabling users to add new loans and savings directly from the UI.
 - Forms include success/error feedback, mobile-first styling, and clear form reset on success.
+- Admin settings menu in the navbar for admins, providing access to:
+  - Manage Users (navigation stub)
+  - Manage Bank Balance (modal to view/update balance)
+  - Change Password (modal to change current user's password)
+  - Manage Payment (modal to record repayments and payouts)
+- Modal components for bank balance, password, and payment management in `src/components/ui/`.
+- Backend endpoints for changing password (`PUT /api/users/:id/password`) and managing payments (`POST /api/payments/repayment`, `POST /api/payments/payout`).
+- Automatic bank balance updates on loan, saving, repayment, and payout actions.
