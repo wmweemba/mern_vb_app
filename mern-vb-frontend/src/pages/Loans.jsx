@@ -1,4 +1,5 @@
 import React from 'react';
+import AddLoanForm from '../features/loans/AddLoanForm';
 
 const Loans = () => (
   <div className="p-4">
@@ -7,8 +8,7 @@ const Loans = () => (
     <div className="mb-4">[Loans List Here]</div>
     {/* Repay loan form for eligible roles */}
     <div className="mb-4">[Repay Loan Form Here]</div>
-    {/* Create loan form for loan officer/admin */}
-    <div>[Create Loan Form Here]</div>
+    <AddLoanForm />
   </div>
 );
 

@@ -177,3 +177,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Utilized `react-icons` for modern iconography in dashboard cards and navbar.
 - Used existing Card and Button UI components for consistent styling.
 - Navbar and dashboard are fully responsive and visually aligned with modern UX best practices.
+
+### Added (continued)
+- Implemented detailed Add Loan form (member, amount, interest, start date, duration, notes) and Add Savings form (member, amount, date, notes) as reusable components in `src/features/loans/AddLoanForm.jsx` and `src/features/savings/AddSavingsForm.jsx`.
+- Integrated these forms into the Loans and Savings pages, enabling users to add new loans and savings directly from the UI.
+- Forms include success/error feedback, mobile-first styling, and clear form reset on success.
