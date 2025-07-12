@@ -8,27 +8,19 @@ const BankBalanceCard = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchBalance = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get('/api/transactions');
-        // Compute balance: sum all credits - debits (assuming type and amount fields)
-        // For this example, assume all 'amount' are positive and type is 'loan', 'saving', or 'fine'
-        let total = 0;
-        for (const tx of res.data) {
-          if (tx.type === 'saving') total += tx.amount;
-          if (tx.type === 'loan') total -= tx.amount;
-          if (tx.type === 'fine') total += tx.amount;
-        }
-        setBalance(total);
+        const res = await axios.get('/api/bank-balance');
+        setBalance(res.data.balance);
       } catch (err) {
         setError('Failed to load bank balance');
       } finally {
         setLoading(false);
       }
     };
-    fetchTransactions();
+    fetchBalance();
   }, []);
 
   return (

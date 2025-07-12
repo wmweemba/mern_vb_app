@@ -7,5 +7,6 @@ router.get('/', verifyToken, requireRole('admin'), userController.getUsers);
 router.post('/', verifyToken, requireRole('admin'), userController.createUser);
 router.delete('/:id', verifyToken, requireRole('admin'), userController.deleteUser);
 router.put('/:id/password', verifyToken, userController.changePassword);
+router.put('/:id', verifyToken, requireRole('admin'), userController.updateUser);
 
 module.exports = router;

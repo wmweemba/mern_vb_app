@@ -195,3 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modal components for bank balance, password, and payment management in `src/components/ui/`.
 - Backend endpoints for changing password (`PUT /api/users/:id/password`) and managing payments (`POST /api/payments/repayment`, `POST /api/payments/payout`).
 - Automatic bank balance updates on loan, saving, repayment, and payout actions.
+- Admins can now edit user details and change user passwords directly from the Manage Users page in the frontend.
+- Added Edit button to user table; form is reused for both adding and editing users, with cancel option for edit mode.
+- Backend now supports updating user details via `PUT /api/users/:id` (admin only), in addition to password changes.
+- Improved admin workflow for user management (create, edit, delete, password reset).

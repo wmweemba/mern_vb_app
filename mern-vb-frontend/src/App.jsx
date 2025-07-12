@@ -7,6 +7,7 @@ import Loans from './pages/Loans';
 import Savings from './pages/Savings';
 import Thresholds from './pages/Thresholds';
 import Reports from './pages/Reports';
+import Users from './pages/Users';
 import Navbar from './components/layout/Navbar';
 
 // Layout with Navbar
@@ -67,6 +68,7 @@ function AppRoutes() {
         <Route path="/savings" element={<Savings />} />
         <Route path="/thresholds" element={<Thresholds />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/users" element={user.role === 'admin' ? <Users /> : <Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Layout>

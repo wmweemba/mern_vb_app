@@ -52,3 +52,24 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({ error: 'Failed to change password', details: err.message });
   }
 };
+
+exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, role, username } = req.body;
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (phone !== undefined) user.phone = phone;
+    if (role !== undefined) user.role = role;
+    if (username !== undefined) user.username = username;
+    await user.save();
+    res.json({ message: 'User updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update user', details: err.message });
+  }
+};
