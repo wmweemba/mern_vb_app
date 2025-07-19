@@ -4,52 +4,35 @@ import DashboardStatsCard from '../components/ui/DashboardStatsCard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
-import { FaUsers, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSlidersH } from 'react-icons/fa';
+import { FaPlus, FaPiggyBank, FaFileAlt } from 'react-icons/fa';
 import axios from 'axios';
 
-const adminActions = [
+const statActions = [
   {
-    title: 'Loans',
-    description: 'View and manage all loan applications and approvals.',
-    icon: <FaMoneyCheckAlt className="size-8 text-blue-600" />,
+    label: 'Add Loan',
     to: '/loans',
+    icon: <FaPlus className="text-white size-6" />, color: 'bg-blue-600',
   },
   {
-    title: 'Savings',
-    description: 'Monitor and manage member savings accounts.',
-    icon: <FaPiggyBank className="size-8 text-green-600" />,
+    label: 'Add Savings',
     to: '/savings',
+    icon: <FaPiggyBank className="text-white size-6" />, color: 'bg-green-600',
   },
   {
-    title: 'Thresholds',
-    description: 'Set and update system thresholds and limits.',
-    icon: <FaSlidersH className="size-8 text-yellow-600" />,
-    to: '/thresholds',
-  },
-  {
-    title: 'Reports',
-    description: 'Access financial and activity reports.',
-    icon: <FaChartBar className="size-8 text-purple-600" />,
+    label: 'View Reports',
     to: '/reports',
+    icon: <FaFileAlt className="text-white size-6" />, color: 'bg-purple-600',
   },
 ];
 
 const AdminActions = () => (
-  <div className="w-full flex justify-center">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-5xl">
-      {adminActions.map((action) => (
-        <Card key={action.title} className="items-center text-center p-4 hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-col items-center">
-            {action.icon}
-            <CardTitle className="mt-2">{action.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CardDescription>{action.description}</CardDescription>
-          </CardContent>
-          <Button asChild className="mt-4 w-full" variant="secondary">
-            <Link to={action.to}>Go to {action.title}</Link>
-          </Button>
-        </Card>
+  <div className="w-full flex justify-center mt-6">
+    <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+      {statActions.map((action) => (
+        <Link to={action.to} key={action.label} className={`flex flex-col items-center justify-center rounded-xl p-4 ${action.color} shadow-md hover:scale-105 transition-transform min-h-[90px]`} style={{ minWidth: 0 }}>
+          {action.icon}
+          <span className="mt-2 text-white font-semibold text-sm text-center">{action.label}</span>
+        </Link>
       ))}
     </div>
   </div>
@@ -79,17 +62,20 @@ const Dashboard = ({ title }) => {
   return (
     <div className="p-4 flex flex-col items-center min-h-screen bg-background">
       <h1 className="text-2xl font-bold mb-4 text-center">{title || 'Dashboard'}</h1>
-      {loading ? (
-        <div className="mb-4 text-gray-500">Loading stats...</div>
-      ) : error ? (
-        <div className="mb-4 text-red-500">{error}</div>
-      ) : (
-        <DashboardStatsCard stats={stats} />
-      )}
-      <div className="mb-4 w-full max-w-md flex justify-center">
-        <BankBalanceCard />
+      <div className="w-full max-w-2xl">
+        {loading ? (
+          <div className="mb-4 text-gray-500">Loading stats...</div>
+        ) : error ? (
+          <div className="mb-4 text-red-500">{error}</div>
+        ) : (
+          <DashboardStatsCard stats={stats} />
+        )}
+        <div className="mb-4 w-full flex justify-center">
+          <BankBalanceCard />
+        </div>
+        <AdminActions />
       </div>
-      <AdminActions />
+      {/* Placeholder for future: charts, recent transactions, etc. */}
     </div>
   );
 };
