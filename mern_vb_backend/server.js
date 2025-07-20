@@ -16,6 +16,7 @@ app.use('/api/bank-balance', require('./routes/bankBalance'));
 app.use('/api/payments', require('./routes/payment'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/savings', require('./routes/savings'));
+app.use('/api/loans', require('./routes/loans'));
 
 const clientOptions = {
   serverApi: {

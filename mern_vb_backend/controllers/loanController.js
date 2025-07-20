@@ -1,14 +1,20 @@
-const Loan = require('../models/Loan');
+const Loan = require('../models/Loans');
+const User = require('../models/User');
 const calculateLoanSchedule = require('../utils/loanCalculator');
 const { Parser } = require('json2csv');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 
 exports.createLoan = async (req, res) => {
-  const { userId, amount } = req.body;
-  if (!userId || !amount) return res.status(400).json({ error: 'Missing fields' });
+  const { username, amount } = req.body;
+  if (!username || !amount) return res.status(400).json({ error: 'Missing fields' });
 
   try {
+    // Look up user by username
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    const userId = user._id;
+
     const { duration, schedule } = calculateLoanSchedule(amount);
 
     const loan = new Loan({
@@ -43,9 +49,14 @@ exports.getLoansByUser = async (req, res) => {
 };
 
 exports.repayInstallment = async (req, res) => {
-  const { loanId, month, paymentDate } = req.body;
+  const { username, loanId, month, paymentDate } = req.body;
   try {
-    const loan = await Loan.findById(loanId);
+    // Look up user by username
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    const userId = user._id;
+
+    const loan = await Loan.findOne({ _id: loanId, userId });
     if (!loan) return res.status(404).json({ error: 'Loan not found' });
 
     const installment = loan.installments.find(inst => inst.month === month);

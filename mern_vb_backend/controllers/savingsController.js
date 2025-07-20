@@ -1,12 +1,18 @@
 const Saving = require('../models/Savings');
 const Loan = require('../models/Loans');
+const User = require('../models/User');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { Parser } = require('json2csv');
 
 exports.createSaving = async (req, res) => {
-  const { userId, month, amount, date } = req.body;
+  const { username, month, amount, date } = req.body;
   try {
+    // Look up user by username
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    const userId = user._id;
+
     const savingDate = date ? new Date(date) : new Date();
 
     let fine = 0;
@@ -47,6 +53,15 @@ exports.getSavingsByUser = async (req, res) => {
     res.json(savings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch savings' });
+  }
+};
+
+exports.getAllSavings = async (req, res) => {
+  try {
+    const savings = await Saving.find().populate('userId', 'username name email');
+    res.json(savings);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch all savings' });
   }
 };
 

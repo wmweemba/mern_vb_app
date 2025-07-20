@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 20-07-2025
+- Full savings history table for all users, visible to everyone, with responsive design.
+- Backend endpoint `GET /api/savings` to return all savings with user info populated.
+- Add Savings and Add Loan forms and backend now use username instead of userId for posting and repayments, improving usability for admins and users.
+
+### Fixed - 20-07-2025
+- Fixed bank balance calculation bug (string concatenation) by ensuring numeric addition in `updateBankBalance`.
+- Improved responsive/mobile-first layout for Savings page and table, ensuring usability on all screen sizes.
+- General UI/UX polish for mobile and desktop.
+
 ### Added
 - Transactions management feature:
   - `models/Transaction.js`: Mongoose model for transaction records (loan, saving, fine).

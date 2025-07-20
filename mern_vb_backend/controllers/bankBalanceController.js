@@ -37,6 +37,8 @@ exports.updateBankBalance = async (amount) => {
   if (!doc) {
     doc = await BankBalance.create({ balance: 0 });
   }
+  amount = Number(amount);
+  if (isNaN(amount)) amount = 0;
   doc.balance += amount;
   await doc.save();
   return doc.balance;

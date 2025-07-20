@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const AddLoanForm = ({ onSuccess }) => {
   const [form, setForm] = useState({
-    member: '',
+    username: '', // was userId
     amount: '',
     interest: '',
     startDate: '',
@@ -24,9 +24,9 @@ const AddLoanForm = ({ onSuccess }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.post('/api/loans', form);
+      await axios.post('/api/loans', { ...form, username: form.username });
       setSuccess(true);
-      setForm({ member: '', amount: '', interest: '', startDate: '', duration: '', notes: '' });
+      setForm({ username: '', amount: '', interest: '', startDate: '', duration: '', notes: '' });
       if (onSuccess) onSuccess();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add loan');
@@ -38,7 +38,7 @@ const AddLoanForm = ({ onSuccess }) => {
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">
       <h2 className="text-lg font-bold mb-2">Add New Loan</h2>
-      <input name="member" value={form.member} onChange={handleChange} placeholder="Member Name or ID" className="border rounded px-3 py-2" required />
+      <input name="username" value={form.username} onChange={handleChange} placeholder="Username" className="border rounded px-3 py-2" required />
       <input name="amount" value={form.amount} onChange={handleChange} placeholder="Amount" type="number" min="0" className="border rounded px-3 py-2" required />
       <input name="interest" value={form.interest} onChange={handleChange} placeholder="Interest Rate (%)" type="number" min="0" step="0.01" className="border rounded px-3 py-2" required />
       <input name="startDate" value={form.startDate} onChange={handleChange} placeholder="Start Date" type="date" className="border rounded px-3 py-2" required />
