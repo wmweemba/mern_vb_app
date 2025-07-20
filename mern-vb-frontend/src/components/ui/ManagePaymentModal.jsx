@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../lib/utils';
 
 const ManagePaymentModal = ({ open, onClose }) => {
   const [type, setType] = useState('repayment');
@@ -14,7 +15,7 @@ const ManagePaymentModal = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open && type === 'fine') {
-      axios.get('/api/payments/unpaid-fines')
+      axios.get(`${API_BASE_URL}/payments/unpaid-fines`)
         .then(res => setUnpaidFines(res.data))
         .catch(() => setUnpaidFines([]));
     }
@@ -25,11 +26,11 @@ const ManagePaymentModal = ({ open, onClose }) => {
     setLoading(true); setSuccess(''); setError('');
     try {
       if (type === 'fine') {
-        await axios.post('/api/payments/pay-fine', { fineId });
+        await axios.post(`${API_BASE_URL}/payments/pay-fine`, { fineId });
         setSuccess('Fine payment recorded!');
         setFineId('');
       } else {
-        const endpoint = type === 'repayment' ? '/api/payments/repayment' : '/api/payments/payout';
+        const endpoint = type === 'repayment' ? `${API_BASE_URL}/payments/repayment` : `${API_BASE_URL}/payments/payout`;
         await axios.post(endpoint, { userId, amount: Number(amount), note });
         setSuccess(type === 'repayment' ? 'Repayment recorded!' : 'Payout recorded!');
         setUserId(''); setAmount(''); setNote('');

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../lib/utils';
 
 const initialForm = { username: '', password: '', role: 'member', name: '', email: '', phone: '' };
 
@@ -15,7 +16,7 @@ const Users = () => {
   const fetchUsers = async () => {
     setLoading(true); setError('');
     try {
-      const res = await axios.get('/api/users');
+      const res = await axios.get(`${API_BASE_URL}/users`);
       setUsers(res.data);
     } catch (err) {
       setError('Failed to load users');
@@ -36,7 +37,7 @@ const Users = () => {
     try {
       if (editId) {
         // Update user details
-        await axios.put(`/api/users/${editId}`, {
+        await axios.put(`${API_BASE_URL}/users/${editId}`, {
           username: form.username,
           name: form.name,
           email: form.email,
@@ -45,11 +46,11 @@ const Users = () => {
         });
         // If password is set, update password
         if (form.password) {
-          await axios.put(`/api/users/${editId}/password`, { newPassword: form.password, oldPassword: '' });
+          await axios.put(`${API_BASE_URL}/users/${editId}/password`, { newPassword: form.password, oldPassword: '' });
         }
         setSuccess('User updated!');
       } else {
-        await axios.post('/api/users', form);
+        await axios.post(`${API_BASE_URL}/users`, form);
         setSuccess('User created!');
       }
       setForm(initialForm);
@@ -67,7 +68,7 @@ const Users = () => {
     setDeleting(id);
     setError(''); setSuccess('');
     try {
-      await axios.delete(`/api/users/${id}`);
+      await axios.delete(`${API_BASE_URL}/users/${id}`);
       setSuccess('User deleted!');
       fetchUsers();
     } catch (err) {

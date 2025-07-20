@@ -75,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated vite.config.js to enhance PWA manifest and runtime caching.
+- Updated all frontend API calls to use API_BASE_URL from environment variables for correct backend communication in both local and production environments.
+- Added src/lib/utils.js to centralize API base URL usage.
 
 ## [0.1.0] - 2025-07-03
 

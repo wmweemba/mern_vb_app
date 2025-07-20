@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardContent } from './card';
+import { API_BASE_URL } from '../../lib/utils';
 
 const BankBalanceCard = () => {
   const [balance, setBalance] = useState(null);
@@ -12,7 +13,7 @@ const BankBalanceCard = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get('/api/bank-balance');
+        const res = await axios.get(`${API_BASE_URL}/bank-balance`);
         setBalance(res.data.balance);
       } catch (err) {
         setError('Failed to load bank balance');

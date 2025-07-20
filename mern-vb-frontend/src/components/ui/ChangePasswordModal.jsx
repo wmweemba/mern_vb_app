@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../store/auth';
+import { API_BASE_URL } from '../../lib/utils';
 
 const ChangePasswordModal = ({ open, onClose }) => {
   const { user } = useAuth();
@@ -14,7 +15,7 @@ const ChangePasswordModal = ({ open, onClose }) => {
     e.preventDefault();
     setLoading(true); setSuccess(''); setError('');
     try {
-      await axios.put(`/api/users/${user.id}/password`, { oldPassword, newPassword });
+      await axios.put(`${API_BASE_URL}/users/${user.id}/password`, { oldPassword, newPassword });
       setSuccess('Password changed successfully!');
       setOldPassword(''); setNewPassword('');
     } catch (err) {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../lib/utils';
 
 const AddFineModal = ({ open, onClose }) => {
   const [form, setForm] = useState({ username: '', amount: '', note: '' });
@@ -15,7 +16,7 @@ const AddFineModal = ({ open, onClose }) => {
     e.preventDefault();
     setLoading(true); setSuccess(''); setError('');
     try {
-      await axios.post('/api/payments/fine', form);
+      await axios.post(`${API_BASE_URL}/payments/fine`, form);
       setSuccess('Fine/Penalty recorded!');
       setForm({ username: '', amount: '', note: '' });
     } catch (err) {

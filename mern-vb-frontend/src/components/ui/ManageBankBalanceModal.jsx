@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../lib/utils';
 
 const ManageBankBalanceModal = ({ open, onClose }) => {
   const [balance, setBalance] = useState('');
@@ -10,7 +11,7 @@ const ManageBankBalanceModal = ({ open, onClose }) => {
   useEffect(() => {
     if (open) {
       setSuccess(''); setError('');
-      axios.get('/api/bank-balance').then(res => {
+      axios.get(`${API_BASE_URL}/bank-balance`).then(res => {
         setBalance(res.data.balance);
       }).catch(() => setBalance(''));
     }
@@ -20,7 +21,7 @@ const ManageBankBalanceModal = ({ open, onClose }) => {
     e.preventDefault();
     setLoading(true); setSuccess(''); setError('');
     try {
-      await axios.put('/api/bank-balance', { balance: Number(balance) });
+      await axios.put(`${API_BASE_URL}/bank-balance`, { balance: Number(balance) });
       setSuccess('Bank balance updated!');
     } catch (err) {
       setError('Failed to update bank balance');

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AddLoanForm from '../features/loans/AddLoanForm';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
+import { API_BASE_URL } from '../lib/utils';
 
 const Loans = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const Loans = () => {
   const fetchLoans = async () => {
     setLoading(true); setError('');
     try {
-      const res = await axios.get('/api/loans');
+      const res = await axios.get(`${API_BASE_URL}/loans`);
       setLoans(res.data);
     } catch (err) {
       setError('Failed to load loans');

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaPiggyBank, FaFileAlt, FaGavel } from 'react-icons/fa';
 import axios from 'axios';
+import { API_BASE_URL } from '../lib/utils';
 
 const statActions = [
   {
@@ -49,9 +50,9 @@ const Dashboard = ({ title }) => {
       setError('');
       try {
         const [dashboardRes, balRes, fineRes] = await Promise.all([
-          axios.get('/api/savings/dashboard'),
-          axios.get('/api/bank-balance'),
-          axios.get('/api/bank-balance/fines'),
+          axios.get(`${API_BASE_URL}/savings/dashboard`),
+          axios.get(`${API_BASE_URL}/bank-balance`),
+          axios.get(`${API_BASE_URL}/bank-balance/fines`),
         ]);
         setStats({
           ...dashboardRes.data,

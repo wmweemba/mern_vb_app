@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../lib/utils';
 
 const AddLoanForm = ({ onSuccess }) => {
   const [form, setForm] = useState({
@@ -24,7 +25,7 @@ const AddLoanForm = ({ onSuccess }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.post('/api/loans', { ...form, username: form.username });
+      await axios.post(`${API_BASE_URL}/loans`, { ...form, username: form.username });
       setSuccess(true);
       setForm({ username: '', amount: '', interest: '', startDate: '', duration: '', notes: '' });
       if (onSuccess) onSuccess();

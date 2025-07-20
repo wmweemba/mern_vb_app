@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AddSavingsForm from '../features/savings/AddSavingsForm';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
+import { API_BASE_URL } from '../lib/utils';
 
 const Savings = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const Savings = () => {
   const fetchSavings = async () => {
     setLoading(true); setError('');
     try {
-      const res = await axios.get('/api/savings');
+      const res = await axios.get(`${API_BASE_URL}/savings`);
       setSavings(res.data);
     } catch (err) {
       setError('Failed to load savings history');

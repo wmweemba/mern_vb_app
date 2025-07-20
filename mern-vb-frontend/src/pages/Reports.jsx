@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { exportToExcel, exportToPDF } from '../lib/export';
 import axios from 'axios';
+import { API_BASE_URL } from '../lib/utils';
 
 // Helper to download PDF from backend
 async function downloadPDFReport(endpoint, filename) {
@@ -54,10 +55,10 @@ async function downloadExcelReport(endpoint, filename) {
 const exportConfigs = [
   {
     label: 'Loans',
-    endpoint: '/api/loans/export',
+    endpoint: `${API_BASE_URL}/loans/export`,
     excelName: 'loans.xlsx',
     pdfName: 'loans.pdf',
-    viewEndpoint: '/api/loans', // Use the all loans endpoint for in-app view
+    viewEndpoint: `${API_BASE_URL}/loans`, // Use the all loans endpoint for in-app view
     columns: [
       { key: 'userId.username', label: 'Username' },
       { key: 'userId.name', label: 'Name' },
@@ -68,10 +69,10 @@ const exportConfigs = [
   },
   {
     label: 'Savings',
-    endpoint: '/api/savings/export',
+    endpoint: `${API_BASE_URL}/savings/export`,
     excelName: 'savings.xlsx',
     pdfName: 'savings.pdf',
-    viewEndpoint: '/api/savings',
+    viewEndpoint: `${API_BASE_URL}/savings`,
     columns: [
       { key: 'userId.username', label: 'Username' },
       { key: 'userId.name', label: 'Name' },
@@ -82,11 +83,11 @@ const exportConfigs = [
   },
   {
     label: 'Transactions',
-    endpoint: '/api/transactions/export',
+    endpoint: `${API_BASE_URL}/transactions/export`,
     excelName: 'transactions_report.csv',
-    pdfEndpoint: '/api/transactions/export/pdf',
+    pdfEndpoint: `${API_BASE_URL}/transactions/export/pdf`,
     pdfName: 'transactions_report.pdf',
-    viewEndpoint: '/api/transactions',
+    viewEndpoint: `${API_BASE_URL}/transactions`,
     columns: [
       { key: 'userId.username', label: 'Username' },
       { key: 'userId.name', label: 'Name' },

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../lib/utils';
 
 const AddSavingsForm = ({ onSuccess }) => {
   const [form, setForm] = useState({
@@ -23,7 +24,7 @@ const AddSavingsForm = ({ onSuccess }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.post('/api/savings', { ...form, username: form.username, month: form.month });
+      await axios.post(`${API_BASE_URL}/savings`, { ...form, username: form.username, month: form.month });
       setSuccess(true);
       setForm({ username: '', month: '', amount: '', date: '', notes: '' });
       if (onSuccess) onSuccess();
