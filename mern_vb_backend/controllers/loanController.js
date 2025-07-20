@@ -41,7 +41,13 @@ exports.createLoan = async (req, res) => {
 
 exports.getLoansByUser = async (req, res) => {
   try {
-    const loans = await Loan.find({ userId: req.params.id });
+    let userId = req.params.id;
+    if (req.query.username) {
+      const user = await User.findOne({ username: req.query.username });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      userId = user._id;
+    }
+    const loans = await Loan.find({ userId });
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch loans' });
@@ -134,5 +140,14 @@ exports.exportLoansReport = async (req, res) => {
     return res.send(csv);
   } catch (err) {
     res.status(500).json({ error: 'Failed to export report', details: err.message });
+  }
+};
+
+exports.getAllLoans = async (req, res) => {
+  try {
+    const loans = await Loan.find().populate('userId', 'username name email');
+    res.json(loans);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch all loans' });
   }
 };

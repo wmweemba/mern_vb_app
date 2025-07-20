@@ -1,4 +1,6 @@
 const BankBalance = require('../models/BankBalance');
+const Transaction = require('../models/Transaction');
+const Fine = require('../models/Fine');
 
 // Get current bank balance
 exports.getBankBalance = async (req, res) => {
@@ -42,4 +44,17 @@ exports.updateBankBalance = async (amount) => {
   doc.balance += amount;
   await doc.save();
   return doc.balance;
+};
+
+exports.getTotalFines = async (req, res) => {
+  try {
+    const result = await Fine.aggregate([
+      { $match: { paid: false } },
+      { $group: { _id: null, totalFines: { $sum: '$amount' } } }
+    ]);
+    const totalFines = result[0]?.totalFines || 0;
+    res.json({ totalFines });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch total fines', details: err.message });
+  }
 }; 

@@ -209,3 +209,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Edit button to user table; form is reused for both adding and editing users, with cancel option for edit mode.
 - Backend now supports updating user details via `PUT /api/users/:id` (admin only), in addition to password changes.
 - Improved admin workflow for user management (create, edit, delete, password reset).
+
+### Added - 21-07-2025
+- Fines system refactored: fines are now only credited to the bank balance when paid, not when issued. Fines are tracked in a dedicated Fine model with paid/unpaid status.
+- Added backend endpoints to issue fines, pay fines, fetch unpaid fines, and delete all fines (admin only).
+- Fine payment workflow updated: frontend now uses a dropdown to select unpaid fines for payment.
+- Added admin-only 'Delete All Fines' button to settings menu for quick reset/testing.
+- Dashboard 'Total Fines' card now shows only outstanding (unpaid) fines.
+- All dashboard stats endpoints are now accessible to all authenticated users, not just admins, so members can see dashboard stats.
+- General UI/UX improvements for payment and fines management.

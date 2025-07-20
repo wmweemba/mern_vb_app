@@ -4,7 +4,7 @@ import DashboardStatsCard from '../components/ui/DashboardStatsCard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
-import { FaPlus, FaPiggyBank, FaFileAlt } from 'react-icons/fa';
+import { FaPlus, FaPiggyBank, FaFileAlt, FaGavel } from 'react-icons/fa';
 import axios from 'axios';
 
 const statActions = [
@@ -48,8 +48,16 @@ const Dashboard = ({ title }) => {
       setLoading(true);
       setError('');
       try {
-        const res = await axios.get('/api/savings/dashboard');
-        setStats(res.data);
+        const [dashboardRes, balRes, fineRes] = await Promise.all([
+          axios.get('/api/savings/dashboard'),
+          axios.get('/api/bank-balance'),
+          axios.get('/api/bank-balance/fines'),
+        ]);
+        setStats({
+          ...dashboardRes.data,
+          bankBalance: balRes.data.balance,
+          totalFines: fineRes.data.totalFines,
+        });
       } catch (err) {
         setError('Failed to load dashboard stats');
       } finally {
@@ -70,9 +78,6 @@ const Dashboard = ({ title }) => {
         ) : (
           <DashboardStatsCard stats={stats} />
         )}
-        <div className="mb-4 w-full flex justify-center">
-          <BankBalanceCard />
-        </div>
         <AdminActions />
       </div>
       {/* Placeholder for future: charts, recent transactions, etc. */}

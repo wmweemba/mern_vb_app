@@ -13,6 +13,7 @@ const allowRoles = (...roles) => (req, res, next) => {
 
 router.post('/', verifyToken, allowRoles('admin', 'loan_officer'), loanController.createLoan);
 router.get('/user/:id', verifyToken, loanController.getLoansByUser);
+router.get('/', verifyToken, loanController.getAllLoans);
 router.put('/repay', verifyToken, requireRole('loan_officer'), loanController.repayInstallment);
 router.get('/export', verifyToken, loanController.exportLoansReport);
 

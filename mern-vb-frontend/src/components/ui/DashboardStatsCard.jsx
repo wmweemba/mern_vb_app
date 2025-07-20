@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaPiggyBank, FaMoneyCheckAlt, FaPercentage, FaChartLine } from 'react-icons/fa';
+import { FaPiggyBank, FaMoneyCheckAlt, FaPercentage, FaChartLine, FaGavel, FaUniversity } from 'react-icons/fa';
 
 const statConfig = [
   {
@@ -42,11 +42,31 @@ const statConfig = [
     trend: '',
     trendColor: '',
   },
+  {
+    label: 'Bank Balance',
+    icon: <FaUniversity className="text-blue-600 size-6" />,
+    key: 'bankBalance',
+    color: 'border-blue-600',
+    valueColor: 'text-blue-700',
+    bg: 'bg-blue-50',
+    trend: '',
+    trendColor: '',
+  },
+  {
+    label: 'Total Fines',
+    icon: <FaGavel className="text-red-600 size-6" />,
+    key: 'totalFines',
+    color: 'border-red-600',
+    valueColor: 'text-red-700',
+    bg: 'bg-red-50',
+    trend: '',
+    trendColor: '',
+  },
 ];
 
 const DashboardStatsCard = ({ stats }) => (
   <div className="w-full flex justify-center mb-6">
-    <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl">
       {statConfig.map(({ label, icon, key, color, valueColor, bg, trend, trendColor }) => (
         <div
           key={key}

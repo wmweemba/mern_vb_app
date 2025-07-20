@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const ManagePaymentModal = ({ open, onClose }) => {
@@ -6,18 +6,34 @@ const ManagePaymentModal = ({ open, onClose }) => {
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [fineId, setFineId] = useState('');
+  const [unpaidFines, setUnpaidFines] = useState([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    if (open && type === 'fine') {
+      axios.get('/api/payments/unpaid-fines')
+        .then(res => setUnpaidFines(res.data))
+        .catch(() => setUnpaidFines([]));
+    }
+  }, [open, type]);
+
+  const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true); setSuccess(''); setError('');
     try {
-      const endpoint = type === 'repayment' ? '/api/payments/repayment' : '/api/payments/payout';
-      await axios.post(endpoint, { userId, amount: Number(amount), note });
-      setSuccess(type === 'repayment' ? 'Repayment recorded!' : 'Payout recorded!');
-      setUserId(''); setAmount(''); setNote('');
+      if (type === 'fine') {
+        await axios.post('/api/payments/pay-fine', { fineId });
+        setSuccess('Fine payment recorded!');
+        setFineId('');
+      } else {
+        const endpoint = type === 'repayment' ? '/api/payments/repayment' : '/api/payments/payout';
+        await axios.post(endpoint, { userId, amount: Number(amount), note });
+        setSuccess(type === 'repayment' ? 'Repayment recorded!' : 'Payout recorded!');
+        setUserId(''); setAmount(''); setNote('');
+      }
     } catch (err) {
       setError('Failed to record payment');
     } finally {
@@ -34,12 +50,26 @@ const ManagePaymentModal = ({ open, onClose }) => {
         <div className="flex gap-2 mb-4">
           <button className={`flex-1 py-2 rounded ${type === 'repayment' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('repayment')}>Repayment</button>
           <button className={`flex-1 py-2 rounded ${type === 'payout' ? 'bg-yellow-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('payout')}>Payout</button>
+          <button className={`flex-1 py-2 rounded ${type === 'fine' ? 'bg-red-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('fine')}>Fine Payment</button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID" className="border rounded px-3 py-2" required />
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" className="border rounded px-3 py-2" required />
-          <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" className="border rounded px-3 py-2" />
-          <button type="submit" className="bg-green-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? (type === 'repayment' ? 'Recording...' : 'Paying...') : (type === 'repayment' ? 'Record Repayment' : 'Record Payout')}</button>
+          {type === 'fine' ? (
+            <select value={fineId} onChange={e => setFineId(e.target.value)} className="border rounded px-3 py-2" required>
+              <option value="">Select a fine to pay</option>
+              {unpaidFines.map(fine => (
+                <option key={fine._id} value={fine._id}>
+                  {fine.userId?.username} ({fine.userId?.name}) - K{Number(fine.amount).toLocaleString()} {fine.note ? `- ${fine.note}` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID" className="border rounded px-3 py-2" required />
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" className="border rounded px-3 py-2" required />
+              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" className="border rounded px-3 py-2" />
+            </>
+          )}
+          <button type="submit" className="bg-green-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? (type === 'repayment' ? 'Recording...' : type === 'payout' ? 'Paying...' : 'Paying Fine...') : (type === 'repayment' ? 'Record Repayment' : type === 'payout' ? 'Record Payout' : 'Pay Fine')}</button>
           {success && <div className="text-green-600 text-sm mt-1">{success}</div>}
           {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
         </form>
