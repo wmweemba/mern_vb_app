@@ -65,6 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed auth context file to auth.jsx for JSX compatibility.
 - Fixed missing dependencies for export features: ensure jspdf-autotable, xlsx, and jspdf are installed.
 
+## [Unreleased]
+### Added
+- PWA install banner/snackbar for easy add-to-homescreen experience.
+- Custom splash screen and theming via manifest: branded background and theme color (#2979FF).
+- Maskable icons for better appearance on all devices.
+- App shortcuts for quick access to 'Add Loan' and 'View Reports' from the homescreen/app icon.
+- Manifest description for improved install experience.
+
+### Changed
+- Updated vite.config.js to enhance PWA manifest and runtime caching.
+
 ## [0.1.0] - 2025-07-03
 
 ### Added

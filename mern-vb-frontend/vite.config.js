@@ -10,33 +10,57 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      injectRegister: 'auto',
+      registerType: 'autoUpdate',
       manifest: {
         name: 'Village Banking App',
         short_name: 'VB App',
         start_url: '/',
         display: 'standalone',
-        background_color: '#F5F7FA',
-        theme_color: '#2979FF',
+        background_color: '#2979FF', // Branded splash background
+        theme_color: '#2979FF', // Branded theme color
+        description: 'A modern PWA for village banking management.',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            src: '/icon-192x192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any maskable'
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
+            purpose: 'any maskable'
+          }
         ],
+        shortcuts: [
+          {
+            name: 'Add Loan',
+            short_name: 'Loan',
+            url: '/loans',
+            icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }]
+          },
+          {
+            name: 'View Reports',
+            short_name: 'Reports',
+            url: '/reports',
+            icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }]
+          }
+        ]
       },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/your-api-domain\.com\/api\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              networkTimeoutSeconds: 10,
+              expiration: { maxEntries: 50, maxAgeSeconds: 86400 }
+            }
+          }
+        ]
+      }
     }),
   ],
   resolve: {

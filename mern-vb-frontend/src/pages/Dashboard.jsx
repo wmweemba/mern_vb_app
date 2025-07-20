@@ -79,8 +79,8 @@ const Dashboard = ({ title }) => {
           <DashboardStatsCard stats={stats} />
         )}
         <AdminActions />
+        {/* Placeholder for future: charts, recent transactions, etc. */}
       </div>
-      {/* Placeholder for future: charts, recent transactions, etc. */}
     </div>
   );
 };

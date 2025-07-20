@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { Parser } = require('json2csv');
+const PDFDocument = require('pdfkit');
 
 exports.createSaving = async (req, res) => {
   const { username, month, amount, date } = req.body;
@@ -119,10 +120,71 @@ exports.exportSavingsReport = async (req, res) => {
     const parser = new Parser();
     const csv = parser.parse(data);
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
     res.header('Content-Type', 'text/csv');
     res.attachment('savings_report.csv');
     return res.send(csv);
   } catch (err) {
     res.status(500).json({ error: 'Failed to export savings report', details: err.message });
+  }
+};
+
+exports.exportSavingsReportPDF = async (req, res) => {
+  try {
+    const savings = await Saving.find().populate('userId', 'username name email');
+    const data = savings.map(s => ({
+      Username: s.userId.username,
+      Name: s.userId.name,
+      Amount: s.amount,
+      Month: s.month,
+      Date: s.date ? s.date.toISOString().split('T')[0] : '',
+      Fine: s.fine,
+      InterestEarned: s.interestEarned
+    }));
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="savings_report.pdf"');
+    doc.pipe(res);
+    doc.fontSize(16).text('Savings Report', { align: 'center' });
+    doc.moveDown();
+    const headers = [
+      'Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'
+    ];
+    const colWidths = [70, 80, 60, 50, 70, 50, 70];
+    let y = doc.y;
+    let x = doc.x;
+    headers.forEach((header, i) => {
+      doc.font('Helvetica-Bold').fontSize(9).text(header, x, y, { width: colWidths[i], align: 'left' });
+      x += colWidths[i];
+    });
+    y += 18;
+    data.forEach(row => {
+      x = doc.x;
+      headers.forEach((header, i) => {
+        let key = header.replace(/ /g, '');
+        if (key === 'InterestEarned') key = 'InterestEarned';
+        doc.font('Helvetica').fontSize(8).text(row[header] || row[key] || '', x, y, { width: colWidths[i], align: 'left' });
+        x += colWidths[i];
+      });
+      y += 14;
+      if (y > doc.page.height - 50) {
+        doc.addPage();
+        y = doc.y;
+      }
+    });
+    doc.end();
+  } catch (err) {
+    console.error('PDF export error:', err.stack || err);
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized: No user info found in request.' });
+    }
+    res.status(500).json({ error: 'Failed to export PDF report', details: err.message, user: req.user });
   }
 };

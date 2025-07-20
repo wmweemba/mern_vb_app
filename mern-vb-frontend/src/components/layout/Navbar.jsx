@@ -8,6 +8,7 @@ import ChangePasswordModal from '../ui/ChangePasswordModal';
 import ManagePaymentModal from '../ui/ManagePaymentModal';
 import AddFineModal from '../ui/AddFineModal';
 import axios from 'axios';
+import InstallPWAButton from '../ui/InstallPWAButton';
 
 const navItems = [
   { name: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt /> },
@@ -17,6 +18,7 @@ const navItems = [
 ];
 
 const canAddFine = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+const canManageBankBalanceOrPayment = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
 const Navbar = () => {
   const { logout, user } = useAuth();
@@ -75,10 +77,16 @@ const Navbar = () => {
                 </button>
                 {showSettings && (
                   <div className="absolute left-0 mt-2 w-56 bg-white border rounded shadow-lg z-50">
-                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); navigate('/users'); }}>Manage Users</button>
-                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowBankBalance(true); }}>Manage Bank Balance</button>
+                    {user?.role === 'admin' && (
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); navigate('/users'); }}>Manage Users</button>
+                    )}
+                    {canManageBankBalanceOrPayment(user) && (
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowBankBalance(true); }}>Manage Bank Balance</button>
+                    )}
                     <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowChangePassword(true); }}>Change Password</button>
-                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowPayment(true); }}>Manage Payment</button>
+                    {canManageBankBalanceOrPayment(user) && (
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowPayment(true); }}>Manage Payment</button>
+                    )}
                     {canAddFine(user) && (
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowFine(true); }}>Add Fine/Penalty</button>
                     )}
@@ -92,10 +100,13 @@ const Navbar = () => {
               </div>
             )}
           </div>
-          <Button variant="destructive" size="sm" onClick={handleLogout} className="flex items-center gap-1">
-            <FaSignOutAlt />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <InstallPWAButton />
+            <Button variant="destructive" size="sm" onClick={handleLogout} className="flex items-center gap-1">
+              <FaSignOutAlt />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </div>
         </div>
       </nav>
       <ManageBankBalanceModal open={showBankBalance} onClose={() => setShowBankBalance(false)} />

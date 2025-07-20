@@ -16,5 +16,6 @@ router.get('/user/:id', verifyToken, loanController.getLoansByUser);
 router.get('/', verifyToken, loanController.getAllLoans);
 router.put('/repay', verifyToken, requireRole('loan_officer'), loanController.repayInstallment);
 router.get('/export', verifyToken, loanController.exportLoansReport);
+router.get('/export/pdf', verifyToken, loanController.exportLoansReportPDF);
 
 module.exports = router;
