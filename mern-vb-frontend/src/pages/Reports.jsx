@@ -223,38 +223,42 @@ const Reports = () => {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Reports</h1>
+    <div className="p-4 w-full max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4 text-center">Reports</h1>
       {exportConfigs.map(config => (
-        <div key={config.label} className="mb-4 flex gap-2 items-center">
-          <span className="font-semibold w-48">{config.label}</span>
-          <button
-            className="bg-[#2979FF] text-white px-3 py-1 rounded"
-            onClick={() => handleExport(config, 'excel')}
-            disabled={loading}
-          >
-            Export Excel
-          </button>
-          <button
-            className="bg-[#4CAF50] text-white px-3 py-1 rounded"
-            onClick={() => handleExport(config, 'pdf')}
-            disabled={loading}
-          >
-            Download PDF
-          </button>
-          <button
-            className="bg-[#6C63FF] text-white px-3 py-1 rounded"
-            onClick={() => handleViewReport(config)}
-            disabled={loading}
-          >
-            Generate & View Report
-          </button>
-          {loading === `${config.label}-excel` && <span className="ml-2 text-xs">Exporting Excel...</span>}
-          {loading === `${config.label}-pdf` && <span className="ml-2 text-xs">Downloading PDF...</span>}
-          {loading === `${config.label}-view` && <span className="ml-2 text-xs">Loading...</span>}
+        <div key={config.label} className="mb-8">
+          <div className="font-semibold mb-2 text-center">{config.label}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mx-auto w-[90%] sm:w-[80%]">
+            <button
+              className="bg-[#2979FF] text-white rounded px-4 py-2 font-medium shadow w-full"
+              onClick={() => handleExport(config, 'excel')}
+              disabled={loading}
+            >
+              Export Excel
+            </button>
+            <button
+              className="bg-[#4CAF50] text-white rounded px-4 py-2 font-medium shadow w-full"
+              onClick={() => handleExport(config, 'pdf')}
+              disabled={loading}
+            >
+              Download PDF
+            </button>
+            <button
+              className="bg-[#6C63FF] text-white rounded px-4 py-2 font-medium shadow w-full"
+              onClick={() => handleViewReport(config)}
+              disabled={loading}
+            >
+              Generate & View Report
+            </button>
+          </div>
+          <div className="mt-1 min-h-[20px] text-center">
+            {loading === `${config.label}-excel` && <span className="text-xs">Exporting Excel...</span>}
+            {loading === `${config.label}-pdf` && <span className="text-xs">Downloading PDF...</span>}
+            {loading === `${config.label}-view` && <span className="text-xs">Loading...</span>}
+          </div>
         </div>
       ))}
-      {error && <div className="text-red-500 mt-2">{error}</div>}
+      {error && <div className="text-red-500 mt-2 text-center">{error}</div>}
       <ReportModal open={modalOpen} onClose={() => setModalOpen(false)} data={modalData} columns={modalColumns} title={modalTitle} />
     </div>
   );

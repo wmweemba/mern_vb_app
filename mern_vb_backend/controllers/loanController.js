@@ -4,7 +4,15 @@ const calculateLoanSchedule = require('../utils/loanCalculator');
 const { Parser } = require('json2csv');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
-const PDFDocument = require('pdfkit');
+const PdfPrinter = require('pdfmake');
+const fonts = {
+  Roboto: {
+    normal: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bold: 'node_modules/pdfmake/build/vfs_fonts.js',
+    italics: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
+  },
+};
 
 exports.createLoan = async (req, res) => {
   const { username, amount } = req.body;
@@ -150,55 +158,46 @@ exports.exportLoansReportPDF = async (req, res) => {
     const flatData = [];
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
-        flatData.push({
-          Username: loan.userId.username,
-          Name: loan.userId.name,
-          LoanAmount: loan.amount,
-          DurationMonths: loan.durationMonths,
-          Month: installment.month,
-          Principal: installment.principal,
-          Interest: installment.interest,
-          TotalDue: installment.total,
-          Paid: installment.paid ? 'Yes' : 'No',
-          PaymentDate: installment.paymentDate ? installment.paymentDate.toISOString().split('T')[0] : ''
-        });
+        flatData.push([
+          loan.userId.username,
+          loan.userId.name,
+          loan.amount,
+          loan.durationMonths,
+          installment.month,
+          installment.principal,
+          installment.interest,
+          installment.total,
+          installment.paid ? 'Yes' : 'No',
+          installment.paymentDate ? installment.paymentDate.toISOString().split('T')[0] : ''
+        ]);
       });
     });
-
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    const printer = new PdfPrinter(fonts);
+    const docDefinition = {
+      content: [
+        { text: 'Loan Report', style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*', '*', '*', '*', '*', '*', '*', '*', '*'],
+            body: [
+              ['Username', 'Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total Due', 'Paid', 'Payment Date'],
+              ...flatData
+            ]
+          },
+          layout: 'lightHorizontalLines',
+        }
+      ],
+      styles: {
+        header: { fontSize: 16, bold: true }
+      },
+      defaultStyle: { font: 'Roboto', fontSize: 9 }
+    };
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="loan_report.pdf"');
-    doc.pipe(res);
-
-    doc.fontSize(16).text('Loan Report', { align: 'center' });
-    doc.moveDown();
-
-    // Table header
-    const headers = [
-      'Username', 'Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total Due', 'Paid', 'Payment Date'
-    ];
-    const colWidths = [70, 80, 60, 50, 40, 55, 55, 55, 35, 70];
-    let y = doc.y;
-    let x = doc.x;
-    headers.forEach((header, i) => {
-      doc.font('Helvetica-Bold').fontSize(9).text(header, x, y, { width: colWidths[i], align: 'left' });
-      x += colWidths[i];
-    });
-    y += 18;
-    // Table rows
-    flatData.forEach(row => {
-      x = doc.x;
-      headers.forEach((header, i) => {
-        doc.font('Helvetica').fontSize(8).text(row[header.replace(/ /g, '')] || row[header] || '', x, y, { width: colWidths[i], align: 'left' });
-        x += colWidths[i];
-      });
-      y += 14;
-      if (y > doc.page.height - 50) {
-        doc.addPage();
-        y = doc.y;
-      }
-    });
-    doc.end();
+    pdfDoc.pipe(res);
+    pdfDoc.end();
   } catch (err) {
     res.status(500).json({ error: 'Failed to export PDF report', details: err.message });
   }

@@ -1,5 +1,13 @@
-const PDFDocument = require('pdfkit');
-const { Parser } = require('json2csv');
+const PdfPrinter = require('pdfmake');
+const fonts = {
+  Roboto: {
+    normal: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bold: 'node_modules/pdfmake/build/vfs_fonts.js',
+    italics: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
+  },
+};
+require('jspdf-autotable');
 const User = require('../models/User');
 const BankBalance = require('../models/BankBalance');
 const Transaction = require('../models/Transaction');
@@ -61,52 +69,45 @@ exports.exportTransactionsReport = async (req, res) => {
 exports.exportTransactionsReportPDF = async (req, res) => {
   try {
     const transactions = await Transaction.find().populate('userId', 'username name').sort({ createdAt: 1 });
-    const data = transactions.map(t => ({
-      Username: t.userId?.username || '',
-      Name: t.userId?.name || '',
-      Type: t.type,
-      Amount: t.amount,
-      Note: t.note,
-      Date: t.createdAt ? t.createdAt.toISOString().split('T')[0] : ''
-    }));
+    const data = transactions.map(t => ([
+      t.userId?.username || '',
+      t.userId?.name || '',
+      t.type,
+      t.amount,
+      t.note,
+      t.createdAt ? t.createdAt.toISOString().split('T')[0] : ''
+    ]));
     // Get closing balance
     let closingBalance = 0;
     const bankDoc = await BankBalance.findOne();
     if (bankDoc) closingBalance = bankDoc.balance;
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    data.push(['', '', '', '', 'Closing Balance', closingBalance]);
+    const printer = new PdfPrinter(fonts);
+    const docDefinition = {
+      content: [
+        { text: 'Transactions Report', style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*', '*', '*', '*', '*'],
+            body: [
+              ['Username', 'Name', 'Type', 'Amount', 'Note', 'Date'],
+              ...data
+            ]
+          },
+          layout: 'lightHorizontalLines',
+        }
+      ],
+      styles: {
+        header: { fontSize: 16, bold: true }
+      },
+      defaultStyle: { font: 'Roboto', fontSize: 9 }
+    };
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="transactions_report.pdf"');
-    doc.pipe(res);
-    doc.fontSize(16).text('Transactions Report', { align: 'center' });
-    doc.moveDown();
-    // Table header
-    const headers = ['Username', 'Name', 'Type', 'Amount', 'Note', 'Date'];
-    const colWidths = [70, 80, 50, 60, 120, 60];
-    let y = doc.y;
-    let x = doc.x;
-    headers.forEach((header, i) => {
-      doc.font('Helvetica-Bold').fontSize(9).text(header, x, y, { width: colWidths[i], align: 'left' });
-      x += colWidths[i];
-    });
-    y += 18;
-    // Table rows
-    data.forEach(row => {
-      x = doc.x;
-      headers.forEach((header, i) => {
-        doc.font('Helvetica').fontSize(8).text(row[header] || '', x, y, { width: colWidths[i], align: 'left' });
-        x += colWidths[i];
-      });
-      y += 14;
-      if (y > doc.page.height - 50) {
-        doc.addPage();
-        y = doc.y;
-      }
-    });
-    // Closing balance row
-    x = doc.x;
-    doc.font('Helvetica-Bold').fontSize(9).text('Closing Balance', x + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y, { width: colWidths[4], align: 'left' });
-    doc.font('Helvetica-Bold').fontSize(9).text(closingBalance.toString(), x + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4], y, { width: colWidths[5], align: 'left' });
-    doc.end();
+    pdfDoc.pipe(res);
+    pdfDoc.end();
   } catch (err) {
     res.status(500).json({ error: 'Failed to export PDF report', details: err.message });
   }

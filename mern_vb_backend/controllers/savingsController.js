@@ -4,7 +4,15 @@ const User = require('../models/User');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { Parser } = require('json2csv');
-const PDFDocument = require('pdfkit');
+const PdfPrinter = require('pdfmake');
+const fonts = {
+  Roboto: {
+    normal: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bold: 'node_modules/pdfmake/build/vfs_fonts.js',
+    italics: 'node_modules/pdfmake/build/vfs_fonts.js',
+    bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
+  },
+};
 
 exports.createSaving = async (req, res) => {
   const { username, month, amount, date } = req.body;
@@ -135,56 +143,42 @@ exports.exportSavingsReport = async (req, res) => {
 exports.exportSavingsReportPDF = async (req, res) => {
   try {
     const savings = await Saving.find().populate('userId', 'username name email');
-    const data = savings.map(s => ({
-      Username: s.userId.username,
-      Name: s.userId.name,
-      Amount: s.amount,
-      Month: s.month,
-      Date: s.date ? s.date.toISOString().split('T')[0] : '',
-      Fine: s.fine,
-      InterestEarned: s.interestEarned
-    }));
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
+    const data = savings.map(s => ([
+      s.userId.username,
+      s.userId.name,
+      s.amount,
+      s.month,
+      s.date ? s.date.toISOString().split('T')[0] : '',
+      s.fine,
+      s.interestEarned
+    ]));
+    const printer = new PdfPrinter(fonts);
+    const docDefinition = {
+      content: [
+        { text: 'Savings Report', style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*', '*', '*', '*', '*', '*'],
+            body: [
+              ['Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'],
+              ...data
+            ]
+          },
+          layout: 'lightHorizontalLines',
+        }
+      ],
+      styles: {
+        header: { fontSize: 16, bold: true }
+      },
+      defaultStyle: { font: 'Roboto', fontSize: 9 }
+    };
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="savings_report.pdf"');
-    doc.pipe(res);
-    doc.fontSize(16).text('Savings Report', { align: 'center' });
-    doc.moveDown();
-    const headers = [
-      'Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'
-    ];
-    const colWidths = [70, 80, 60, 50, 70, 50, 70];
-    let y = doc.y;
-    let x = doc.x;
-    headers.forEach((header, i) => {
-      doc.font('Helvetica-Bold').fontSize(9).text(header, x, y, { width: colWidths[i], align: 'left' });
-      x += colWidths[i];
-    });
-    y += 18;
-    data.forEach(row => {
-      x = doc.x;
-      headers.forEach((header, i) => {
-        let key = header.replace(/ /g, '');
-        if (key === 'InterestEarned') key = 'InterestEarned';
-        doc.font('Helvetica').fontSize(8).text(row[header] || row[key] || '', x, y, { width: colWidths[i], align: 'left' });
-        x += colWidths[i];
-      });
-      y += 14;
-      if (y > doc.page.height - 50) {
-        doc.addPage();
-        y = doc.y;
-      }
-    });
-    doc.end();
+    pdfDoc.pipe(res);
+    pdfDoc.end();
   } catch (err) {
-    console.error('PDF export error:', err.stack || err);
-    if (!req.user) {
-      return res.status(401).json({ error: 'Unauthorized: No user info found in request.' });
-    }
-    res.status(500).json({ error: 'Failed to export PDF report', details: err.message, user: req.user });
+    res.status(500).json({ error: 'Failed to export PDF report', details: err.message });
   }
 };

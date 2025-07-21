@@ -78,6 +78,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all frontend API calls to use API_BASE_URL from environment variables for correct backend communication in both local and production environments.
 - Added src/lib/utils.js to centralize API base URL usage.
 
+## [Unreleased]
+### Added - 21-07-2025
+- Refactored Loans and Savings pages to use a mobile-first accordion view for each user, replacing the previous table layouts.
+- Each loan and savings entry is now displayed as a card-like accordion item with modern UI touches: icons, color coding, rounded corners, and shadows.
+- Collapsed view shows user name and total (loan amount or total savings); expanded view shows detailed breakdowns (repayment schedule for loans, monthly savings for savings) with dates and notes.
+- Grouped savings and loans by user for easier navigation and improved mobile usability.
+
+### Changed - 21-07-2025
+- Improved consistency and modern feel across the app by unifying the UI patterns for displaying financial data.
+- Enhanced mobile experience and accessibility for both Loans and Savings pages.
+- Switched PDF report generation for Loans, Savings, and Transactions to pdfmake for full Node.js compatibility and reliable tabular output.
+- Centered and constrained the Reports page layout for a modern, consistent look on all screen sizes.
+- Improved navbar icon sizing and dashboard/reports UI consistency.
+- Fixed mobile and desktop alignment issues for all major pages.
+
 ## [0.1.0] - 2025-07-03
 
 ### Added

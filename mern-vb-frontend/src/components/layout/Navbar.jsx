@@ -11,10 +11,10 @@ import axios from 'axios';
 import InstallPWAButton from '../ui/InstallPWAButton';
 
 const navItems = [
-  { name: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt /> },
-  { name: 'Loans', to: '/loans', icon: <FaMoneyCheckAlt /> },
-  { name: 'Savings', to: '/savings', icon: <FaPiggyBank /> },
-  { name: 'Reports', to: '/reports', icon: <FaChartBar /> },
+  { name: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt className="text-xl sm:text-lg" /> },
+  { name: 'Loans', to: '/loans', icon: <FaMoneyCheckAlt className="text-xl sm:text-lg" /> },
+  { name: 'Savings', to: '/savings', icon: <FaPiggyBank className="text-xl sm:text-lg" /> },
+  { name: 'Reports', to: '/reports', icon: <FaChartBar className="text-xl sm:text-lg" /> },
 ];
 
 const canAddFine = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
@@ -72,7 +72,7 @@ const Navbar = () => {
                   onClick={() => setShowSettings((v) => !v)}
                   aria-label="Settings"
                 >
-                  <FaCog />
+                  <FaCog className="text-xl sm:text-lg" />
                   <span className="hidden sm:inline">Settings</span>
                 </button>
                 {showSettings && (

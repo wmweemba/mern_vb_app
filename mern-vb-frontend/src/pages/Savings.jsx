@@ -3,6 +3,8 @@ import AddSavingsForm from '../features/savings/AddSavingsForm';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
+import { FaPiggyBank, FaCalendarAlt, FaStickyNote } from 'react-icons/fa';
 
 const Savings = () => {
   const { user } = useAuth();
@@ -26,9 +28,24 @@ const Savings = () => {
 
   const canAddSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
+  // Group savings by userId
+  const savingsByUser = savings.reduce((acc, s) => {
+    const key = s.userId?._id || s.userId || s.username;
+    if (!acc[key]) {
+      acc[key] = {
+        user: s.userId,
+        total: 0,
+        entries: [],
+      };
+    }
+    acc[key].total += Number(s.amount);
+    acc[key].entries.push(s);
+    return acc;
+  }, {});
+
   return (
-    <div className="p-2 sm:p-4 w-full max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-center sm:text-left">Savings</h1>
+    <div className="p-2 sm:p-4 w-full max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4 text-center">Savings</h1>
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
         {canAddSavings && (
           <div className="w-full md:max-w-md lg:mx-0 lg:w-1/3">
@@ -40,32 +57,38 @@ const Savings = () => {
           {loading && <div>Loading...</div>}
           {error && <div className="text-red-500">{error}</div>}
           {!loading && !error && (
-            <div className="w-full overflow-x-auto rounded shadow border bg-white">
-              <table className="min-w-[600px] w-full text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Username</th>
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Name</th>
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Month</th>
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Amount</th>
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Date</th>
-                    <th className="p-1 sm:p-2 text-gray-700 dark:text-gray-200">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savings.map(s => (
-                    <tr key={s._id} className="border-t">
-                      <td className="p-1 sm:p-2 whitespace-nowrap text-gray-900 dark:text-gray-100">{s.userId?.username}</td>
-                      <td className="p-1 sm:p-2 whitespace-nowrap text-gray-900 dark:text-gray-100">{s.userId?.name}</td>
-                      <td className="p-1 sm:p-2 text-center text-gray-900 dark:text-gray-100">{s.month}</td>
-                      <td className="p-1 sm:p-2 text-right text-gray-900 dark:text-gray-100">K{Number(s.amount).toLocaleString()}</td>
-                      <td className="p-1 sm:p-2 whitespace-nowrap text-gray-900 dark:text-gray-100">{s.date ? new Date(s.date).toLocaleDateString() : ''}</td>
-                      <td className="p-1 sm:p-2 text-gray-900 dark:text-gray-100">{s.notes || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Accordion type="single" collapsible>
+              {Object.values(savingsByUser).map(({ user, total, entries }) => (
+                <AccordionItem key={user?._id || user?.username || user} value={user?._id || user?.username || user}>
+                  <AccordionTrigger>
+                    <div className="flex items-center gap-2 w-full">
+                      <FaPiggyBank className="text-green-600" />
+                      <span className="font-semibold">{user?.name}</span>
+                      <span className="ml-auto text-green-700 font-bold">K{Number(total).toLocaleString()}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex flex-col gap-2">
+                      {entries.sort((a, b) => a.month - b.month).map((s, idx) => (
+                        <div key={s._id || idx} className="rounded shadow bg-gray-50 p-2 mb-2 flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <FaCalendarAlt className="text-gray-500" />
+                            <span>Month: <span className="font-semibold">{s.month}</span></span>
+                            <span className="ml-4">Amount: <span className="font-semibold text-green-700">K{Number(s.amount).toLocaleString()}</span></span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-700 mt-1">
+                            <span>Date: {s.date ? new Date(s.date).toLocaleDateString() : 'N/A'}</span>
+                            {s.notes && (
+                              <span className="flex items-center gap-1 ml-4"><FaStickyNote className="text-yellow-500" /> Notes: {s.notes}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           )}
         </div>
       </div>
