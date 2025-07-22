@@ -62,15 +62,15 @@ function AppRoutes() {
   }
   return (
     <Layout>
-      <Routes>
-        <Route path="/dashboard" element={dashboard} />
-        <Route path="/loans" element={<Loans />} />
-        <Route path="/savings" element={<Savings />} />
-        <Route path="/thresholds" element={<Thresholds />} />
-        <Route path="/reports" element={<Reports />} />
+    <Routes>
+      <Route path="/dashboard" element={dashboard} />
+      <Route path="/loans" element={<Loans />} />
+      <Route path="/savings" element={<Savings />} />
+      <Route path="/thresholds" element={<Thresholds />} />
+      <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={user.role === 'admin' ? <Users /> : <Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
     </Layout>
   );
 }

@@ -246,3 +246,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard 'Total Fines' card now shows only outstanding (unpaid) fines.
 - All dashboard stats endpoints are now accessible to all authenticated users, not just admins, so members can see dashboard stats.
 - General UI/UX improvements for payment and fines management.
+
+### Added - 22-07-2025
+- Set up Jest and React Testing Library for both backend and frontend.
+- Added Babel configuration for frontend test compatibility.
+- Scaffolded unit and integration tests for backend (auth/role middleware, loans/savings controllers, report generation).
+- Scaffolded component and page tests for frontend (DashboardStatsCard, Users management, PWA install banner).
+- Fixed test reliability issues (async act, text matchers, placeholder ambiguity, import.meta.env mocks).
+- Updated test assertions to match actual UI/component output.
