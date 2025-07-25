@@ -22,6 +22,7 @@ A modern, full-stack MERN (MongoDB, Express, React, Node.js) application for man
 - **Backend**: [Render](https://render.com/) (Node.js server, HTTPS, environment variables)
 - **Full Deployment**: [Netlify] (https://villagebanking.netlify.app/) (Deployed App)
 - **Pitch Deck**: [Gamma] (https://gamma.app/docs/Village-Banking-App-n6plewc9jc5eixw) (Pitch Deck Presentaion)
+- Test login account: Username: test, Password: vbtest
 
 ## Getting Started
 
