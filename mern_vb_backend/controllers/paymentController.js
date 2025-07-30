@@ -2,14 +2,65 @@ const { updateBankBalance } = require('./bankBalanceController');
 const { logTransaction } = require('./transactionController');
 const User = require('../models/User');
 const Fine = require('../models/Fine');
+const Loan = require('../models/Loans');
+
+// exports.repayment = async (req, res) => {
+//   const { userId, amount, note } = req.body;
+//   try {
+//     await updateBankBalance(amount); // Credit
+//     await logTransaction({ userId, type: 'repayment', amount, note });
+//     res.json({ message: 'Repayment recorded', amount });
+//   } catch (err) {
+//     res.status(500).json({ error: 'Failed to record repayment', details: err.message });
+//   }
+// };
 
 exports.repayment = async (req, res) => {
-  const { userId, amount, note } = req.body;
+  const { username, amount, note } = req.body;
+
   try {
-    await updateBankBalance(amount); // Credit
+    // 1. Find user by username
+    const user = await User.findOne({ username });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const userId = user._id;
+
+    // 2. Update bank balance
+    await updateBankBalance(amount);
+
+    // 3. Log transaction
     await logTransaction({ userId, type: 'repayment', amount, note });
-    res.json({ message: 'Repayment recorded', amount });
+
+    // 4. Find active loan
+    const loan = await Loan.findOne({ userId, fullyPaid: false });
+    if (!loan) return res.status(404).json({ error: 'No active loan found for this user' });
+
+    // 5. Find next unpaid installment
+    const nextInstallment = loan.installments.find(inst => !inst.paid);
+    if (!nextInstallment) {
+      loan.fullyPaid = true;
+      await loan.save();
+      return res.status(400).json({ error: 'All installments already paid' });
+    }
+
+    const expectedTotal = nextInstallment.total;
+
+    if (amount >= expectedTotal) {
+      nextInstallment.paid = true;
+      nextInstallment.paymentDate = new Date();
+    } else {
+      return res.status(400).json({ error: `Insufficient amount. Expected at least K${expectedTotal}` });
+    }
+
+    // 6. Mark loan as fully paid if all done
+    if (loan.installments.every(inst => inst.paid)) {
+      loan.fullyPaid = true;
+    }
+
+    await loan.save();
+
+    res.json({ message: 'Repayment recorded and loan updated', loan });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Failed to record repayment', details: err.message });
   }
 };

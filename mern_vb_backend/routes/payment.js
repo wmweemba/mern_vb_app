@@ -10,8 +10,8 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-router.post('/repayment', verifyToken, requireRole('admin'), paymentController.repayment);
-router.post('/payout', verifyToken, requireRole('admin'), paymentController.payout);
+router.post('/repayment', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.repayment);
+router.post('/payout', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.payout);
 router.post('/fine', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.fine);
 router.post('/pay-fine', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.payFine);
 router.get('/unpaid-fines', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.getUnpaidFines);

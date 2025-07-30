@@ -4,7 +4,8 @@ import { API_BASE_URL } from '../../lib/utils';
 
 const ManagePaymentModal = ({ open, onClose }) => {
   const [type, setType] = useState('repayment');
-  const [userId, setUserId] = useState('');
+  // const [userId, setUserId] = useState('');
+  const [username, setUsername] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [fineId, setFineId] = useState('');
@@ -31,7 +32,8 @@ const ManagePaymentModal = ({ open, onClose }) => {
         setFineId('');
       } else {
         const endpoint = type === 'repayment' ? `${API_BASE_URL}/payments/repayment` : `${API_BASE_URL}/payments/payout`;
-        await axios.post(endpoint, { userId, amount: Number(amount), note });
+        // await axios.post(endpoint, { userId, amount: Number(amount), note });
+        await axios.post(endpoint, { username, amount: Number(amount), note });
         setSuccess(type === 'repayment' ? 'Repayment recorded!' : 'Payout recorded!');
         setUserId(''); setAmount(''); setNote('');
       }
@@ -65,7 +67,8 @@ const ManagePaymentModal = ({ open, onClose }) => {
             </select>
           ) : (
             <>
-              <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID" className="border rounded px-3 py-2" required />
+              {/* <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID" className="border rounded px-3 py-2" required /> */}
+              <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" className="border rounded px-3 py-2" required />
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" className="border rounded px-3 py-2" required />
               <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" className="border rounded px-3 py-2" />
             </>
