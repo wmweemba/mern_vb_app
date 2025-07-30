@@ -254,3 +254,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scaffolded component and page tests for frontend (DashboardStatsCard, Users management, PWA install banner).
 - Fixed test reliability issues (async act, text matchers, placeholder ambiguity, import.meta.env mocks).
 - Updated test assertions to match actual UI/component output.
+
+### Added - 30-07-2025
+- Enabled Loan Officer role to record loan repayments via the `POST /api/payments/repayment` route.
+- Updated backend repayment controller logic to:
+  - Accept `username` instead of `userId`
+  - Lookup user document before logging transactions or applying payments
+  - Automatically mark loan installments as paid and update loan status accordingly
+- Enhanced loan repayment validation with:
+  - Graceful handling of overpayments, completed loans, and invalid usernames
+  - Accurate tracking of repayment per installment with interest
+- Frontend: Updated `ManagePaymentModal.jsx` to:
+  - Use `username` input instead of `userId`
+  - Send correctly structured repayment and payout requests to backend
+- Added full error and success state handling to loan repayment workflow
+
+### Fixed - 30-07-2025
+- Fixed CastError and ObjectId validation errors caused by mismatch between username and userId in repayment payloads
+- Corrected loan transaction logging bug that prevented repayments from affecting bank balance or loan status
+- Improved loan controller logic to prevent duplicate installment payments and unexpected loan overpayment
+
+### Changed - 30-07-2025
+- Reworked repayment backend to align with frontend UX expectations and simplify member lookup via username
+- Updated transaction logging system to gracefully handle non-loan payments like repayments and payouts
+- Improved user experience and error clarity in payment modal
+
+### Technical Details
+- `controllers/paymentController.js` now resolves user ID from username before recording repayment
+- `transactionController.logTransaction()` supports new `repayment` type for audit trail
+- `Loan.findOne()` queries adjusted to use correct user reference and loan filters
+- Frontend `ManagePaymentModal.jsx` renamed local state from `userId` to `username` and updated payload structure
