@@ -284,3 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `transactionController.logTransaction()` supports new `repayment` type for audit trail
 - `Loan.findOne()` queries adjusted to use correct user reference and loan filters
 - Frontend `ManagePaymentModal.jsx` renamed local state from `userId` to `username` and updated payload structure
+
+## Fixed - 31-07-2025
+- Fixed Generate/View Transactions report on Reports page to allow all users to view reports. Previously only the admin could veiw
+- Fixed transactions report export to Excel. Reordered the route/transactions.js to match what the controller was expecting.

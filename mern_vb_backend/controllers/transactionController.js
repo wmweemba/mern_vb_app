@@ -1,3 +1,4 @@
+const { Parser } = require('json2csv');
 const PdfPrinter = require('pdfmake');
 const fonts = {
   Roboto: {
@@ -55,13 +56,20 @@ exports.exportTransactionsReport = async (req, res) => {
     const bankDoc = await BankBalance.findOne();
     if (bankDoc) closingBalance = bankDoc.balance;
     // Add closing balance row
-    data.push({ Username: '', Name: '', Type: '', Amount: '', Note: 'Closing Balance', Date: closingBalance });
+    // data.push({ Username: '', Name: '', Type: '', Amount: '', Note: 'Closing Balance', Date: closingBalance });
+    //data.push({ Username: '', Name: '', Type: '', Amount: closingBalance, Note: 'Closing Balance', Date: '' });
     const parser = new Parser();
     const csv = parser.parse(data);
-    res.header('Content-Type', 'text/csv');
-    res.attachment('transactions_report.csv');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="transactions_report.csv"');
     return res.send(csv);
+
   } catch (err) {
+    console.error('CSV Export Error:', err); // Additional error details for troubleshooting
     res.status(500).json({ error: 'Failed to export transactions report', details: err.message });
   }
 };
