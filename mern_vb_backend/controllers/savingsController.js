@@ -4,15 +4,15 @@ const User = require('../models/User');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { Parser } = require('json2csv');
-const PdfPrinter = require('pdfmake');
-const fonts = {
-  Roboto: {
-    normal: 'node_modules/pdfmake/build/vfs_fonts.js',
-    bold: 'node_modules/pdfmake/build/vfs_fonts.js',
-    italics: 'node_modules/pdfmake/build/vfs_fonts.js',
-    bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
-  },
-};
+// const PdfPrinter = require('pdfmake');
+// const fonts = {
+//   Roboto: {
+//     normal: 'node_modules/pdfmake/build/vfs_fonts.js',
+//     bold: 'node_modules/pdfmake/build/vfs_fonts.js',
+//     italics: 'node_modules/pdfmake/build/vfs_fonts.js',
+//     bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
+//   },
+// };
 
 exports.createSaving = async (req, res) => {
   const { username, month, amount, date } = req.body;
@@ -140,45 +140,45 @@ exports.exportSavingsReport = async (req, res) => {
   }
 };
 
-exports.exportSavingsReportPDF = async (req, res) => {
-  try {
-    const savings = await Saving.find().populate('userId', 'username name email');
-    const data = savings.map(s => ([
-      s.userId.username,
-      s.userId.name,
-      s.amount,
-      s.month,
-      s.date ? s.date.toISOString().split('T')[0] : '',
-      s.fine,
-      s.interestEarned
-    ]));
-    const printer = new PdfPrinter(fonts);
-    const docDefinition = {
-      content: [
-        { text: 'Savings Report', style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', '*', '*', '*', '*', '*', '*'],
-            body: [
-              ['Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'],
-              ...data
-            ]
-          },
-          layout: 'lightHorizontalLines',
-        }
-      ],
-      styles: {
-        header: { fontSize: 16, bold: true }
-      },
-      defaultStyle: { font: 'Roboto', fontSize: 9 }
-    };
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="savings_report.pdf"');
-    pdfDoc.pipe(res);
-    pdfDoc.end();
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to export PDF report', details: err.message });
-  }
-};
+// exports.exportSavingsReportPDF = async (req, res) => {
+//   try {
+//     const savings = await Saving.find().populate('userId', 'username name email');
+//     const data = savings.map(s => ([
+//       s.userId.username,
+//       s.userId.name,
+//       s.amount,
+//       s.month,
+//       s.date ? s.date.toISOString().split('T')[0] : '',
+//       s.fine,
+//       s.interestEarned
+//     ]));
+//     const printer = new PdfPrinter(fonts);
+//     const docDefinition = {
+//       content: [
+//         { text: 'Savings Report', style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
+//         {
+//           table: {
+//             headerRows: 1,
+//             widths: ['*', '*', '*', '*', '*', '*', '*'],
+//             body: [
+//               ['Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'],
+//               ...data
+//             ]
+//           },
+//           layout: 'lightHorizontalLines',
+//         }
+//       ],
+//       styles: {
+//         header: { fontSize: 16, bold: true }
+//       },
+//       defaultStyle: { font: 'Roboto', fontSize: 9 }
+//     };
+//     const pdfDoc = printer.createPdfKitDocument(docDefinition);
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', 'attachment; filename="savings_report.pdf"');
+//     pdfDoc.pipe(res);
+//     pdfDoc.end();
+//   } catch (err) {
+//     res.status(500).json({ error: 'Failed to export PDF report', details: err.message });
+//   }
+// };

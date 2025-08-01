@@ -17,7 +17,7 @@ router.post('/', verifyToken, allowRoles('admin', 'loan_officer'), savingsContro
 router.get('/', verifyToken, savingsController.getAllSavings);
 router.get('/user/:id', verifyToken, savingsController.getSavingsByUser);
 router.get('/export', verifyToken, savingsController.exportSavingsReport);
-router.get('/export/pdf', verifyToken, savingsController.exportSavingsReportPDF);
+// router.get('/export/pdf', verifyToken, savingsController.exportSavingsReportPDF);
 router.get('/dashboard', verifyToken, savingsController.getDashboardStats);
 
 // Threshold routes

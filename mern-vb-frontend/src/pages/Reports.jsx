@@ -1,32 +1,10 @@
 import React, { useState } from 'react';
-import { exportToExcel, exportToPDF } from '../lib/export';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { exportToExcel } from '../lib/export';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
 
-// Helper to download PDF from backend
-async function downloadPDFReport(endpoint, filename) {
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) throw new Error('Failed to download PDF');
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    alert('Error downloading PDF: ' + err.message);
-  }
-}
 // Helper to download Excel/CSV from backend
 async function downloadExcelReport(endpoint, filename) {
   try {
@@ -52,13 +30,49 @@ async function downloadExcelReport(endpoint, filename) {
   }
 }
 
+// Frontend PDF generator for transactions
+const generateTransactionPDF = async (filename) => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.get(`${API_BASE_URL}/transactions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const transactions = res.data;
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Transactions Report', 105, 15, { align: 'center' });
+
+    const tableData = transactions.map(t => ([
+      t.userId?.username || '',
+      t.userId?.name || '',
+      t.type,
+      `K${Number(t.amount).toLocaleString()}`,
+      t.note || '',
+      new Date(t.createdAt).toLocaleDateString(),
+    ]));
+
+    autoTable(doc, {
+      startY: 25,
+      head: [['Username', 'Name', 'Type', 'Amount', 'Note', 'Date']],
+      body: tableData,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [33, 150, 243] },
+    });
+
+    doc.save(filename);
+  } catch (err) {
+    alert('Error generating PDF: ' + err.message);
+  }
+};
+
 const exportConfigs = [
   {
     label: 'Loans',
     endpoint: `${API_BASE_URL}/loans/export`,
     excelName: 'loans.xlsx',
-    pdfName: 'loans.pdf',
-    viewEndpoint: `${API_BASE_URL}/loans`, // Use the all loans endpoint for in-app view
+    pdfName: 'loans_report.pdf',
+    viewEndpoint: `${API_BASE_URL}/loans`,
     columns: [
       { key: 'userId.username', label: 'Username' },
       { key: 'userId.name', label: 'Name' },
@@ -71,7 +85,7 @@ const exportConfigs = [
     label: 'Savings',
     endpoint: `${API_BASE_URL}/savings/export`,
     excelName: 'savings.xlsx',
-    pdfName: 'savings.pdf',
+    pdfName: 'savings_report.pdf',
     viewEndpoint: `${API_BASE_URL}/savings`,
     columns: [
       { key: 'userId.username', label: 'Username' },
@@ -85,7 +99,6 @@ const exportConfigs = [
     label: 'Transactions',
     endpoint: `${API_BASE_URL}/transactions/export`,
     excelName: 'transactions_report.csv',
-    pdfEndpoint: `${API_BASE_URL}/transactions/export/pdf`,
     pdfName: 'transactions_report.pdf',
     viewEndpoint: `${API_BASE_URL}/transactions`,
     columns: [
@@ -176,13 +189,12 @@ const Reports = () => {
         if (type === 'excel') {
           await downloadExcelReport(config.endpoint, config.excelName);
         } else if (type === 'pdf') {
-          await downloadPDFReport(config.pdfEndpoint, config.pdfName);
+          await generateTransactionPDF(config.pdfName);
         }
         return;
       }
       const res = await axios.get(config.endpoint);
       let data = res.data;
-      // If backend returns CSV, parse to array of objects
       if (typeof data === 'string' && data.includes(',')) {
         const [header, ...rows] = data.trim().split('\n');
         const keys = header.split(',');
@@ -192,7 +204,7 @@ const Reports = () => {
         });
       }
       if (type === 'excel') exportToExcel(data, config.excelName);
-      else exportToPDF(data, config.pdfName);
+      // You can add PDF logic for Loans and Savings here if needed
     } catch (err) {
       setError(`Failed to export ${config.label}`);
     } finally {
@@ -264,4 +276,8 @@ const Reports = () => {
   );
 };
 
-export default Reports; 
+export default Reports;
+
+
+
+

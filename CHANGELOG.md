@@ -288,3 +288,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Fixed - 31-07-2025
 - Fixed Generate/View Transactions report on Reports page to allow all users to view reports. Previously only the admin could veiw
 - Fixed transactions report export to Excel. Reordered the route/transactions.js to match what the controller was expecting.
+
+
+## Added – 01-08-2025
+- Replaced backend PDF report generation with frontend PDF exports using jspdf and jspdf-autotable for a simpler, dependency-free approach.
+- Integrated frontend PDF generation for Transactions, Loans, and Savings reports.
+- Refactored Reports.jsx to use exportToPDF() for generating and downloading PDFs client-side.
+- Created reusable column definitions and transformation logic to ensure clean, structured PDF output.
+- Added support for downloading reports in both Excel (CSV/XLSX) and PDF formats directly from the frontend.
+
+## Changed – 01-08-2025
+- Refactored src/lib/export.js to support frontend PDF generation using jspdf:
+- Supports auto-detection of columns when none are provided.
+- Converts nested fields like userId.username into flattened columns for easier export.
+- Removed backend /api/transactions/export/pdf route and its corresponding controller function (exportTransactionsReportPDF) to eliminate unused or conflicting routes.
+- Updated Reports.jsx to decouple all export functionality from the backend for PDF generation.
+- Replaced pdfmake implementation in controllers (transactions and savings) with frontend-generated PDF exports using jspdf.
+
+## Fixed – 01-08-2025
+- Fixed route collision in routes/transactions.js caused by incorrect ordering of dynamic routes (:userId) before static routes like /export.
+- Resolved backend crash during server startup by ensuring all route handlers reference valid exported controller functions.
+- Fixed PDF export functionality for Savings and Loans reports, which previously failed due to font issues and complex backend dependencies.
+
+Removed – 01-08-2025
+- Deprecated pdfmake usage in the backend in favor of frontend PDF rendering using jspdf, which is more portable and better integrated with the React UI.
+- Removed exportTransactionsReportPDF() and exportSavingsReportPDF() from backend controllers to reduce maintenance complexity.

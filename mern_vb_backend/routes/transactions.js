@@ -9,7 +9,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 // router.get('/export/pdf', verifyToken, transactionController.exportTransactionsReportPDF);
 
 router.get('/export', verifyToken, transactionController.exportTransactionsReport);
-router.get('/export/pdf', verifyToken, transactionController.exportTransactionsReportPDF);
+// router.get('/export/pdf', verifyToken, transactionController.exportTransactionsReportPDF);
 router.get('/', verifyToken, transactionController.getAllTransactions);
 router.get('/:userId', verifyToken, transactionController.getTransactionsByUser);
 
