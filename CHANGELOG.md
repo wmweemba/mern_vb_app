@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 02-09-2025
+- Added ability for admin, loan officer, and treasurer to edit existing loans via new backend endpoint and frontend modal.
+- Added ability to reverse/remove a loan repayment (installment) made in error, with backend API and frontend UI for authorized roles.
+- Added support for partial loan repayments: backend now tracks paidAmount for each installment, allows partial payments, and carries over overpayments to subsequent installments.
+- Frontend now displays paid and remaining amounts for each loan installment, improving clarity for borrowers and staff.
+- Added EditLoanForm component and integrated edit/reverse dialogs in Loans page.
+- Updated backend loan model to include paidAmount field for installments.
+- Updated payment controller logic to support partial payments and overpayment carryover.
+- Added route and controller for reversing installment payments.
+- Added concurrently to root package.json and setup for running both backend and frontend dev servers with pnpm start.
+
+### Changed - 02-09-2025
+- Improved loan repayment workflow to support partial payments and display payment progress in the UI.
+- Updated Loans page UI to show paid/remaining amounts for each installment.
+- Updated backend and frontend logic to ensure only authorized roles can edit loans or reverse payments.
+
+### Fixed - 02-09-2025
+- Fixed error when posting partial repayments by updating backend logic to accept and track partial payments.
+- Fixed UI to provide clear feedback on payment status and errors.
+
 ### Added - 20-07-2025
 - Full savings history table for all users, visible to everyone, with responsive design.
 - Backend endpoint `GET /api/savings` to return all savings with user info populated.

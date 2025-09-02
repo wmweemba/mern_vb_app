@@ -34,7 +34,7 @@ exports.repayment = async (req, res) => {
     const loan = await Loan.findOne({ userId, fullyPaid: false });
     if (!loan) return res.status(404).json({ error: 'No active loan found for this user' });
 
-    // 5. Find next unpaid installment
+    // 5. Find next unpaid or partially paid installment
     const nextInstallment = loan.installments.find(inst => !inst.paid);
     if (!nextInstallment) {
       loan.fullyPaid = true;
@@ -42,13 +42,34 @@ exports.repayment = async (req, res) => {
       return res.status(400).json({ error: 'All installments already paid' });
     }
 
-    const expectedTotal = nextInstallment.total;
+    // Add to paidAmount
+    nextInstallment.paidAmount = (nextInstallment.paidAmount || 0) + amount;
 
-    if (amount >= expectedTotal) {
+    // If paidAmount >= total, mark as paid
+    if (nextInstallment.paidAmount >= nextInstallment.total) {
       nextInstallment.paid = true;
       nextInstallment.paymentDate = new Date();
-    } else {
-      return res.status(400).json({ error: `Insufficient amount. Expected at least K${expectedTotal}` });
+      // If overpaid, carry over to next installment
+      const overpay = nextInstallment.paidAmount - nextInstallment.total;
+      if (overpay > 0) {
+        // Recursively apply overpay to next installments
+        let remaining = overpay;
+        let idx = loan.installments.findIndex(inst => inst.month === nextInstallment.month) + 1;
+        while (remaining > 0 && idx < loan.installments.length) {
+          const inst = loan.installments[idx];
+          if (!inst.paid) {
+            inst.paidAmount = (inst.paidAmount || 0) + remaining;
+            if (inst.paidAmount >= inst.total) {
+              inst.paid = true;
+              inst.paymentDate = new Date();
+              remaining = inst.paidAmount - inst.total;
+            } else {
+              remaining = 0;
+            }
+          }
+          idx++;
+        }
+      }
     }
 
     // 6. Mark loan as fully paid if all done

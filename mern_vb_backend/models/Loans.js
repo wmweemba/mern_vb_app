@@ -10,6 +10,7 @@ const loanSchema = new mongoose.Schema({
     principal: Number,
     interest: Number,
     total: Number,
+    paidAmount: { type: Number, default: 0 },
     paid: { type: Boolean, default: false },
     paymentDate: Date,
     penalties: {

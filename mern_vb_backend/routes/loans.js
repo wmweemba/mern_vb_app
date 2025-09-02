@@ -11,10 +11,13 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
+
 router.post('/', verifyToken, allowRoles('admin', 'loan_officer'), loanController.createLoan);
 router.get('/user/:id', verifyToken, loanController.getLoansByUser);
 router.get('/', verifyToken, loanController.getAllLoans);
 router.put('/repay', verifyToken, requireRole('loan_officer'), loanController.repayInstallment);
+router.put('/:loanId', verifyToken, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.updateLoan);
+router.put('/:loanId/installments/:month/reverse', verifyToken, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.reverseInstallmentPayment);
 router.get('/export', verifyToken, loanController.exportLoansReport);
 router.get('/export/pdf', verifyToken, loanController.exportLoansReportPDF);
 

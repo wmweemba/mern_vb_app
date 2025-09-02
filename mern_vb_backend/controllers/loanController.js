@@ -1,3 +1,30 @@
+// Reverse a paid installment (admin, loan_officer, treasurer only)
+exports.reverseInstallmentPayment = async (req, res) => {
+  const { loanId, month } = req.params;
+  const allowedRoles = ['admin', 'loan_officer', 'treasurer'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+  }
+  try {
+    const loan = await Loan.findById(loanId);
+    if (!loan) return res.status(404).json({ error: 'Loan not found' });
+    const installment = loan.installments.find(inst => inst.month === Number(month));
+    if (!installment) return res.status(404).json({ error: 'Installment not found' });
+    if (!installment.paid) return res.status(400).json({ error: 'Installment is not marked as paid.' });
+
+    // Reverse payment
+    installment.paid = false;
+    installment.paymentDate = undefined;
+    installment.penalties = { lateInterest: 0, overdueFine: 0, earlyPaymentCharge: 0 };
+
+    // Update loan fullyPaid status
+    loan.fullyPaid = loan.installments.every(inst => inst.paid);
+    await loan.save();
+    res.json({ message: 'Installment payment reversed.', loan });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reverse payment', details: err.message });
+  }
+};
 const Loan = require('../models/Loans');
 const User = require('../models/User');
 const calculateLoanSchedule = require('../utils/loanCalculator');
@@ -12,6 +39,42 @@ const fonts = {
     italics: 'node_modules/pdfmake/build/vfs_fonts.js',
     bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js',
   },
+};
+
+// Update loan details (admin, loan_officer, treasurer only)
+exports.updateLoan = async (req, res) => {
+  const { loanId } = req.params;
+  const updates = req.body;
+  const allowedRoles = ['admin', 'loan_officer', 'treasurer'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+  }
+  try {
+    const loan = await Loan.findById(loanId);
+    if (!loan) return res.status(404).json({ error: 'Loan not found' });
+
+    // Prevent editing principal, interestRate, duration if repayments have started
+    const repaymentsStarted = loan.installments.some(inst => inst.paid);
+    const restrictedFields = ['amount', 'interestRate', 'durationMonths'];
+    if (repaymentsStarted) {
+      for (const field of restrictedFields) {
+        if (updates[field] !== undefined && updates[field] !== loan[field]) {
+          return res.status(400).json({ error: `Cannot edit ${field} after repayments have started.` });
+        }
+      }
+    }
+
+    // Only update allowed fields
+    for (const key in updates) {
+      if (loan[key] !== undefined && !restrictedFields.includes(key)) {
+        loan[key] = updates[key];
+      }
+    }
+    await loan.save();
+    res.json({ message: 'Loan updated successfully', loan });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update loan', details: err.message });
+  }
 };
 
 exports.createLoan = async (req, res) => {
