@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { useAuth } from '../../store/auth';
-import { FaTachometerAlt, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSignOutAlt, FaCog } from 'react-icons/fa';
+import { FaTachometerAlt, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSignOutAlt, FaCog, FaRecycle } from 'react-icons/fa';
 import ManageBankBalanceModal from '../ui/ManageBankBalanceModal';
 import ChangePasswordModal from '../ui/ChangePasswordModal';
 import ManagePaymentModal from '../ui/ManagePaymentModal';
 import AddFineModal from '../ui/AddFineModal';
+import BeginNewCycleModal from '../ui/BeginNewCycleModal';
 import axios from 'axios';
 import InstallPWAButton from '../ui/InstallPWAButton';
 
@@ -19,6 +20,7 @@ const navItems = [
 
 const canAddFine = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 const canManageBankBalanceOrPayment = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+const canStartNewCycle = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
 const Navbar = () => {
   const { logout, user } = useAuth();
@@ -29,7 +31,28 @@ const Navbar = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showFine, setShowFine] = useState(false);
+  const [showNewCycle, setShowNewCycle] = useState(false);
   const [deletingFines, setDeletingFines] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showSettings]);
 
   const handleLogout = () => {
     logout();
@@ -66,7 +89,7 @@ const Navbar = () => {
             ))}
             {/* Settings dropdown for admin/treasurer/loan_officer */}
             {user && (
-              <div className="relative ml-2">
+              <div className="relative ml-2" ref={dropdownRef}>
                 <button
                   className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
                   onClick={() => setShowSettings((v) => !v)}
@@ -90,10 +113,25 @@ const Navbar = () => {
                     {canAddFine(user) && (
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowFine(true); }}>Add Fine/Penalty</button>
                     )}
+                    {canStartNewCycle(user) && (
+                      <>
+                        <hr className="my-1" />
+                        <button 
+                          className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold flex items-center gap-2" 
+                          onClick={() => { setShowSettings(false); setShowNewCycle(true); }}
+                        >
+                          <FaRecycle className="text-sm" />
+                          Begin New Cycle
+                        </button>
+                      </>
+                    )}
                     {user?.role === 'admin' && (
-                      <button className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold" onClick={() => { setShowSettings(false); handleDeleteAllFines(); }} disabled={deletingFines}>
-                        {deletingFines ? 'Deleting Fines...' : 'Delete All Fines'}
-                      </button>
+                      <>
+                        <hr className="my-1" />
+                        <button className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold" onClick={() => { setShowSettings(false); handleDeleteAllFines(); }} disabled={deletingFines}>
+                          {deletingFines ? 'Deleting Fines...' : 'Delete All Fines'}
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -113,6 +151,14 @@ const Navbar = () => {
       <ChangePasswordModal open={showChangePassword} onClose={() => setShowChangePassword(false)} />
       <ManagePaymentModal open={showPayment} onClose={() => setShowPayment(false)} />
       <AddFineModal open={showFine} onClose={() => setShowFine(false)} />
+      <BeginNewCycleModal 
+        isOpen={showNewCycle}
+        onClose={() => setShowNewCycle(false)}
+        onSuccess={() => {
+          // Optionally refresh page or show success message
+          window.location.reload();
+        }}
+      />
     </>
   );
 };

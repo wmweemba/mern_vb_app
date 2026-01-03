@@ -20,7 +20,10 @@ const loanSchema = new mongoose.Schema({
     }
   }],
   createdAt: { type: Date, default: Date.now },
-  fullyPaid: { type: Boolean, default: false }
+  fullyPaid: { type: Boolean, default: false },
+  cycleNumber: { type: Number },
+  cycleEndDate: { type: Date },
+  archived: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model('Loan', loanSchema);

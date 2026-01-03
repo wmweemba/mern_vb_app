@@ -7,7 +7,9 @@ A modern, full-stack MERN (MongoDB, Express, React, Node.js) application for man
 - **Loans & savings management** with forms, history, and role restrictions
 - **Bank balance tracking** and real-time updates
 - **Fines/penalties system** with payment and admin controls
+- **Cycle management system** - Reset banking cycles while preserving historical data with automatic backup reports
 - **Reports**: in-app viewing, PDF/Excel export, and downloadable reports
+- **Historical data access** - Complete audit trail with cycle-based reporting
 - **Responsive, mobile-first UI** with modern card layouts
 - **Authentication** with JWT and secure password management
 - **PWA support**: installable, offline-ready, with custom splash, shortcuts, and install banner

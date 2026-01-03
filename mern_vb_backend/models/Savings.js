@@ -6,7 +6,10 @@ const savingSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     date: { type: Date, default: Date.now },
     fine: { type: Number, default: 0 },
-    interestEarned: { type: Number, default: 0 }
+    interestEarned: { type: Number, default: 0 },
+    cycleNumber: { type: Number },
+    cycleEndDate: { type: Date },
+    archived: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model('Saving', savingSchema);

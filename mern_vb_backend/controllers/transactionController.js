@@ -15,7 +15,7 @@ const Transaction = require('../models/Transaction');
 
 exports.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find().populate('userId', 'username name email').sort({ createdAt: -1 });
+    const transactions = await Transaction.find({ archived: { $ne: true } }).populate('userId', 'username').sort({ createdAt: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve transactions', details: err.message });
@@ -24,7 +24,7 @@ exports.getAllTransactions = async (req, res) => {
 
 exports.getTransactionsByUser = async (req, res) => {
   try {
-    const transactions = await Transaction.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+    const transactions = await Transaction.find({ userId: req.params.userId, archived: { $ne: true } }).sort({ createdAt: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve user transactions', details: err.message });
@@ -42,7 +42,7 @@ exports.logTransaction = async ({ userId, type, amount, referenceId, note }) => 
 
 exports.exportTransactionsReport = async (req, res) => {
   try {
-    const transactions = await Transaction.find().populate('userId', 'username name').sort({ createdAt: 1 });
+    const transactions = await Transaction.find({ archived: { $ne: true } }).populate('userId', 'username name').sort({ createdAt: 1 });
     const data = transactions.map(t => ({
       Username: t.userId?.username || '',
       Name: t.userId?.name || '',

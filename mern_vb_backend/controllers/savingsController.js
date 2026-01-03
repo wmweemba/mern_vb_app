@@ -58,7 +58,7 @@ exports.createSaving = async (req, res) => {
 
 exports.getSavingsByUser = async (req, res) => {
   try {
-    const savings = await Saving.find({ userId: req.params.id });
+    const savings = await Saving.find({ userId: req.params.id, archived: { $ne: true } });
     res.json(savings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch savings' });
@@ -67,7 +67,7 @@ exports.getSavingsByUser = async (req, res) => {
 
 exports.getAllSavings = async (req, res) => {
   try {
-    const savings = await Saving.find().populate('userId', 'username name email');
+    const savings = await Saving.find({ archived: { $ne: true } }).populate('userId', 'username name email');
     res.json(savings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch all savings' });
@@ -76,8 +76,9 @@ exports.getAllSavings = async (req, res) => {
 
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Total Saved and Interest on Savings
+    // Total Saved and Interest on Savings (current cycle only)
     const savingsAgg = await Saving.aggregate([
+      { $match: { archived: { $ne: true } } },
       {
         $group: {
           _id: null,
@@ -89,8 +90,8 @@ exports.getDashboardStats = async (req, res) => {
     const totalSaved = savingsAgg[0]?.totalSaved || 0;
     const totalInterestSavings = savingsAgg[0]?.totalInterestSavings || 0;
 
-    // Total Loaned and Interest on Loans
-    const loans = await Loan.find();
+    // Total Loaned and Interest on Loans (current cycle only)
+    const loans = await Loan.find({ archived: { $ne: true } });
     let totalLoaned = 0;
     let totalInterestLoans = 0;
     loans.forEach(loan => {
@@ -113,7 +114,7 @@ exports.getDashboardStats = async (req, res) => {
 
 exports.exportSavingsReport = async (req, res) => {
   try {
-    const savings = await Saving.find().populate('userId', 'username name email');
+    const savings = await Saving.find({ archived: { $ne: true } }).populate('userId', 'username name email');
     const data = savings.map(s => ({
       Username: s.userId.username,
       Name: s.userId.name,

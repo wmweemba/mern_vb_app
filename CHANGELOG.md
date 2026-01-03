@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 03-01-2026
+- **New Cycle Management System**: Comprehensive feature for resetting the banking cycle while preserving historical data
+  - Added "Begin New Cycle" functionality accessible via settings dropdown for admin, treasurer, and loan_officer roles
+  - Automatic generation and download of CSV backup reports (loans, savings, transactions, fines) before cycle reset
+  - Complete reset of current cycle data: loans, savings balances, fines, and bank balance return to zero
+  - Historical data preservation: all previous cycle data archived with cycle metadata for future reporting
+  - Added cycle tracking fields to all data models (cycleNumber, cycleEndDate, archived)
+  - New API endpoints: `/api/cycle/begin-new-cycle`, `/api/cycle/historical-reports`, `/api/cycle/available-cycles`
+  - Updated all controllers to filter archived data, ensuring current dashboard shows only active cycle data
+  - Enhanced settings dropdown with click-outside-to-close behavior and proper UX patterns
+  - Added BeginNewCycleModal with 3-step process: confirmation, processing, and completion feedback
+- Updated favicon and app title for better branding
+- Added admin password reset script for development convenience
+
+### Changed - 03-01-2026
+- Moved "Begin New Cycle" from main dashboard to settings dropdown for better UX (infrequent but critical action)
+- Improved settings dropdown behavior to close when clicking outside, following modern app patterns
+- Enhanced data isolation between cycles while maintaining complete audit trail
+- Updated all data retrieval methods to exclude archived records from current cycle operations
+
+### Fixed - 03-01-2026
+- Fixed syntax errors in React components with proper JSX quote handling
+- Resolved AuthContext export issues in Dashboard component
+- Improved dropdown component patterns for better accessibility and usability
+
 ### Added - 02-09-2025
 - Added ability for admin, loan officer, and treasurer to edit existing loans via new backend endpoint and frontend modal.
 - Added ability to reverse/remove a loan repayment (installment) made in error, with backend API and frontend UI for authorized roles.

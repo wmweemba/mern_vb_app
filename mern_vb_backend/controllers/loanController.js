@@ -119,7 +119,7 @@ exports.getLoansByUser = async (req, res) => {
       if (!user) return res.status(404).json({ error: 'User not found' });
       userId = user._id;
     }
-    const loans = await Loan.find({ userId });
+    const loans = await Loan.find({ userId, archived: { $ne: true } });
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch loans' });
@@ -180,7 +180,7 @@ exports.repayInstallment = async (req, res) => {
 
 exports.exportLoansReport = async (req, res) => {
   try {
-    const loans = await Loan.find().populate('userId', 'username name email');
+    const loans = await Loan.find({ archived: { $ne: true } }).populate('userId', 'username name email');
     const flatData = [];
 
     loans.forEach(loan => {
@@ -268,7 +268,7 @@ exports.exportLoansReportPDF = async (req, res) => {
 
 exports.getAllLoans = async (req, res) => {
   try {
-    const loans = await Loan.find().populate('userId', 'username name email');
+    const loans = await Loan.find({ archived: { $ne: true } }).populate('userId', 'username name email');
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch all loans' });

@@ -44,27 +44,28 @@ const Dashboard = ({ title }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const fetchStats = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [dashboardRes, balRes, fineRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/savings/dashboard`),
+        axios.get(`${API_BASE_URL}/bank-balance`),
+        axios.get(`${API_BASE_URL}/bank-balance/fines`),
+      ]);
+      setStats({
+        ...dashboardRes.data,
+        bankBalance: balRes.data.balance,
+        totalFines: fineRes.data.totalFines,
+      });
+    } catch (err) {
+      setError('Failed to load dashboard stats');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [dashboardRes, balRes, fineRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/savings/dashboard`),
-          axios.get(`${API_BASE_URL}/bank-balance`),
-          axios.get(`${API_BASE_URL}/bank-balance/fines`),
-        ]);
-        setStats({
-          ...dashboardRes.data,
-          bankBalance: balRes.data.balance,
-          totalFines: fineRes.data.totalFines,
-        });
-      } catch (err) {
-        setError('Failed to load dashboard stats');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchStats();
   }, []);
 

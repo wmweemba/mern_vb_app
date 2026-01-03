@@ -49,7 +49,7 @@ exports.updateBankBalance = async (amount) => {
 exports.getTotalFines = async (req, res) => {
   try {
     const result = await Fine.aggregate([
-      { $match: { paid: false } },
+      { $match: { paid: false, archived: { $ne: true } } },
       { $group: { _id: null, totalFines: { $sum: '$amount' } } }
     ]);
     const totalFines = result[0]?.totalFines || 0;
