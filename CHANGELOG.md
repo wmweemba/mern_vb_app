@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-01-04
+
 ### Added - 04-01-2026
 - **Enhanced Reporting System**: Comprehensive cycle-based data reporting with historical access
   - Added "Select Report Period" modal for choosing between current cycle and historical cycle data
