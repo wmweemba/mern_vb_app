@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 04-01-2026
+- **Enhanced Reporting System**: Comprehensive cycle-based data reporting with historical access
+  - Added "Select Report Period" modal for choosing between current cycle and historical cycle data
+  - New enhanced report endpoints (`/api/reports/enhanced`, `/api/reports/cycles`) supporting cycle-based filtering
+  - Intelligent cycle detection: automatically identifies archived data even without explicit cycle management
+  - Historical cycle dropdown with formatted cycle names and dates (e.g., "Cycle 1 (Sep 5, 2025)")
+  - Support for both current active data and historical archived data in all report types
+  - Enhanced data transformation with robust null/undefined value handling for reliable report generation
+  - Improved column mapping between backend data structure and frontend display tables
+  - Reports now show comprehensive loan details: installments, principal, interest, payment status, dates
+  - Enhanced savings reports with interest earned, fines, and payment dates
+  - Detailed transaction reports with user information, transaction types, amounts, and notes
+  - Automatic fallback for legacy data without cycle numbers (creates "Historical Data" cycle option)
+
 ### Added - 03-01-2026
 - **New Cycle Management System**: Comprehensive feature for resetting the banking cycle while preserving historical data
   - Added "Begin New Cycle" functionality accessible via settings dropdown for admin, treasurer, and loan_officer roles
@@ -21,11 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated favicon and app title for better branding
 - Added admin password reset script for development convenience
 
+### Changed - 04-01-2026
+- **Reports System Overhaul**: Completely redesigned reporting system for better usability and data access
+  - Replaced single-cycle reports with flexible current/historical cycle selection
+  - Updated frontend column mappings to match enhanced backend data structure
+  - Improved data transformation logic to handle edge cases and missing data gracefully
+  - Enhanced report modal with better pagination and data display formatting
+  - Reports now leverage the cycle management system for seamless historical data access
+
 ### Changed - 03-01-2026
 - Moved "Begin New Cycle" from main dashboard to settings dropdown for better UX (infrequent but critical action)
 - Improved settings dropdown behavior to close when clicking outside, following modern app patterns
 - Enhanced data isolation between cycles while maintaining complete audit trail
 - Updated all data retrieval methods to exclude archived records from current cycle operations
+
+### Fixed - 04-01-2026
+- **Data Display Issues**: Resolved critical reporting problems
+  - Fixed column key mismatches preventing data from appearing in report tables
+  - Improved handling of undefined/null createdAt dates and other missing fields
+  - Enhanced data transformation to gracefully handle loans without installments
+  - Fixed date formatting inconsistencies across all report types
+  - Resolved frontend-backend data structure alignment issues
+- Removed debugging code and temporary files for clean production deployment
 
 ### Fixed - 03-01-2026
 - Fixed syntax errors in React components with proper JSX quote handling

@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 import { exportToExcel } from '../lib/export';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
+import ReportSelectionModal from '../components/ui/ReportSelectionModal';
 
 // Helper to download Excel/CSV from backend
 async function downloadExcelReport(endpoint, filename) {
@@ -74,11 +75,16 @@ const exportConfigs = [
     pdfName: 'loans_report.pdf',
     viewEndpoint: `${API_BASE_URL}/loans`,
     columns: [
-      { key: 'userId.username', label: 'Username' },
-      { key: 'userId.name', label: 'Name' },
-      { key: 'amount', label: 'Amount' },
-      { key: 'durationMonths', label: 'Duration' },
-      { key: 'fullyPaid', label: 'Status' },
+      { key: 'Username', label: 'Username' },
+      { key: 'Name', label: 'Name' },
+      { key: 'LoanAmount', label: 'Loan Amount' },
+      { key: 'DurationMonths', label: 'Duration (Months)' },
+      { key: 'Month', label: 'Installment Month' },
+      { key: 'Principal', label: 'Principal' },
+      { key: 'Interest', label: 'Interest' },
+      { key: 'Total', label: 'Total' },
+      { key: 'Paid', label: 'Paid' },
+      { key: 'LoanCreatedAt', label: 'Loan Date' },
     ],
   },
   {
@@ -88,11 +94,13 @@ const exportConfigs = [
     pdfName: 'savings_report.pdf',
     viewEndpoint: `${API_BASE_URL}/savings`,
     columns: [
-      { key: 'userId.username', label: 'Username' },
-      { key: 'userId.name', label: 'Name' },
-      { key: 'amount', label: 'Amount' },
-      { key: 'month', label: 'Month' },
-      { key: 'date', label: 'Date' },
+      { key: 'Username', label: 'Username' },
+      { key: 'Name', label: 'Name' },
+      { key: 'Amount', label: 'Amount' },
+      { key: 'Month', label: 'Month' },
+      { key: 'InterestEarned', label: 'Interest Earned' },
+      { key: 'Fine', label: 'Fine' },
+      { key: 'Date', label: 'Date' },
     ],
   },
   {
@@ -102,16 +110,16 @@ const exportConfigs = [
     pdfName: 'transactions_report.pdf',
     viewEndpoint: `${API_BASE_URL}/transactions`,
     columns: [
-      { key: 'userId.username', label: 'Username' },
-      { key: 'userId.name', label: 'Name' },
-      { key: 'type', label: 'Type' },
-      { key: 'amount', label: 'Amount' },
-      { key: 'note', label: 'Note' },
-      { key: 'createdAt', label: 'Date' },
+      { key: 'Username', label: 'Username' },
+      { key: 'Name', label: 'Name' },
+      { key: 'Type', label: 'Type' },
+      { key: 'Amount', label: 'Amount' },
+      { key: 'Note', label: 'Note' },
+      { key: 'Date', label: 'Date' },
     ],
     transform: (data) => data.map(t => ({
       ...t,
-      createdAt: t.createdAt ? t.createdAt.split('T')[0] : '',
+      Date: t.Date ? t.Date.split('T')[0] : t.Date,
     })),
   },
 ];
@@ -180,6 +188,62 @@ const Reports = () => {
   const [modalData, setModalData] = useState([]);
   const [modalColumns, setModalColumns] = useState([]);
   const [modalTitle, setModalTitle] = useState('');
+  const [reportSelectionOpen, setReportSelectionOpen] = useState(false);
+  const [pendingReportConfig, setPendingReportConfig] = useState(null);
+
+  const handleViewReport = async (config) => {
+    setPendingReportConfig(config);
+    setReportSelectionOpen(true);
+  };
+
+  const handleCycleSelected = async (cycleType, cycleNumber, reportConfig) => {
+    setLoading(`${reportConfig.label}-view`);
+    setError('');
+    setReportSelectionOpen(false);
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Use enhanced endpoint for cycle-based reporting
+      let url = `${API_BASE_URL}/reports/enhanced`;
+      const params = new URLSearchParams({
+        reportType: reportConfig.label.toLowerCase(),
+        cycleType: cycleType,
+        format: 'json'
+      });
+      
+      if (cycleNumber) {
+        params.append('cycleNumber', cycleNumber);
+      }
+      
+      url += `?${params.toString()}`;
+      
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (!res.ok) throw new Error('Failed to load report');
+      
+      const result = await res.json();
+      let data = result.data || [];
+      
+      // Apply existing transformation if needed
+      if (reportConfig.transform) {
+        data = reportConfig.transform(data);
+      }
+      
+      setModalData(data);
+      setModalColumns(reportConfig.columns);
+      setModalTitle(`${reportConfig.label} - ${result.reportTitle}`);
+      setModalOpen(true);
+      
+    } catch (err) {
+      setError(`Failed to load ${reportConfig.label} report: ${err.message}`);
+    } finally {
+      setLoading('');
+      setPendingReportConfig(null);
+    }
+  };
 
   const handleExport = async (config, type) => {
     setLoading(`${config.label}-${type}`);
@@ -207,28 +271,6 @@ const Reports = () => {
       // You can add PDF logic for Loans and Savings here if needed
     } catch (err) {
       setError(`Failed to export ${config.label}`);
-    } finally {
-      setLoading('');
-    }
-  };
-
-  const handleViewReport = async (config) => {
-    setLoading(`${config.label}-view`);
-    setError('');
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(config.viewEndpoint, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to load report');
-      let data = await res.json();
-      if (config.transform) data = config.transform(data);
-      setModalData(data);
-      setModalColumns(config.columns);
-      setModalTitle(config.label);
-      setModalOpen(true);
-    } catch (err) {
-      setError(`Failed to load ${config.label} report`);
     } finally {
       setLoading('');
     }
@@ -271,7 +313,23 @@ const Reports = () => {
         </div>
       ))}
       {error && <div className="text-red-500 mt-2 text-center">{error}</div>}
-      <ReportModal open={modalOpen} onClose={() => setModalOpen(false)} data={modalData} columns={modalColumns} title={modalTitle} />
+      
+      <ReportModal 
+        open={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        data={modalData} 
+        columns={modalColumns} 
+        title={modalTitle} 
+      />
+      
+      <ReportSelectionModal
+        open={reportSelectionOpen}
+        onClose={() => {
+          setReportSelectionOpen(false);
+          setPendingReportConfig(null);
+        }}
+        onSelect={(cycleType, cycleNumber) => handleCycleSelected(cycleType, cycleNumber, pendingReportConfig)}
+      />
     </div>
   );
 };

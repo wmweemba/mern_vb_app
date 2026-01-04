@@ -18,6 +18,7 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/savings', require('./routes/savings'));
 app.use('/api/loans', require('./routes/loans'));
 app.use('/api/cycle', require('./routes/cycle'));
+app.use('/api/reports', require('./routes/reports'));
 
 const clientOptions = {
   serverApi: {

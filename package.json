@@ -1,7 +1,7 @@
 {
   "name": "mern_vb_app",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "scripts": {
     "start": "concurrently \"pnpm --filter mern_vb_backend dev\" \"pnpm --filter mern-vb-frontend dev\""
   },
