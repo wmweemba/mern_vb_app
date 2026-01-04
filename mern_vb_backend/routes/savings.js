@@ -16,6 +16,7 @@ const allowRoles = (...roles) => (req, res, next) => {
 router.post('/', verifyToken, allowRoles('admin', 'loan_officer'), savingsController.createSaving);
 router.get('/', verifyToken, savingsController.getAllSavings);
 router.get('/user/:id', verifyToken, savingsController.getSavingsByUser);
+router.put('/:savingId', verifyToken, allowRoles('admin', 'loan_officer', 'treasurer'), savingsController.updateSaving);
 router.get('/export', verifyToken, savingsController.exportSavingsReport);
 // router.get('/export/pdf', verifyToken, savingsController.exportSavingsReportPDF);
 router.get('/dashboard', verifyToken, savingsController.getDashboardStats);

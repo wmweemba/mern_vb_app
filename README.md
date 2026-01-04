@@ -4,7 +4,7 @@ A modern, full-stack MERN (MongoDB, Express, React, Node.js) application for man
 
 ## Features
 - **Role-based dashboard** for admins, treasurers, loan officers, and members
-- **Loans & savings management** with forms, history, and role restrictions
+- **Loans & savings management** with forms, history, edit functionality, and role restrictions
 - **Bank balance tracking** and real-time updates
 - **Fines/penalties system** with payment and admin controls
 - **Advanced Cycle Management** - Reset banking cycles while preserving complete historical data with automatic backup reports
@@ -14,11 +14,12 @@ A modern, full-stack MERN (MongoDB, Express, React, Node.js) application for man
 - **Authentication** with JWT and secure password management
 - **PWA support**: installable, offline-ready, with custom splash, shortcuts, and install banner
 
-## New in v2.0
+## New in v2.0+
 - **Enhanced Reporting**: Choose between current cycle and historical cycle data with intelligent cycle detection
 - **Comprehensive Data Display**: Detailed loan installment tracking, savings with interest calculations, and transaction history
 - **Improved Data Management**: Robust handling of legacy data and missing fields with automatic fallbacks
 - **Better User Experience**: Streamlined cycle management and intuitive report selection interface
+- **Editable Savings**: Authorized users can now edit existing savings entries with full audit trail (v2.0.1)
 
 ## Tech Stack
 - **Frontend**: React, Vite, Tailwind CSS, React Router, Axios

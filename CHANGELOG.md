@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-01-04
+
+### Added - 04-01-2026
+- **Savings Edit Functionality**: Added ability for authorized users (admin, treasurer, loan_officer) to edit existing savings entries
+  - New `updateSaving` API endpoint (`PUT /api/savings/:id`) with role-based access control
+  - Created `EditSavingsForm` component following established design patterns from loan edit functionality
+  - Added edit buttons to savings entries on the Savings page with modal-based editing interface
+  - Comprehensive validation and error handling for savings updates
+  - Automatic bank balance adjustment when savings amounts are modified
+  - Transaction logging for audit trail of savings adjustments
+  - Form pre-population with existing savings data for seamless editing experience
+
+### Fixed - 04-01-2026
+- **Transaction Logging**: Fixed transaction type enum validation error
+  - Corrected `saving_adjustment` transaction type to use valid `saving` enum value
+  - Resolved console errors during savings edit operations
+  - Improved transaction logging consistency across the application
+
 ## [2.0.0] - 2026-01-04
 
 ### Added - 04-01-2026

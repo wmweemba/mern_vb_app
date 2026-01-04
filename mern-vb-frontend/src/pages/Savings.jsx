@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import AddSavingsForm from '../features/savings/AddSavingsForm';
+import EditSavingsForm from '../features/savings/EditSavingsForm';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
-import { FaPiggyBank, FaCalendarAlt, FaStickyNote } from 'react-icons/fa';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { FaPiggyBank, FaCalendarAlt, FaStickyNote, FaEdit } from 'react-icons/fa';
 
 const Savings = () => {
   const { user } = useAuth();
   const [savings, setSavings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingSaving, setEditingSaving] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchSavings = async () => {
     setLoading(true); setError('');
@@ -27,6 +31,23 @@ const Savings = () => {
   useEffect(() => { fetchSavings(); }, []);
 
   const canAddSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+  const canEditSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+
+  const handleEditSaving = (saving) => {
+    setEditingSaving(saving);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false);
+    setEditingSaving(null);
+    fetchSavings();
+  };
+
+  const handleEditCancel = () => {
+    setIsEditModalOpen(false);
+    setEditingSaving(null);
+  };
 
   // Group savings by userId
   const savingsByUser = savings.reduce((acc, s) => {
@@ -75,6 +96,15 @@ const Savings = () => {
                             <FaCalendarAlt className="text-gray-500" />
                             <span>Month: <span className="font-semibold">{s.month}</span></span>
                             <span className="ml-4">Amount: <span className="font-semibold text-green-700">K{Number(s.amount).toLocaleString()}</span></span>
+                            {canEditSavings && (
+                              <button
+                                onClick={() => handleEditSaving(s)}
+                                className="ml-auto bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+                                title="Edit savings entry"
+                              >
+                                <FaEdit /> Edit
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-700 mt-1">
                             <span>Date: {s.date ? new Date(s.date).toLocaleDateString() : 'N/A'}</span>
@@ -92,6 +122,22 @@ const Savings = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Savings Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Savings Entry</DialogTitle>
+          </DialogHeader>
+          {editingSaving && (
+            <EditSavingsForm
+              saving={editingSaving}
+              onSuccess={handleEditSuccess}
+              onCancel={handleEditCancel}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

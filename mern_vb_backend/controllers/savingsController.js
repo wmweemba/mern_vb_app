@@ -74,6 +74,82 @@ exports.getAllSavings = async (req, res) => {
   }
 };
 
+// Update savings entry (admin, loan_officer, treasurer only)
+exports.updateSaving = async (req, res) => {
+  const { savingId } = req.params;
+  const updates = req.body;
+  const allowedRoles = ['admin', 'loan_officer', 'treasurer'];
+  
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+  }
+
+  try {
+    const saving = await Saving.findById(savingId);
+    if (!saving) return res.status(404).json({ error: 'Savings entry not found' });
+
+    // Store original amount for bank balance adjustment
+    const originalAmount = saving.amount;
+    const newAmount = updates.amount || originalAmount;
+    const amountDifference = newAmount - originalAmount;
+
+    // Handle username change if provided
+    if (updates.username) {
+      const user = await User.findOne({ username: updates.username });
+      if (!user) return res.status(400).json({ error: 'User not found' });
+      updates.userId = user._id;
+      delete updates.username; // Remove username from updates object
+    }
+
+    // Calculate new fine and interest if amount or month changed
+    if (updates.amount !== undefined || updates.month !== undefined) {
+      const month = updates.month || saving.month;
+      const amount = updates.amount || saving.amount;
+      
+      let fine = 0;
+      let interest = +(amount * 0.10).toFixed(2);
+
+      // Required savings check
+      if (month === 1 && amount < 3000) fine = 500;
+      else if (month > 1 && amount < 1000) fine = 500;
+      else if (month <= 3 && amount > 5000) {
+        return res.status(400).json({ error: 'Cannot save more than K5,000 in the first 3 months' });
+      }
+
+      updates.fine = fine;
+      updates.interestEarned = interest;
+    }
+
+    // Update the saving with provided updates
+    Object.keys(updates).forEach(key => {
+      if (saving[key] !== undefined) {
+        saving[key] = updates[key];
+      }
+    });
+
+    await saving.save();
+
+    // Adjust bank balance if amount changed
+    if (amountDifference !== 0) {
+      await updateBankBalance(amountDifference);
+      
+      // Log the adjustment transaction
+      await logTransaction({
+        userId: saving.userId,
+        type: 'saving',
+        amount: amountDifference,
+        referenceId: saving._id,
+        note: `Savings adjustment: ${amountDifference > 0 ? '+' : ''}K${Math.abs(amountDifference)} for month ${saving.month}.`
+      });
+    }
+
+    const populatedSaving = await Saving.findById(savingId).populate('userId', 'username name email');
+    res.json({ message: 'Savings updated successfully', saving: populatedSaving });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update savings', details: err.message });
+  }
+};
+
 exports.getDashboardStats = async (req, res) => {
   try {
     // Total Saved and Interest on Savings (current cycle only)
