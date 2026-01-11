@@ -55,9 +55,10 @@ exports.updateLoan = async (req, res) => {
       return res.status(404).json({ error: 'Loan not found' });
     }
 
-    // Prevent editing principal, interestRate, duration if repayments have started
+    // Prevent editing principal and interestRate if repayments have started
+    // Duration can still be changed to extend/reduce loan term
     const repaymentsStarted = loan.installments.some(inst => inst.paid);
-    const restrictedFields = ['amount', 'interestRate', 'durationMonths'];
+    const restrictedFields = ['amount', 'interestRate'];
     
     if (repaymentsStarted) {
       for (const field of restrictedFields) {
@@ -67,9 +68,11 @@ exports.updateLoan = async (req, res) => {
       }
     }
 
-    // Store original amount for bank balance adjustment
+    // Store original values for tracking changes
     const originalAmount = loan.amount;
+    const originalDuration = loan.durationMonths;
     let amountChanged = false;
+    let durationChanged = false;
 
     // Update loan fields - allow all valid fields to be updated
     const allowedFields = ['amount', 'interestRate', 'durationMonths', 'notes'];
@@ -81,21 +84,76 @@ exports.updateLoan = async (req, res) => {
           continue; // Skip restricted fields when repayments have started
         }
         
-        // Track if amount is being changed
+        // Track if amount or duration is being changed
         if (key === 'amount' && updates[key] !== loan[key]) {
           amountChanged = true;
+        }
+        if (key === 'durationMonths' && updates[key] !== loan[key]) {
+          durationChanged = true;
         }
         
         loan[key] = updates[key];
       }
     }
 
-    // If critical loan parameters were updated and no repayments have started, 
-    // we need to recalculate the loan schedule
-    if (!repaymentsStarted && updates.amount) {
-      const { schedule, duration } = calculateLoanSchedule(updates.amount);
-      loan.installments = schedule;
-      loan.durationMonths = duration;
+    // If critical loan parameters were updated, recalculate the loan schedule
+    if (amountChanged || durationChanged) {
+      const finalAmount = loan.amount;
+      const finalDuration = loan.durationMonths;
+      
+      if (repaymentsStarted && durationChanged) {
+        // For loans with started payments, recalculate from current state
+        const paidInstallments = loan.installments.filter(inst => inst.paid);
+        const totalPaidPrincipal = paidInstallments.reduce((sum, inst) => sum + inst.principal, 0);
+        const remainingPrincipal = finalAmount - totalPaidPrincipal;
+        const remainingDuration = finalDuration - paidInstallments.length;
+        
+        if (remainingDuration > 0 && remainingPrincipal > 0) {
+          // Recalculate only unpaid installments
+          const unpaidInstallments = loan.installments.filter(inst => !inst.paid);
+          const newInstallmentPrincipal = +(remainingPrincipal / remainingDuration).toFixed(2);
+          
+          // Update existing unpaid installments
+          let principalBalance = remainingPrincipal;
+          unpaidInstallments.forEach((inst, index) => {
+            const currentPrincipal = index === unpaidInstallments.length - 1 ? 
+              principalBalance : newInstallmentPrincipal;
+            const interest = +(principalBalance * (loan.interestRate / 100)).toFixed(2);
+            
+            inst.principal = currentPrincipal;
+            inst.interest = interest;
+            inst.total = +(currentPrincipal + interest).toFixed(2);
+            principalBalance -= currentPrincipal;
+          });
+          
+          // Add or remove installments if duration changed
+          const currentInstallmentCount = loan.installments.length;
+          if (finalDuration > currentInstallmentCount) {
+            // Add new installments
+            for (let month = currentInstallmentCount + 1; month <= finalDuration; month++) {
+              loan.installments.push({
+                month,
+                principal: 0,
+                interest: 0,
+                total: 0,
+                paid: false,
+                penalties: {
+                  lateInterest: 0,
+                  overdueFine: 0,
+                  earlyPaymentCharge: 0
+                }
+              });
+            }
+          } else if (finalDuration < currentInstallmentCount) {
+            // Remove excess installments (only unpaid ones)
+            loan.installments = loan.installments.slice(0, finalDuration);
+          }
+        }
+      } else if (!repaymentsStarted) {
+        // For new loans, completely recalculate
+        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration);
+        loan.installments = schedule;
+      }
     }
 
     // Adjust bank balance if loan amount changed

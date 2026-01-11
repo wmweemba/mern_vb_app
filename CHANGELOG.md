@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-01-11
+
+### Fixed - 11-01-2026
+- **Loan Duration Edit Functionality**: Fixed restriction preventing loan duration updates after loan creation
+  - Removed overly restrictive blocking of `durationMonths` field edits for existing loans
+  - Updated loan calculator to accept custom duration parameter instead of auto-calculation only
+  - Enhanced loan recalculation logic to handle duration changes while preserving paid installments
+  - Added smart installment recalculation that adjusts only unpaid installments when duration changes
+  - Fixed issue where loan officers and treasurers couldn't modify loan terms as intended
+  - Improved loan schedule calculation for both new loans and loans with partial payments
+
+### Enhanced - 11-01-2026
+- **Intelligent Loan Recalculation**: Improved loan schedule updates for duration changes
+  - For loans with no payments: Complete schedule recalculation with new parameters
+  - For loans with payments: Preserves paid installments while recalculating remaining schedule
+  - Automatic handling of duration extension (adds installments) and reduction (removes excess unpaid installments)
+  - Maintains loan integrity and payment history while allowing necessary adjustments
+- **Flexible Loan Duration Management**: Enhanced duration handling in loan calculator utility
+  - Loan calculator now accepts optional custom duration parameter
+  - Maintains backward compatibility with automatic duration calculation based on loan amount
+  - Enables precise control over loan terms for different member situations
+
 ## [2.0.2] - 2026-01-11
 
 ### Fixed - 11-01-2026
