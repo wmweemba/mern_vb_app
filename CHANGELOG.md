@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-01-11
+
+### Fixed - 11-01-2026
+- **Loan Edit Functionality**: Fixed critical bug where loan edits were not being saved properly
+  - Corrected backend `updateLoan` function field update logic that prevented loan parameter changes
+  - Fixed improper handling of restricted vs allowed fields during loan updates
+  - Added automatic loan schedule recalculation when amount is modified (only when no repayments have started)
+  - Resolved issue where loan amount, interest rate, and duration changes were being blocked incorrectly
+
+### Added - 11-01-2026
+- **Enhanced Loan Edit UI**: Improved user experience for loan editing interface
+  - Added clear field labels to EditLoanForm component (Amount, Interest Rate, Duration, Notes)
+  - Implemented proper label-input association for better accessibility
+  - Enhanced form layout with better spacing and visual hierarchy
+  - Added descriptive placeholders and improved textarea sizing for notes field
+- **Bank Balance Auto-Adjustment**: Automatic bank balance updates when loan amounts are edited
+  - Added logic to adjust bank balance when loan amounts are modified
+  - Calculates difference between old and new loan amounts and updates bank accordingly
+  - Creates audit trail transactions for all bank balance adjustments from loan edits
+  - Only applies adjustments when no repayments have been made (preserving loan integrity)
+- **Extended Bank Balance Management Permissions**: Expanded access to bank balance management
+  - Updated role permissions to allow loan_officer, treasurer, and admin to manage bank balance
+  - Previously only admin users could update bank balance, now aligned with other financial operations
+  - Maintains security while improving operational flexibility for authorized financial roles
+
+### Changed - 11-01-2026
+- **Improved Role-Based Access Control**: Enhanced consistency across financial management features
+  - Bank balance management now follows same role pattern as loan and savings management
+  - Better alignment of permissions across all financial operations
+
 ## [2.0.1] - 2026-01-04
 
 ### Added - 04-01-2026

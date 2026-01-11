@@ -51,11 +51,14 @@ exports.updateLoan = async (req, res) => {
   }
   try {
     const loan = await Loan.findById(loanId);
-    if (!loan) return res.status(404).json({ error: 'Loan not found' });
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
 
     // Prevent editing principal, interestRate, duration if repayments have started
     const repaymentsStarted = loan.installments.some(inst => inst.paid);
     const restrictedFields = ['amount', 'interestRate', 'durationMonths'];
+    
     if (repaymentsStarted) {
       for (const field of restrictedFields) {
         if (updates[field] !== undefined && updates[field] !== loan[field]) {
@@ -64,12 +67,55 @@ exports.updateLoan = async (req, res) => {
       }
     }
 
-    // Only update allowed fields
+    // Store original amount for bank balance adjustment
+    const originalAmount = loan.amount;
+    let amountChanged = false;
+
+    // Update loan fields - allow all valid fields to be updated
+    const allowedFields = ['amount', 'interestRate', 'durationMonths', 'notes'];
+    
     for (const key in updates) {
-      if (loan[key] !== undefined && !restrictedFields.includes(key)) {
+      if (allowedFields.includes(key) && updates[key] !== undefined) {
+        // If repayments have started, only allow non-restricted fields
+        if (repaymentsStarted && restrictedFields.includes(key)) {
+          continue; // Skip restricted fields when repayments have started
+        }
+        
+        // Track if amount is being changed
+        if (key === 'amount' && updates[key] !== loan[key]) {
+          amountChanged = true;
+        }
+        
         loan[key] = updates[key];
       }
     }
+
+    // If critical loan parameters were updated and no repayments have started, 
+    // we need to recalculate the loan schedule
+    if (!repaymentsStarted && updates.amount) {
+      const { schedule, duration } = calculateLoanSchedule(updates.amount);
+      loan.installments = schedule;
+      loan.durationMonths = duration;
+    }
+
+    // Adjust bank balance if loan amount changed
+    if (amountChanged && !repaymentsStarted) {
+      const amountDifference = updates.amount - originalAmount;
+      
+      // If new amount is higher, debit more from bank (negative adjustment)
+      // If new amount is lower, credit back to bank (positive adjustment)
+      await updateBankBalance(-amountDifference);
+      
+      // Log the bank balance adjustment transaction
+      await logTransaction({
+        userId: loan.userId,
+        type: 'loan',
+        amount: amountDifference,
+        referenceId: loan._id,
+        note: `Loan amount adjusted from K${originalAmount} to K${updates.amount} (difference: K${amountDifference})`
+      });
+    }
+    
     await loan.save();
     res.json({ message: 'Loan updated successfully', loan });
   } catch (err) {
