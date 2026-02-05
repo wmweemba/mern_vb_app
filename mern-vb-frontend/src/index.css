@@ -118,3 +118,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile UI enhancements for accordion pages */
+@layer utilities {
+  .mobile-safe-bottom {
+    padding-bottom: max(5rem, env(safe-area-inset-bottom, 5rem));
+  }
+  
+  @media (min-width: 640px) {
+    .mobile-safe-bottom {
+      padding-bottom: 2rem;
+    }
+  }
+  
+  /* Smooth scroll behavior for accordion items */
+  .scroll-mt-4 {
+    scroll-margin-top: 1rem;
+  }
+  
+  /* Ensure accordion content is accessible on mobile */
+  @media (max-width: 639px) {
+    [data-state="open"] {
+      scroll-margin-top: 2rem;
+      scroll-margin-bottom: 2rem;
+    }
+  }
+}

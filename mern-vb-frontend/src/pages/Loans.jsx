@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AddLoanForm from '../features/loans/AddLoanForm';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
@@ -19,6 +19,7 @@ const Loans = () => {
   const [reversing, setReversing] = useState({ loan: null, month: null });
   const [reverseLoading, setReverseLoading] = useState(false);
   const [reverseError, setReverseError] = useState('');
+  const accordionRefs = useRef({});
 
   const fetchLoans = async () => {
     setLoading(true); setError('');
@@ -50,8 +51,21 @@ const Loans = () => {
   const canAddLoan = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
   const canEditLoan = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
+  const handleAccordionChange = (value) => {
+    if (value && accordionRefs.current[value]) {
+      // Small delay to ensure the accordion content is rendered
+      setTimeout(() => {
+        accordionRefs.current[value].scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  };
+
   return (
-    <div className="p-2 sm:p-4 w-full max-w-2xl mx-auto">
+    <div className="p-2 sm:p-4 w-full max-w-2xl mx-auto mobile-safe-bottom">
       <h1 className="text-2xl font-bold mb-4 text-center">Loans</h1>
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
         {canAddLoan && (
@@ -64,9 +78,14 @@ const Loans = () => {
           {loading && <div>Loading...</div>}
           {error && <div className="text-red-500">{error}</div>}
           {!loading && !error && (
-            <Accordion type="single" collapsible>
+            <Accordion type="single" collapsible onValueChange={handleAccordionChange}>
               {loans.map((loan) => (
-                <AccordionItem key={loan._id} value={loan._id}>
+                <AccordionItem 
+                  key={loan._id} 
+                  value={loan._id}
+                  ref={(el) => accordionRefs.current[loan._id] = el}
+                  className="scroll-mt-4"
+                >
                   <AccordionTrigger>
                     <div className="flex items-center gap-2 w-full">
                       <FaMoneyBillWave className="text-blue-500" />

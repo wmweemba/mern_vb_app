@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AddSavingsForm from '../features/savings/AddSavingsForm';
 import EditSavingsForm from '../features/savings/EditSavingsForm';
 import axios from 'axios';
@@ -15,6 +15,7 @@ const Savings = () => {
   const [error, setError] = useState('');
   const [editingSaving, setEditingSaving] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const accordionRefs = useRef({});
 
   const fetchSavings = async () => {
     setLoading(true); setError('');
@@ -49,6 +50,19 @@ const Savings = () => {
     setEditingSaving(null);
   };
 
+  const handleAccordionChange = (value) => {
+    if (value && accordionRefs.current[value]) {
+      // Small delay to ensure the accordion content is rendered
+      setTimeout(() => {
+        accordionRefs.current[value].scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  };
+
   // Group savings by userId
   const savingsByUser = savings.reduce((acc, s) => {
     const key = s.userId?._id || s.userId || s.username;
@@ -65,7 +79,7 @@ const Savings = () => {
   }, {});
 
   return (
-    <div className="p-2 sm:p-4 w-full max-w-2xl mx-auto">
+    <div className="p-2 sm:p-4 w-full max-w-2xl mx-auto mobile-safe-bottom">
       <h1 className="text-2xl font-bold mb-4 text-center">Savings</h1>
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
         {canAddSavings && (
@@ -78,9 +92,16 @@ const Savings = () => {
           {loading && <div>Loading...</div>}
           {error && <div className="text-red-500">{error}</div>}
           {!loading && !error && (
-            <Accordion type="single" collapsible>
-              {Object.values(savingsByUser).map(({ user, total, entries }) => (
-                <AccordionItem key={user?._id || user?.username || user} value={user?._id || user?.username || user}>
+            <Accordion type="single" collapsible onValueChange={handleAccordionChange}>
+              {Object.values(savingsByUser).map(({ user, total, entries }) => {
+                const itemKey = user?._id || user?.username || user;
+                return (
+                <AccordionItem 
+                  key={itemKey} 
+                  value={itemKey}
+                  ref={(el) => accordionRefs.current[itemKey] = el}
+                  className="scroll-mt-4"
+                >
                   <AccordionTrigger>
                     <div className="flex items-center gap-2 w-full">
                       <FaPiggyBank className="text-green-600" />
@@ -117,7 +138,8 @@ const Savings = () => {
                     </div>
                   </AccordionContent>
                 </AccordionItem>
-              ))}
+                );
+              })}
             </Accordion>
           )}
         </div>
