@@ -67,6 +67,17 @@ const Dashboard = ({ title }) => {
 
   useEffect(() => {
     fetchStats();
+    
+    // Listen for loan data changes from payment modal
+    const handleLoanDataChange = () => {
+      fetchStats(); // Refresh dashboard stats when payments are made
+    };
+    
+    window.addEventListener('loanDataChanged', handleLoanDataChange);
+    
+    return () => {
+      window.removeEventListener('loanDataChanged', handleLoanDataChange);
+    };
   }, []);
 
   return (

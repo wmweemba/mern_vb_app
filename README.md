@@ -14,6 +14,89 @@ A modern, full-stack MERN (MongoDB, Express, React, Node.js) application for man
 - **Authentication** with JWT and secure password management
 - **PWA support**: installable, offline-ready, with custom splash, shortcuts, and install banner
 
+## System Configuration & Key Definitions
+
+### User Roles & Permissions
+The application uses a strict role-based access control system:
+
+| Role | Permissions |
+|------|------------|
+| **admin** | Full access to all operations, user management, cycle resets |
+| **treasurer** | Financial operations (bank balance, payments, reports, fines) |
+| **loan_officer** | Loan management, member operations, savings management |
+| **member** | Read-only access to personal data and loan details |
+
+### Transaction Types & Payment Processing
+
+#### Supported Transaction Types
+The system recognizes these transaction types for complete audit trail:
+
+| Type | Description | Balance Effect | Usage |
+|------|-------------|----------------|--------|
+| `saving` | Member savings deposits | +Bank | When members deposit money |
+| `loan` | Loan disbursements to members | -Bank | When loans are given out |
+| `loan_payment` | Loan installment payments | +Bank | When members pay loan installments |
+| `payment` | General payments (legacy) | +Bank | Generic payment transactions |
+| `payout` | Money withdrawn/paid out | -Bank | When money leaves the system |
+| `fine` | Fine/penalty payments | +Bank | When members pay fines |
+| `cycle_reset` | Cycle initialization balance | +Bank | Starting balance for new cycle |
+
+#### Payment Processing Flow
+1. **Validation**: User, amount, and loan verification
+2. **Calculation**: Determine which installments to pay
+3. **Atomic Transaction**: All updates use MongoDB sessions
+4. **Bank Balance Update**: Automatic balance adjustment
+5. **Transaction Logging**: Complete audit trail
+6. **Frontend Refresh**: Real-time UI updates via global events
+
+#### Payment Modal Types
+The payment modal supports three distinct operations:
+
+| Payment Type | Description | API Endpoint |
+|--------------|-------------|--------------|
+| **Loan Payment** | Pay loan installments | `/api/payments/repayment` |
+| **Payout** | Withdraw money from bank | `/api/payments/payout` |
+| **Fine Payment** | Pay outstanding fines | `/api/payments/pay-fine` |
+
+### Financial Data Flow
+
+#### Loan Management
+- **Creation**: Loan amount debited from bank balance
+- **Payments**: Sequential installment payment (Month 1 → 2 → 3 → 4)
+- **Overpayment Handling**: Excess amounts applied to next installments
+- **Reversals**: Atomic reversal with bank balance restoration
+
+#### Bank Balance Calculation
+```
+Bank Balance = Starting Balance 
+             + All Savings Deposits
+             + All Loan Payments  
+             + All Fine Payments
+             - All Loan Disbursements
+             - All Payouts
+```
+
+#### Data Integrity Features
+- **Atomic Transactions**: MongoDB sessions prevent partial updates
+- **Corruption Detection**: Validates payment amounts vs installment totals
+- **Automatic Rollback**: Failed operations automatically undo changes
+- **Audit Trail**: Complete transaction logging with timestamps and notes
+
+### Frontend State Management
+
+#### Global Event System
+The application uses a custom event system for real-time updates:
+
+| Event | Trigger | Listeners |
+|-------|---------|-----------|
+| `loanDataChanged` | Payment/reversal success | Loans page, Dashboard |
+
+#### Authentication Flow
+1. **JWT Storage**: Tokens stored in localStorage with auto-refresh
+2. **Route Protection**: Role-based redirects built into main App component
+3. **API Integration**: Axios interceptors auto-inject JWT tokens
+4. **Session Management**: Automatic logout on token expiration
+
 ## New in v2.0+
 - **Enhanced Reporting**: Choose between current cycle and historical cycle data with intelligent cycle detection
 - **Comprehensive Data Display**: Detailed loan installment tracking, savings with interest calculations, and transaction history

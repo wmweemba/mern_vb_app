@@ -32,7 +32,20 @@ const Loans = () => {
     }
   };
 
-  useEffect(() => { fetchLoans(); }, []);
+  useEffect(() => { 
+    fetchLoans(); 
+    
+    // Listen for loan data changes from payment modal
+    const handleLoanDataChange = () => {
+      fetchLoans(); // Refresh loan data when payments are made
+    };
+    
+    window.addEventListener('loanDataChanged', handleLoanDataChange);
+    
+    return () => {
+      window.removeEventListener('loanDataChanged', handleLoanDataChange);
+    };
+  }, []);
 
   const canAddLoan = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
   const canEditLoan = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);

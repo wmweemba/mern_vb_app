@@ -31,12 +31,14 @@ exports.getTransactionsByUser = async (req, res) => {
   }
 };
 
-exports.logTransaction = async ({ userId, type, amount, referenceId, note }) => {
+exports.logTransaction = async ({ userId, type, amount, referenceId, note }, session = null) => {
   try {
     const transaction = new Transaction({ userId, type, amount, referenceId, note });
-    await transaction.save();
+    await transaction.save({ session });
+    return transaction;
   } catch (err) {
     console.error('Transaction log failed:', err.message);
+    throw err; // Re-throw to ensure transaction fails if logging fails
   }
 };
 

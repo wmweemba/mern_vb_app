@@ -1,36 +1,81 @@
 // Reverse a paid installment (admin, loan_officer, treasurer only)
+const mongoose = require('mongoose');
+
 exports.reverseInstallmentPayment = async (req, res) => {
   const { loanId, month } = req.params;
   const allowedRoles = ['admin', 'loan_officer', 'treasurer'];
   if (!allowedRoles.includes(req.user.role)) {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
   }
+
+  const session = await mongoose.startSession();
+  
   try {
-    const loan = await Loan.findById(loanId);
-    if (!loan) return res.status(404).json({ error: 'Loan not found' });
-    const installment = loan.installments.find(inst => inst.month === Number(month));
-    if (!installment) return res.status(404).json({ error: 'Installment not found' });
-    if (!installment.paid) return res.status(400).json({ error: 'Installment is not marked as paid.' });
+    await session.withTransaction(async () => {
+      const loan = await Loan.findById(loanId).session(session);
+      if (!loan) {
+        throw new Error('Loan not found');
+      }
+      
+      const installment = loan.installments.find(inst => inst.month === Number(month));
+      if (!installment) {
+        throw new Error('Installment not found');
+      }
+      if (!installment.paid) {
+        throw new Error('Installment is not marked as paid');
+      }
 
-    // Reverse payment
-    installment.paid = false;
-    installment.paymentDate = undefined;
-    installment.penalties = { lateInterest: 0, overdueFine: 0, earlyPaymentCharge: 0 };
+      // Get the amount that was paid for this installment
+      const paidAmount = installment.paidAmount || installment.total;
+      
+      // Validate that paidAmount is reasonable (not corrupted data)
+      if (paidAmount > installment.total * 2) { // Allow some overpayment but not extreme corruption
+        throw new Error(`Cannot reverse: paidAmount (${paidAmount}) appears corrupted for installment total (${installment.total})`);
+      }
+      
+      // Reverse the payment
+      installment.paid = false;
+      installment.paymentDate = undefined;
+      installment.paidAmount = 0; // Reset paid amount
+      installment.penalties = { lateInterest: 0, overdueFine: 0, earlyPaymentCharge: 0 };
 
-    // Update loan fullyPaid status
-    loan.fullyPaid = loan.installments.every(inst => inst.paid);
-    await loan.save();
-    res.json({ message: 'Installment payment reversed.', loan });
+      // Update bank balance (subtract the payment amount since we're reversing)
+      await updateBankBalance(-paidAmount, session);
+
+      // Log reversal transaction
+      await logTransaction({
+        userId: loan.userId,
+        type: 'loan_payment',
+        amount: -paidAmount, // Negative amount to indicate reversal
+        note: `Reversed payment for Month ${month} - Amount: K${paidAmount}`,
+        referenceId: loanId
+      }, session);
+
+      // Update loan fullyPaid status
+      loan.fullyPaid = false; // Since we reversed a payment, loan is no longer fully paid
+      
+      await loan.save({ session });
+      
+      res.json({ 
+        message: `Installment payment reversed successfully - K${paidAmount} refunded`,
+        loan,
+        reversedAmount: paidAmount
+      });
+    });
   } catch (err) {
+    console.error('Reverse payment error:', err);
     res.status(500).json({ error: 'Failed to reverse payment', details: err.message });
+  } finally {
+    await session.endSession();
   }
 };
+
 const Loan = require('../models/Loans');
 const User = require('../models/User');
 const calculateLoanSchedule = require('../utils/loanCalculator');
-const { Parser } = require('json2csv');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
+const { Parser } = require('json2csv');
 const PdfPrinter = require('pdfmake');
 const fonts = {
   Roboto: {

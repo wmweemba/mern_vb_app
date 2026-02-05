@@ -34,15 +34,16 @@ exports.setBankBalance = async (req, res) => {
 };
 
 // Internal helper to update balance by amount (positive or negative)
-exports.updateBankBalance = async (amount) => {
-  let doc = await BankBalance.findOne();
+exports.updateBankBalance = async (amount, session = null) => {
+  let doc = await BankBalance.findOne().session(session);
   if (!doc) {
-    doc = await BankBalance.create({ balance: 0 });
+    doc = await BankBalance.create([{ balance: 0 }], { session });
+    doc = doc[0]; // create with session returns array
   }
   amount = Number(amount);
   if (isNaN(amount)) amount = 0;
   doc.balance += amount;
-  await doc.save();
+  await doc.save({ session });
   return doc.balance;
 };
 

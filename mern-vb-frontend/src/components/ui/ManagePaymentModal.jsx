@@ -24,21 +24,64 @@ const ManagePaymentModal = ({ open, onClose }) => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setLoading(true); setSuccess(''); setError('');
+    setLoading(true); 
+    setSuccess(''); // Clear previous messages
+    setError('');
+    
     try {
+      let response;
+      
       if (type === 'fine') {
-        await axios.post(`${API_BASE_URL}/payments/pay-fine`, { fineId });
+        response = await axios.post(`${API_BASE_URL}/payments/pay-fine`, { fineId });
         setSuccess('Fine payment recorded!');
         setFineId('');
+        // Reset unpaid fines list
+        const updatedFines = await axios.get(`${API_BASE_URL}/payments/unpaid-fines`);
+        setUnpaidFines(updatedFines.data);
       } else {
         const endpoint = type === 'repayment' ? `${API_BASE_URL}/payments/repayment` : `${API_BASE_URL}/payments/payout`;
-        // await axios.post(endpoint, { userId, amount: Number(amount), note });
-        await axios.post(endpoint, { username, amount: Number(amount), note });
-        setSuccess(type === 'repayment' ? 'Repayment recorded!' : 'Payout recorded!');
-        setUserId(''); setAmount(''); setNote('');
+        response = await axios.post(endpoint, { username, amount: Number(amount), note });
+        
+        // Show specific success message with details
+        if (type === 'repayment' && response.data.installmentsPaid) {
+          const installmentDetails = response.data.installmentsPaid
+            .map(inst => `Month ${inst.month}: K${inst.amount}`)
+            .join(', ');
+          setSuccess(`Loan payment recorded! Paid: ${installmentDetails}`);
+          if (response.data.loanFullyPaid) {
+            setSuccess(prev => prev + ' - Loan fully paid!');
+          }
+        } else {
+          setSuccess(type === 'repayment' ? 'Loan payment recorded!' : 'Payout recorded!');
+        }
+        
+        // Trigger global refresh event for loan data
+        if (type === 'repayment' || type === 'payout') {
+          window.dispatchEvent(new CustomEvent('loanDataChanged', { detail: { type, response: response.data } }));
+        }
+        
+        // Clear form fields on success
+        setUsername(''); 
+        setAmount(''); 
+        setNote('');
       }
     } catch (err) {
-      setError('Failed to record payment');
+      console.error('Payment error:', err);
+      
+      // Extract specific error message from backend response
+      let errorMessage = 'Failed to record payment';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+        // Add details if available
+        if (err.response.data.details) {
+          errorMessage += `: ${err.response.data.details}`;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -51,7 +94,7 @@ const ManagePaymentModal = ({ open, onClose }) => {
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>&times;</button>
         <h2 className="text-lg font-bold mb-4">Manage Payment</h2>
         <div className="flex gap-2 mb-4">
-          <button className={`flex-1 py-2 rounded ${type === 'repayment' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('repayment')}>Repayment</button>
+          <button className={`flex-1 py-2 rounded ${type === 'repayment' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('repayment')}>Loan Payment</button>
           <button className={`flex-1 py-2 rounded ${type === 'payout' ? 'bg-yellow-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('payout')}>Payout</button>
           <button className={`flex-1 py-2 rounded ${type === 'fine' ? 'bg-red-600 text-white' : 'bg-gray-200'}`} onClick={() => setType('fine')}>Fine Payment</button>
         </div>
@@ -73,7 +116,7 @@ const ManagePaymentModal = ({ open, onClose }) => {
               <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" className="border rounded px-3 py-2" />
             </>
           )}
-          <button type="submit" className="bg-green-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? (type === 'repayment' ? 'Recording...' : type === 'payout' ? 'Paying...' : 'Paying Fine...') : (type === 'repayment' ? 'Record Repayment' : type === 'payout' ? 'Record Payout' : 'Pay Fine')}</button>
+          <button type="submit" className="bg-green-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? (type === 'repayment' ? 'Recording...' : type === 'payout' ? 'Paying...' : 'Paying Fine...') : (type === 'repayment' ? 'Record Loan Payment' : type === 'payout' ? 'Record Payout' : 'Pay Fine')}</button>
           {success && <div className="text-green-600 text-sm mt-1">{success}</div>}
           {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
         </form>

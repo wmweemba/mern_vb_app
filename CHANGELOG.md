@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-02-05
+
+### Fixed - Critical Payment System Issues
+- **Payment Processing Atomicity**: Implemented MongoDB sessions for atomic transaction processing
+  - All payment operations now use atomic transactions to prevent partial updates
+  - Enhanced error handling with automatic rollback protection
+  - Fixed bank balance inconsistencies caused by failed payment operations
+  - Added transaction validation before database commits
+
+- **Frontend Data Synchronization**: Fixed loan data not updating after payments
+  - Implemented global event system for real-time UI updates
+  - Payment modal now dispatches `loanDataChanged` events after successful operations
+  - Loans page automatically refreshes when payments are made from navigation
+  - Dashboard statistics update immediately after financial transactions
+
+- **Payment Reversal System**: Enhanced reversal logic with atomicity and corruption detection
+  - Added MongoDB sessions for atomic reversal operations
+  - Implemented validation to detect and prevent corrupted payment data processing
+  - Enhanced error messages with specific reversal amounts and details
+  - Fixed bank balance updates during payment reversals
+
+- **Data Integrity Restoration**: Fixed corrupted loan installment data
+  - Created repair script to clean up impossible `paidAmount` values in loan records
+  - Reset corrupted installments where `paid=false` but `paidAmount > total`
+  - Implemented validation in reversal logic to prevent future corruption
+
+- **Bank Balance Audit and Correction**: Comprehensive financial audit system
+  - Created current cycle transaction audit script for balance verification
+  - Identified and corrected K42,149.95 bank balance discrepancy
+  - Implemented transaction-based balance calculation for accuracy verification
+  - Fixed bank balance to reflect accurate current cycle financial activity (K174,989.00)
+
+### Enhanced - Payment and Transaction Systems
+- **Transaction Type Validation**: Clarified and standardized payment type handling
+  - Updated Transaction model enum to include all valid types: `['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset']`
+  - Fixed transaction type mismatches that caused payment processing errors
+  - Improved error messages for invalid transaction types
+
+- **Payment Modal User Experience**: Enhanced payment confirmation and error handling
+  - Updated frontend to parse and display actual backend error responses
+  - Improved success messages to show detailed payment breakdowns
+  - Fixed double message display (success + error) issue
+  - Enhanced payment type labeling for clarity
+
+- **Loan Management Robustness**: Strengthened loan processing with better validation
+  - Added corruption detection in payment processing workflows
+  - Enhanced installment payment tracking with detailed payment dates
+  - Improved loan status calculation and fully-paid determination
+  - Added comprehensive transaction logging for audit trails
+
+### Technical Improvements
+- **Database Session Management**: Implemented proper MongoDB session handling
+  - Updated `updateBankBalance` and `logTransaction` utilities to support sessions
+  - Enhanced error handling in session-based operations
+  - Improved transaction consistency across all financial operations
+
+- **Audit and Monitoring Tools**: Created comprehensive financial audit capabilities
+  - Current cycle transaction analysis scripts
+  - Bank balance verification and correction tools
+  - Cross-verification between transaction logs and data collections
+  - Detailed financial activity reporting
 ## [2.0.3] - 2026-01-11
 
 ### Fixed - 11-01-2026

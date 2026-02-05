@@ -3,6 +3,7 @@ const { logTransaction } = require('./transactionController');
 const User = require('../models/User');
 const Fine = require('../models/Fine');
 const Loan = require('../models/Loans');
+const mongoose = require('mongoose');
 
 // exports.repayment = async (req, res) => {
 //   const { userId, amount, note } = req.body;
@@ -18,71 +19,143 @@ const Loan = require('../models/Loans');
 exports.repayment = async (req, res) => {
   const { username, amount, note } = req.body;
 
+  // Use MongoDB session for atomic transactions
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    // 1. Find user by username
-    const user = await User.findOne({ username });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    // 1. Validate inputs
+    if (!username || !amount || amount <= 0) {
+      await session.abortTransaction();
+      return res.status(400).json({ error: 'Invalid username or amount' });
+    }
+
+    const paymentAmount = Number(amount);
+    if (isNaN(paymentAmount)) {
+      await session.abortTransaction();
+      return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
+    // 2. Find user by username (with session)
+    const user = await User.findOne({ username }).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: `User '${username}' not found` });
+    }
     const userId = user._id;
 
-    // 2. Update bank balance
-    await updateBankBalance(amount);
+    // 3. Find active loan (with session)
+    const loan = await Loan.findOne({ userId, fullyPaid: false }).session(session);
+    if (!loan) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: `No active loan found for user '${username}'` });
+    }
 
-    // 3. Log transaction
-    await logTransaction({ userId, type: 'repayment', amount, note });
-
-    // 4. Find active loan
-    const loan = await Loan.findOne({ userId, fullyPaid: false });
-    if (!loan) return res.status(404).json({ error: 'No active loan found for this user' });
-
-    // 5. Find next unpaid or partially paid installment
+    // 4. Find next unpaid or partially paid installment
     const nextInstallment = loan.installments.find(inst => !inst.paid);
     if (!nextInstallment) {
-      loan.fullyPaid = true;
-      await loan.save();
-      return res.status(400).json({ error: 'All installments already paid' });
+      await session.abortTransaction();
+      return res.status(400).json({ error: 'All loan installments are already paid' });
     }
 
-    // Add to paidAmount
-    nextInstallment.paidAmount = (nextInstallment.paidAmount || 0) + amount;
-
-    // If paidAmount >= total, mark as paid
-    if (nextInstallment.paidAmount >= nextInstallment.total) {
-      nextInstallment.paid = true;
-      nextInstallment.paymentDate = new Date();
-      // If overpaid, carry over to next installment
-      const overpay = nextInstallment.paidAmount - nextInstallment.total;
-      if (overpay > 0) {
-        // Recursively apply overpay to next installments
-        let remaining = overpay;
-        let idx = loan.installments.findIndex(inst => inst.month === nextInstallment.month) + 1;
-        while (remaining > 0 && idx < loan.installments.length) {
-          const inst = loan.installments[idx];
-          if (!inst.paid) {
-            inst.paidAmount = (inst.paidAmount || 0) + remaining;
-            if (inst.paidAmount >= inst.total) {
-              inst.paid = true;
-              inst.paymentDate = new Date();
-              remaining = inst.paidAmount - inst.total;
-            } else {
-              remaining = 0;
-            }
-          }
-          idx++;
-        }
+    // 5. Calculate payment effects (validation only - no database changes yet)
+    let installmentsToUpdate = [];
+    let currentInstallment = nextInstallment;
+    let remainingPayment = paymentAmount;
+    
+    // Calculate which installments will be affected
+    let idx = loan.installments.findIndex(inst => inst.month === currentInstallment.month);
+    while (remainingPayment > 0 && idx < loan.installments.length) {
+      const inst = loan.installments[idx];
+      if (!inst.paid) {
+        const currentPaid = inst.paidAmount || 0;
+        const amountNeeded = inst.total - currentPaid;
+        const paymentForThis = Math.min(remainingPayment, amountNeeded);
+        
+        installmentsToUpdate.push({
+          index: idx,
+          newPaidAmount: currentPaid + paymentForThis,
+          willBePaid: (currentPaid + paymentForThis) >= inst.total,
+          paymentApplied: paymentForThis
+        });
+        
+        remainingPayment -= paymentForThis;
+        if (remainingPayment <= 0) break;
       }
+      idx++;
     }
 
-    // 6. Mark loan as fully paid if all done
-    if (loan.installments.every(inst => inst.paid)) {
+    if (installmentsToUpdate.length === 0) {
+      await session.abortTransaction();
+      return res.status(400).json({ error: 'No installments available for payment' });
+    }
+
+    // 6. ATOMIC OPERATIONS - All database changes in single transaction
+    
+    // Update loan installments first (most likely to fail)
+    installmentsToUpdate.forEach(update => {
+      const installment = loan.installments[update.index];
+      installment.paidAmount = update.newPaidAmount;
+      if (update.willBePaid) {
+        installment.paid = true;
+        installment.paymentDate = new Date();
+      }
+    });
+
+    // Update loan fullyPaid status
+    const allPaid = loan.installments.every(inst => inst.paid);
+    if (allPaid) {
       loan.fullyPaid = true;
     }
 
-    await loan.save();
+    // Save loan (with session)
+    await loan.save({ session });
 
-    res.json({ message: 'Repayment recorded and loan updated', loan });
+    // Update bank balance (with session)
+    await updateBankBalance(paymentAmount, session);
+
+    // Log transaction (with session) 
+    await logTransaction({ 
+      userId, 
+      type: 'loan_payment', 
+      amount: paymentAmount, 
+      note: note || `Payment for ${installmentsToUpdate.length} installment(s)`,
+      referenceId: loan._id 
+    }, session);
+
+    // Commit the transaction - all or nothing
+    await session.commitTransaction();
+
+    // Build success response
+    const paidInstallments = installmentsToUpdate.map(update => ({
+      month: loan.installments[update.index].month,
+      amount: update.paymentApplied,
+      paid: update.willBePaid
+    }));
+
+    res.json({ 
+      message: 'Loan payment recorded successfully',
+      paymentAmount,
+      installmentsPaid: paidInstallments,
+      loanFullyPaid: allPaid,
+      loan 
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to record repayment', details: err.message });
+    // Abort transaction on any error
+    await session.abortTransaction();
+    console.error('Payment processing error:', err);
+    
+    // Return specific error message
+    res.status(500).json({ 
+      error: 'Failed to process loan payment', 
+      details: err.message,
+      username,
+      amount: paymentAmount 
+    });
+  } finally {
+    // Always end the session
+    await session.endSession();
   }
 };
 
