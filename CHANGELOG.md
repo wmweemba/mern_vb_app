@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed - 06-02-2026
+- **PDF Report Generation**: Fixed non-functional PDF downloads for Loans and Savings reports
+  - Implemented missing `generateLoansPDF` and `generateSavingsPDF` functions in Reports.jsx
+  - Added proper loan installment flattening for comprehensive PDF table display
+  - Updated `handleExport` function to route PDF requests to appropriate generators
+  - PDF reports now work for all report types (Transactions, Loans, Savings) with consistent formatting
+  - Maintained Excel export functionality while adding missing PDF capabilities
+
 - **Legacy Payment Data Corruption**: Fixed corrupted loan installment data for patriciam user
   - Repaired loan payment records where database showed K0 payments despite transaction logs showing K9,533.67 in payments
   - Applied payment corrections: Month 1 fully paid (K4,766.67) and Month 2 partially paid (K4,400.00)

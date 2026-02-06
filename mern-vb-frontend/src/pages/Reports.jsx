@@ -67,6 +67,87 @@ const generateTransactionPDF = async (filename) => {
   }
 };
 
+const generateLoansPDF = async (filename) => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.get(`${API_BASE_URL}/loans`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const loans = res.data;
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Loans Report', 105, 15, { align: 'center' });
+
+    // Flatten loan data for table display
+    const tableData = [];
+    loans.forEach(loan => {
+      loan.installments.forEach(installment => {
+        tableData.push([
+          loan.userId?.username || '',
+          loan.userId?.name || '',
+          `K${Number(loan.amount).toLocaleString()}`,
+          loan.durationMonths,
+          installment.month,
+          `K${Number(installment.principal).toLocaleString()}`,
+          `K${Number(installment.interest).toLocaleString()}`,
+          `K${Number(installment.total).toLocaleString()}`,
+          installment.paid ? 'Yes' : 'No',
+          new Date(loan.createdAt).toLocaleDateString(),
+        ]);
+      });
+    });
+
+    autoTable(doc, {
+      startY: 25,
+      head: [['Username', 'Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total', 'Paid', 'Date']],
+      body: tableData,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [33, 150, 243] },
+    });
+
+    doc.save(filename);
+  } catch (err) {
+    alert('Error generating PDF: ' + err.message);
+  }
+};
+
+const generateSavingsPDF = async (filename) => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.get(`${API_BASE_URL}/savings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const savings = res.data;
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Savings Report', 105, 15, { align: 'center' });
+
+    const tableData = savings.map(saving => ([
+      saving.userId?.username || '',
+      saving.userId?.name || '',
+      `K${Number(saving.amount).toLocaleString()}`,
+      saving.month,
+      `K${Number(saving.interestEarned || 0).toLocaleString()}`,
+      `K${Number(saving.fine || 0).toLocaleString()}`,
+      new Date(saving.createdAt).toLocaleDateString(),
+    ]));
+
+    autoTable(doc, {
+      startY: 25,
+      head: [['Username', 'Name', 'Amount', 'Month', 'Interest Earned', 'Fine', 'Date']],
+      body: tableData,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [33, 150, 243] },
+    });
+
+    doc.save(filename);
+  } catch (err) {
+    alert('Error generating PDF: ' + err.message);
+  }
+};
+
 const exportConfigs = [
   {
     label: 'Loans',
@@ -257,6 +338,26 @@ const Reports = () => {
         }
         return;
       }
+
+      if (config.label === 'Loans') {
+        if (type === 'excel') {
+          await downloadExcelReport(config.endpoint, config.excelName);
+        } else if (type === 'pdf') {
+          await generateLoansPDF(config.pdfName);
+        }
+        return;
+      }
+
+      if (config.label === 'Savings') {
+        if (type === 'excel') {
+          await downloadExcelReport(config.endpoint, config.excelName);
+        } else if (type === 'pdf') {
+          await generateSavingsPDF(config.pdfName);
+        }
+        return;
+      }
+
+      // Fallback for any other report types
       const res = await axios.get(config.endpoint);
       let data = res.data;
       if (typeof data === 'string' && data.includes(',')) {
@@ -268,7 +369,6 @@ const Reports = () => {
         });
       }
       if (type === 'excel') exportToExcel(data, config.excelName);
-      // You can add PDF logic for Loans and Savings here if needed
     } catch (err) {
       setError(`Failed to export ${config.label}`);
     } finally {
