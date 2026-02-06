@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 06-02-2026
+- **Legacy Payment Data Corruption**: Fixed corrupted loan installment data for patriciam user
+  - Repaired loan payment records where database showed K0 payments despite transaction logs showing K9,533.67 in payments
+  - Applied payment corrections: Month 1 fully paid (K4,766.67) and Month 2 partially paid (K4,400.00)
+  - This addresses legacy corruption from pre-atomic transaction period (before Feb 5, 2026)
+  - Created repair script for systematic correction of historical payment data discrepancies
+
+- **Documentation Path References**: Fixed broken file path references in copilot instructions
+  - Updated relative paths in `.github/copilot-instructions.md` to correctly reference project files
+  - Fixed 15 file path resolution errors in VS Code problems panel
+  - Ensured proper navigation from GitHub documentation to actual source files
+
 ## [2.0.4] - 2026-02-05
 
 ### Fixed - Critical Payment System Issues

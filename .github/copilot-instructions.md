@@ -131,8 +131,8 @@ The system uses standardized transaction types for complete audit trails:
 - **API responses**: Include descriptive success messages and detailed error objects
 
 ## Key Files to Reference
-- [mern_vb_backend/server.js](mern_vb_backend/server.js) - Main Express server setup
-- [mern-vb-frontend/src/store/auth.jsx](mern-vb-frontend/src/store/auth.jsx) - Authentication patterns
-- [mern_vb_backend/middleware/auth.js](mern_vb_backend/middleware/auth.js) - JWT verification patterns
-- [mern_vb_backend/utils/loanCalculator.js](mern_vb_backend/utils/loanCalculator.js) - Business logic example
-- [mern-vb-frontend/src/components/ui/DashboardStatsCard.jsx](mern-vb-frontend/src/components/ui/DashboardStatsCard.jsx) - Component patterns
+- [mern_vb_backend/server.js](../mern_vb_backend/server.js) - Main Express server setup
+- [mern-vb-frontend/src/store/auth.jsx](../mern-vb-frontend/src/store/auth.jsx) - Authentication patterns
+- [mern_vb_backend/middleware/auth.js](../mern_vb_backend/middleware/auth.js) - JWT verification patterns
+- [mern_vb_backend/utils/loanCalculator.js](../mern_vb_backend/utils/loanCalculator.js) - Business logic example
+- [mern-vb-frontend/src/components/ui/DashboardStatsCard.jsx](../mern-vb-frontend/src/components/ui/DashboardStatsCard.jsx) - Component patterns
