@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed - 06-02-2026
+- **PDF Report Generation - Production Fix**: Fixed Loans and Savings PDF downloads failing in production
+  - Aligned generateLoansPDF and generateSavingsPDF functions to match exact pattern of working generateTransactionPDF
+  - Ensured identical API call structure, token handling, and error management across all PDF generators
+  - Production deployment now supports PDF exports for all report types (Transactions, Loans, Savings)
+  - Maintained backward compatibility with development environment functionality
+
 - **PDF Report Generation**: Fixed non-functional PDF downloads for Loans and Savings reports
   - Implemented missing `generateLoansPDF` and `generateSavingsPDF` functions in Reports.jsx
   - Added proper loan installment flattening for comprehensive PDF table display

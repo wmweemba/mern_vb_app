@@ -79,7 +79,7 @@ const generateLoansPDF = async (filename) => {
     doc.setFontSize(16);
     doc.text('Loans Report', 105, 15, { align: 'center' });
 
-    // Flatten loan data for table display
+    // Flatten loan data for table display - using same pattern as transactions
     const tableData = [];
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
