@@ -17,7 +17,7 @@ const mongoose = require('mongoose');
 // };
 
 exports.repayment = async (req, res) => {
-  const { username, amount, note } = req.body;
+  const { username, amount, note, loanId } = req.body;
 
   // Use MongoDB session for atomic transactions
   const session = await mongoose.startSession();
@@ -45,7 +45,14 @@ exports.repayment = async (req, res) => {
     const userId = user._id;
 
     // 3. Find active loan (with session)
-    const loan = await Loan.findOne({ userId, fullyPaid: false }).session(session);
+    let loan;
+    if (loanId) {
+      loan = await Loan.findOne({ _id: loanId, userId, archived: { $ne: true } }).session(session);
+    } else {
+      loan = await Loan.findOne({ userId, fullyPaid: false, archived: { $ne: true } })
+        .sort({ createdAt: -1 })
+        .session(session);
+    }
     if (!loan) {
       await session.abortTransaction();
       return res.status(404).json({ error: `No active loan found for user '${username}'` });

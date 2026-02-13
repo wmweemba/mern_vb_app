@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 13-02-2026
+- **Loan Payment Allocation (Multiple Active Loans)**: Ensured repayments apply to the most recent active loan in the current cycle
+  - Updated repayment logic to select latest active, non-archived loan by default
+  - Added optional `loanId` targeting for explicit payment routing
+  - Added audit and repair scripts to diagnose and correct misapplied loan payments
+
 ### Fixed - 06-02-2026
 - **PDF Report Generation - Production Fix**: Fixed Loans and Savings PDF downloads failing in production
   - Aligned generateLoansPDF and generateSavingsPDF functions to match exact pattern of working generateTransactionPDF
