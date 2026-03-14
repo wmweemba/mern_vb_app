@@ -15,6 +15,10 @@ router.post('/payout', verifyToken, allowRoles('admin', 'treasurer', 'loan_offic
 router.post('/fine', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.fine);
 router.post('/pay-fine', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.payFine);
 router.get('/unpaid-fines', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.getUnpaidFines);
+router.get('/fines', verifyToken, paymentController.getAllFines);
+router.patch('/fines/:fineId', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.editFine);
+router.put('/fines/:fineId/void', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.voidFine);
+router.delete('/fines/:fineId', verifyToken, allowRoles('admin', 'treasurer', 'loan_officer'), paymentController.deleteFine);
 router.delete('/fines', verifyToken, requireRole('admin'), paymentController.deleteAllFines);
 
 module.exports = router; 

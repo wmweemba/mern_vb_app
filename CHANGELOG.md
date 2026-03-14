@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-03-14
+
+### Added
+- **Loan Deletion**: Admins and loan officers can now delete loans that have no payments recorded
+  - Deletion is blocked with a clear error message if any installment has been paid
+  - Atomically restores the disbursed amount to the bank balance on deletion
+  - Logs a reversal transaction for full audit trail
+  - Confirmation dialog in UI shows reversal impact before proceeding
+
+- **Operations Menu**: New dedicated "Operations" dropdown in the navbar (admin, loan_officer, treasurer)
+  - Consolidates: Manage Bank Balance, Manage Payment, Add Fine/Penalty, Begin New Cycle, View Fines & Penalties, Delete All Fines (admin only)
+  - "Settings" dropdown now contains only Change Password and Manage Users (admin)
+  - Operations menu is hidden from members with no role permissions
+
+- **Fine & Penalty Management**: Complete fine lifecycle management for officers/admin
+  - Edit unpaid, non-cancelled fines (amount and reason/notes)
+  - Void fines with a mandatory cancel reason — cancelled fines keep an audit trail; bank balance is reversed if the fine had already been paid
+  - Permanently delete fines — bank balance reversed automatically if the fine was paid
+  - Status badges on each fine: Paid (green), Unpaid (yellow), Cancelled (grey)
+
+- **Fines & Penalties Viewer**: All users can now view fines relevant to them
+  - Officers/admin see all fines across all members with full management actions
+  - Members see only their own fines read-only, accessible from the Reports page
+  - Empty state message shown when a member has no fines
+  - Accessible from both the Operations menu (navbar) and the Reports page
+
+- **Reports Page — Fines Section**: New "Fines & Penalties" card added to the top of the Reports page
+  - Visible to all roles with a role-appropriate subtitle
+  - Opens the Fines & Penalties modal on click
+
+### Fixed
+- **Loan Creation — Custom Duration Ignored**: `createLoan` was auto-calculating duration based only on amount thresholds, ignoring the duration entered in the form
+  - K50,000 loans always created 4-month schedules regardless of what was entered
+  - Now correctly reads `duration` from the request body; auto-calculates only when not provided
+  - Also reads custom `interestRate` from the body and recalculates the schedule accordingly
+
+- **Loan Edit — Duration Field Incorrectly Locked**: `EditLoanForm` was disabling all three fields (amount, interestRate, durationMonths) once any payment existed
+  - Backend only restricts `amount` and `interestRate` after payments begin; duration was always editable
+  - Fixed: only amount and interest rate disable after payments; duration remains editable
+  - Added informational warning banner when editing a loan with existing payments
+
 ### Fixed - 13-02-2026
 - **Loan Payment Allocation (Multiple Active Loans)**: Ensured repayments apply to the most recent active loan in the current cycle
   - Updated repayment logic to select latest active, non-archived loan by default

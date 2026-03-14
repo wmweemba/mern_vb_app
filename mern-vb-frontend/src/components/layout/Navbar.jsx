@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { useAuth } from '../../store/auth';
-import { FaTachometerAlt, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSignOutAlt, FaCog, FaRecycle } from 'react-icons/fa';
+import { FaTachometerAlt, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSignOutAlt, FaCog, FaRecycle, FaTools } from 'react-icons/fa';
 import ManageBankBalanceModal from '../ui/ManageBankBalanceModal';
 import ChangePasswordModal from '../ui/ChangePasswordModal';
 import ManagePaymentModal from '../ui/ManagePaymentModal';
 import AddFineModal from '../ui/AddFineModal';
 import BeginNewCycleModal from '../ui/BeginNewCycleModal';
+import FinesModal from '../ui/FinesModal';
 import axios from 'axios';
 import InstallPWAButton from '../ui/InstallPWAButton';
 
@@ -18,32 +19,36 @@ const navItems = [
   { name: 'Reports', to: '/reports', icon: <FaChartBar className="text-xl sm:text-lg" /> },
 ];
 
-const canAddFine = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
-const canManageBankBalanceOrPayment = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
-const canStartNewCycle = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+const canAccessOperations = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
 const Navbar = () => {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showSettings, setShowSettings] = useState(false);
+  const [showOperations, setShowOperations] = useState(false);
   const [showBankBalance, setShowBankBalance] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showFine, setShowFine] = useState(false);
   const [showNewCycle, setShowNewCycle] = useState(false);
+  const [showFinesModal, setShowFinesModal] = useState(false);
   const [deletingFines, setDeletingFines] = useState(false);
   const dropdownRef = useRef(null);
+  const operationsRef = useRef(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowSettings(false);
       }
+      if (operationsRef.current && !operationsRef.current.contains(event.target)) {
+        setShowOperations(false);
+      }
     };
 
-    if (showSettings) {
+    if (showSettings || showOperations) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
     }
@@ -52,7 +57,7 @@ const Navbar = () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showSettings]);
+  }, [showSettings, showOperations]);
 
   const handleLogout = () => {
     logout();
@@ -87,12 +92,51 @@ const Navbar = () => {
                 <span className="hidden sm:inline">{item.name}</span>
               </Link>
             ))}
-            {/* Settings dropdown for admin/treasurer/loan_officer */}
+
+            {/* Operations dropdown — admin, loan_officer, treasurer only */}
+            {user && canAccessOperations(user) && (
+              <div className="relative ml-2" ref={operationsRef}>
+                <button
+                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+                  onClick={() => { setShowOperations((v) => !v); setShowSettings(false); }}
+                  aria-label="Operations"
+                >
+                  <FaTools className="text-xl sm:text-lg" />
+                  <span className="hidden sm:inline">Operations</span>
+                </button>
+                {showOperations && (
+                  <div className="absolute left-0 mt-2 w-60 bg-white border rounded shadow-lg z-50">
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowOperations(false); setShowBankBalance(true); }}>Manage Bank Balance</button>
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowOperations(false); setShowPayment(true); }}>Manage Payment</button>
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowOperations(false); setShowFine(true); }}>Add Fine/Penalty</button>
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowOperations(false); setShowFinesModal(true); }}>View Fines &amp; Penalties</button>
+                    <hr className="my-1" />
+                    <button
+                      className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold flex items-center gap-2"
+                      onClick={() => { setShowOperations(false); setShowNewCycle(true); }}
+                    >
+                      <FaRecycle className="text-sm" />
+                      Begin New Cycle
+                    </button>
+                    {user?.role === 'admin' && (
+                      <>
+                        <hr className="my-1" />
+                        <button className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold" onClick={() => { setShowOperations(false); handleDeleteAllFines(); }} disabled={deletingFines}>
+                          {deletingFines ? 'Deleting Fines...' : 'Delete All Fines'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settings dropdown — all logged in users */}
             {user && (
               <div className="relative ml-2" ref={dropdownRef}>
                 <button
                   className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
-                  onClick={() => setShowSettings((v) => !v)}
+                  onClick={() => { setShowSettings((v) => !v); setShowOperations(false); }}
                   aria-label="Settings"
                 >
                   <FaCog className="text-xl sm:text-lg" />
@@ -103,36 +147,7 @@ const Navbar = () => {
                     {user?.role === 'admin' && (
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); navigate('/users'); }}>Manage Users</button>
                     )}
-                    {canManageBankBalanceOrPayment(user) && (
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowBankBalance(true); }}>Manage Bank Balance</button>
-                    )}
                     <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowChangePassword(true); }}>Change Password</button>
-                    {canManageBankBalanceOrPayment(user) && (
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowPayment(true); }}>Manage Payment</button>
-                    )}
-                    {canAddFine(user) && (
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { setShowSettings(false); setShowFine(true); }}>Add Fine/Penalty</button>
-                    )}
-                    {canStartNewCycle(user) && (
-                      <>
-                        <hr className="my-1" />
-                        <button 
-                          className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold flex items-center gap-2" 
-                          onClick={() => { setShowSettings(false); setShowNewCycle(true); }}
-                        >
-                          <FaRecycle className="text-sm" />
-                          Begin New Cycle
-                        </button>
-                      </>
-                    )}
-                    {user?.role === 'admin' && (
-                      <>
-                        <hr className="my-1" />
-                        <button className="w-full text-left px-4 py-2 hover:bg-red-100 text-red-600 font-semibold" onClick={() => { setShowSettings(false); handleDeleteAllFines(); }} disabled={deletingFines}>
-                          {deletingFines ? 'Deleting Fines...' : 'Delete All Fines'}
-                        </button>
-                      </>
-                    )}
                   </div>
                 )}
               </div>
@@ -151,6 +166,7 @@ const Navbar = () => {
       <ChangePasswordModal open={showChangePassword} onClose={() => setShowChangePassword(false)} />
       <ManagePaymentModal open={showPayment} onClose={() => setShowPayment(false)} />
       <AddFineModal open={showFine} onClose={() => setShowFine(false)} />
+      <FinesModal open={showFinesModal} onClose={() => setShowFinesModal(false)} />
       <BeginNewCycleModal 
         isOpen={showNewCycle}
         onClose={() => setShowNewCycle(false)}

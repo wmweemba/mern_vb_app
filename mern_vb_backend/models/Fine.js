@@ -10,6 +10,9 @@ const fineSchema = new mongoose.Schema({
   paid: { type: Boolean, default: false },
   paidAt: { type: Date },
   paymentTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+  cancelled: { type: Boolean, default: false },
+  cancelledAt: { type: Date },
+  cancelReason: { type: String },
   cycleNumber: { type: Number },
   cycleEndDate: { type: Date },
   archived: { type: Boolean, default: false }

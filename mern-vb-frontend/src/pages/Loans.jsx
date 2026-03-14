@@ -19,6 +19,9 @@ const Loans = () => {
   const [reversing, setReversing] = useState({ loan: null, month: null });
   const [reverseLoading, setReverseLoading] = useState(false);
   const [reverseError, setReverseError] = useState('');
+  const [deletingLoan, setDeletingLoan] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const accordionRefs = useRef({});
 
   const fetchLoans = async () => {
@@ -162,6 +165,50 @@ const Loans = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Loan Dialog */}
+      {deletingLoan && (
+        <Dialog open={true} onOpenChange={() => { setDeletingLoan(null); setDeleteError(''); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Loan</DialogTitle>
+            </DialogHeader>
+            <div className="mb-2">
+              Are you sure you want to <strong>permanently delete</strong> the loan for{' '}
+              <strong>{deletingLoan.userId?.username}</strong> (K{Number(deletingLoan.amount).toLocaleString()})?
+            </div>
+            <div className="text-sm text-gray-600 mb-2">
+              The disbursed amount will be restored to the bank balance and a reversal entry will be logged.
+              This action cannot be undone.
+            </div>
+            {deleteError && <div className="text-red-500 text-sm mb-2">{deleteError}</div>}
+            <DialogFooter>
+              <button
+                className="bg-red-600 text-white rounded px-4 py-2 mr-2"
+                disabled={deleteLoading}
+                onClick={async () => {
+                  setDeleteLoading(true);
+                  setDeleteError('');
+                  try {
+                    await axios.delete(`${API_BASE_URL}/loans/${deletingLoan._id}`);
+                    setDeletingLoan(null);
+                    fetchLoans();
+                  } catch (err) {
+                    setDeleteError(err.response?.data?.error || 'Failed to delete loan');
+                  } finally {
+                    setDeleteLoading(false);
+                  }
+                }}
+              >{deleteLoading ? 'Deleting...' : 'Delete Loan'}</button>
+              <button
+                className="bg-gray-300 text-gray-700 rounded px-4 py-2"
+                onClick={() => { setDeletingLoan(null); setDeleteError(''); }}
+                disabled={deleteLoading}
+              >Cancel</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
                         </div>
                       </div>
                       {canEditLoan && (
@@ -170,6 +217,14 @@ const Loans = () => {
                           onClick={() => setEditingLoan(loan)}
                         >
                           Edit Loan
+                        </button>
+                      )}
+                      {canEditLoan && !loan.fullyPaid && (
+                        <button
+                          className="mt-2 px-4 py-2 bg-red-600 text-white rounded shadow hover:bg-red-700 flex items-center gap-2"
+                          onClick={() => { setDeletingLoan(loan); setDeleteError(''); }}
+                        >
+                          Delete Loan
                         </button>
                       )}
                       <Dialog>

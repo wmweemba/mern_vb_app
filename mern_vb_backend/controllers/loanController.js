@@ -227,7 +227,7 @@ exports.updateLoan = async (req, res) => {
 };
 
 exports.createLoan = async (req, res) => {
-  const { username, amount } = req.body;
+  const { username, amount, duration: customDuration, interestRate } = req.body;
   if (!username || !amount) return res.status(400).json({ error: 'Missing fields' });
 
   try {
@@ -236,12 +236,28 @@ exports.createLoan = async (req, res) => {
     if (!user) return res.status(400).json({ error: 'User not found' });
     const userId = user._id;
 
-    const { duration, schedule } = calculateLoanSchedule(amount);
+    const parsedDuration = customDuration ? Number(customDuration) : null;
+    const { duration, schedule } = calculateLoanSchedule(amount, parsedDuration);
+
+    // Apply custom interest rate if provided, otherwise keep default 10%
+    const appliedInterestRate = interestRate !== undefined ? Number(interestRate) : 10;
+    if (appliedInterestRate !== 10) {
+      // Recalculate schedule with custom interest rate
+      const principalPerMonth = +(amount / duration).toFixed(2);
+      let principalBalance = amount;
+      schedule.forEach((inst, i) => {
+        const interest = +(principalBalance * (appliedInterestRate / 100)).toFixed(2);
+        inst.interest = interest;
+        inst.total = +(inst.principal + interest).toFixed(2);
+        principalBalance -= inst.principal;
+      });
+    }
 
     const loan = new Loan({
       userId,
       amount,
       durationMonths: duration,
+      interestRate: appliedInterestRate,
       installments: schedule
     });
 
@@ -251,12 +267,55 @@ exports.createLoan = async (req, res) => {
       type: 'loan',
       amount,
       referenceId: loan._id,
-      note: `Loan of K${amount} created.`
+      note: `Loan of K${amount} created for ${duration} month(s).`
     });
     await updateBankBalance(-amount); // Debit the bank balance
     res.status(201).json(loan);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create loan', details: err.message });
+  }
+};
+
+exports.deleteLoan = async (req, res) => {
+  const { loanId } = req.params;
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const loan = await Loan.findById(loanId).session(session);
+      if (!loan) {
+        throw Object.assign(new Error('Loan not found'), { status: 404 });
+      }
+
+      const hasPayments = loan.installments.some(inst => inst.paid || (inst.paidAmount && inst.paidAmount > 0));
+      if (hasPayments || loan.fullyPaid) {
+        throw Object.assign(
+          new Error('Cannot delete a loan that has existing payments. Please reverse all payments first.'),
+          { status: 400 }
+        );
+      }
+
+      // Restore the disbursed amount back to the bank balance
+      await updateBankBalance(loan.amount, session);
+
+      // Log the reversal in transactions for audit trail
+      await logTransaction({
+        userId: loan.userId,
+        type: 'loan',
+        amount: -loan.amount,
+        referenceId: loan._id,
+        note: `Loan of K${loan.amount} deleted - disbursement reversed.`
+      }, session);
+
+      await Loan.findByIdAndDelete(loanId).session(session);
+
+      res.json({ message: `Loan deleted successfully. K${loan.amount} restored to bank balance.` });
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to delete loan', details: err.message });
+  } finally {
+    await session.endSession();
   }
 };
 

@@ -13,6 +13,8 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const paymentsStarted = loan.installments.some(inst => inst.paid);
+
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -36,7 +38,11 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">
       <h2 className="text-lg font-bold mb-2">Edit Loan</h2>
-      
+      {paymentsStarted && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded px-3 py-2 text-sm text-yellow-800">
+          Payments have been made on this loan. Amount and interest rate are locked — only duration and notes can be updated.
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <label htmlFor="amount" className="text-sm font-medium text-gray-700">
           Loan Amount (K)
@@ -49,9 +55,9 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
           placeholder="Enter loan amount" 
           type="number" 
           min="0" 
-          className="border rounded px-3 py-2" 
+          className="border rounded px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400" 
           required 
-          disabled={loan.installments.some(inst => inst.paid)} 
+          disabled={paymentsStarted}
         />
       </div>
 
@@ -68,9 +74,9 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
           type="number" 
           min="0" 
           step="0.01" 
-          className="border rounded px-3 py-2" 
+          className="border rounded px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400" 
           required 
-          disabled={loan.installments.some(inst => inst.paid)} 
+          disabled={paymentsStarted}
         />
       </div>
 
@@ -88,7 +94,6 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
           min="1" 
           className="border rounded px-3 py-2" 
           required 
-          disabled={loan.installments.some(inst => inst.paid)} 
         />
       </div>
 

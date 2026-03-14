@@ -5,6 +5,8 @@ import { exportToExcel } from '../lib/export';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
 import ReportSelectionModal from '../components/ui/ReportSelectionModal';
+import FinesModal from '../components/ui/FinesModal';
+import { useAuth } from '../store/auth';
 
 // Helper to download Excel/CSV from backend
 async function downloadExcelReport(endpoint, filename) {
@@ -263,6 +265,7 @@ const ReportModal = ({ open, onClose, data, columns, title }) => {
 };
 
 const Reports = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState('');
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -271,6 +274,7 @@ const Reports = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [reportSelectionOpen, setReportSelectionOpen] = useState(false);
   const [pendingReportConfig, setPendingReportConfig] = useState(null);
+  const [showFinesModal, setShowFinesModal] = useState(false);
 
   const handleViewReport = async (config) => {
     setPendingReportConfig(config);
@@ -376,9 +380,30 @@ const Reports = () => {
     }
   };
 
+  const isOfficer = ['admin', 'loan_officer', 'treasurer'].includes(user?.role);
+
   return (
     <div className="p-4 w-full max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-center">Reports</h1>
+
+      {/* Fines & Penalties section — visible to all roles */}
+      <div className="mb-8 border rounded-lg p-4 bg-orange-50">
+        <div className="font-semibold mb-1 text-center text-orange-800">Fines &amp; Penalties</div>
+        <p className="text-sm text-center text-orange-700 mb-3">
+          {isOfficer
+            ? 'View and manage all member fines and penalties.'
+            : 'View any fines or penalties issued to your account.'}
+        </p>
+        <div className="flex justify-center">
+          <button
+            className="bg-orange-500 hover:bg-orange-600 text-white rounded px-6 py-2 font-medium shadow"
+            onClick={() => setShowFinesModal(true)}
+          >
+            View Fines &amp; Penalties
+          </button>
+        </div>
+      </div>
+
       {exportConfigs.map(config => (
         <div key={config.label} className="mb-8">
           <div className="font-semibold mb-2 text-center">{config.label}</div>
@@ -430,6 +455,8 @@ const Reports = () => {
         }}
         onSelect={(cycleType, cycleNumber) => handleCycleSelected(cycleType, cycleNumber, pendingReportConfig)}
       />
+
+      <FinesModal open={showFinesModal} onClose={() => setShowFinesModal(false)} />
     </div>
   );
 };

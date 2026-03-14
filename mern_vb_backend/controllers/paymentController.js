@@ -235,4 +235,113 @@ exports.deleteAllFines = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete fines' });
   }
+};
+
+// Get all fines — officers/admin see all; members see only their own
+exports.getAllFines = async (req, res) => {
+  try {
+    let query = { archived: { $ne: true } };
+    if (req.user.role === 'member') {
+      query.userId = req.user.id;
+    }
+    const fines = await Fine.find(query)
+      .populate('userId', 'username name')
+      .populate('issuedBy', 'username')
+      .sort({ issuedAt: -1 });
+    res.json(fines);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch fines', details: err.message });
+  }
+};
+
+// Edit a fine — only allowed when unpaid and not cancelled
+exports.editFine = async (req, res) => {
+  const { fineId } = req.params;
+  const { amount, note } = req.body;
+  try {
+    const fine = await Fine.findById(fineId);
+    if (!fine) return res.status(404).json({ error: 'Fine not found' });
+    if (fine.paid) return res.status(400).json({ error: 'Cannot edit a paid fine' });
+    if (fine.cancelled) return res.status(400).json({ error: 'Cannot edit a cancelled fine' });
+    if (amount !== undefined) fine.amount = Number(amount);
+    if (note !== undefined) fine.note = note;
+    await fine.save();
+    res.json({ message: 'Fine updated successfully', fine });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update fine', details: err.message });
+  }
+};
+
+// Void/cancel a fine — keeps audit trail; reverses bank balance if fine was already paid
+exports.voidFine = async (req, res) => {
+  const { fineId } = req.params;
+  const { cancelReason } = req.body;
+  if (!cancelReason || !cancelReason.trim()) {
+    return res.status(400).json({ error: 'A cancel reason is required to void a fine' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const fine = await Fine.findById(fineId).session(session);
+      if (!fine) throw Object.assign(new Error('Fine not found'), { status: 404 });
+      if (fine.cancelled) throw Object.assign(new Error('Fine is already cancelled'), { status: 400 });
+
+      if (fine.paid) {
+        // Reverse the bank balance since the fine was already paid/collected
+        await updateBankBalance(-fine.amount, session);
+        await logTransaction({
+          userId: fine.userId,
+          type: 'fine',
+          amount: -fine.amount,
+          referenceId: fine._id,
+          note: `Fine voided: ${cancelReason}. Original amount K${fine.amount} reversed.`
+        }, session);
+      }
+
+      fine.cancelled = true;
+      fine.cancelledAt = new Date();
+      fine.cancelReason = cancelReason.trim();
+      await fine.save({ session });
+
+      res.json({ message: 'Fine voided successfully', fine });
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to void fine', details: err.message });
+  } finally {
+    await session.endSession();
+  }
+};
+
+// Permanently delete a fine — reverses bank balance if fine was paid
+exports.deleteFine = async (req, res) => {
+  const { fineId } = req.params;
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const fine = await Fine.findById(fineId).session(session);
+      if (!fine) throw Object.assign(new Error('Fine not found'), { status: 404 });
+
+      if (fine.paid && !fine.cancelled) {
+        // Reverse bank balance since the fine payment was collected
+        await updateBankBalance(-fine.amount, session);
+        await logTransaction({
+          userId: fine.userId,
+          type: 'fine',
+          amount: -fine.amount,
+          referenceId: fine._id,
+          note: `Fine permanently deleted - payment of K${fine.amount} reversed.`
+        }, session);
+      }
+
+      await Fine.findByIdAndDelete(fineId).session(session);
+      res.json({ message: 'Fine deleted successfully' });
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to delete fine', details: err.message });
+  } finally {
+    await session.endSession();
+  }
 }; 
