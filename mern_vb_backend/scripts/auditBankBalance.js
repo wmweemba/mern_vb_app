@@ -21,7 +21,7 @@ const auditBankBalance = async () => {
 
     // Categorize transactions
     const transactionsByType = {
-      savings: [],
+      saving: [],
       loan: [],
       loan_payment: [],
       payment: [],
@@ -48,7 +48,7 @@ const auditBankBalance = async () => {
       // Calculate balance effect
       let balanceEffect = 0;
       switch(type) {
-        case 'savings':
+        case 'saving':
           balanceEffect = amount; // Savings deposits increase bank balance
           break;
         case 'loan':
@@ -89,7 +89,7 @@ const auditBankBalance = async () => {
     console.log('\n💡 DETAILED BREAKDOWN:\n');
     
     // Savings Analysis
-    const savingsTransactions = transactionsByType.savings;
+    const savingsTransactions = transactionsByType.saving;
     const totalSavingsDeposits = savingsTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     console.log(`💰 Savings Deposits: ${savingsTransactions.length} transactions = K${totalSavingsDeposits}`);
     

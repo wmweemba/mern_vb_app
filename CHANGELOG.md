@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-04-01
+
+### Fixed
+- **Bank balance correction (Sprint Day 1 audit)**: Resolved a K158,989.00 discrepancy between the recorded balance (K179,622.67) and the true balance (K20,633.67). Three root causes identified and corrected:
+  - **Duplicate payment transactions**: 4 phantom transactions were deleted — idah had 2 duplicate `loan_payment` entries (2× K17,500) and sampa had 2 duplicates (2× K14,000), totalling K63,000 of excess bank balance credits created during troubleshooting sessions.
+  - **Patriciam data entry error**: Loan transaction `69637bb667c6d49b9d295b10` was logged as K11 instead of K11,000. The loan record had been corrected directly in the DB but the transaction record and corresponding bank balance debit were never updated. Fixed transaction amount and note.
+  - **Manual `setBankBalance` override**: A prior admin override set the balance to match an external bank figure without a corresponding transaction record, causing the transaction trail to diverge from the stored balance.
+  - All three corrections were applied atomically via a MongoDB session in `scripts/fixBalanceCorrection.js`. Pre-correction backups written to `mern_vb_backend/backups/`.
+  - Post-fix audit confirms: recorded K20,633.67 = calculated K20,633.67, savings match (K235,300), loan payments match (K115,833.67). Difference: K0.00.
+
+### Added
+- `mern_vb_backend/scripts/fixBalanceCorrection.js` — one-time atomic correction script (backup → delete duplicates → fix patriciam tx → recalculate balance → log audit transaction → verify)
+
+### Security / Data Integrity
+- Balance correction logged as an audit `cycle_reset` transaction with full explanation, preserving the audit trail
+
 ## [2.1.0] - 2026-03-14
 
 ### Added
