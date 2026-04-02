@@ -75,6 +75,7 @@ const User = require('../models/User');
 const calculateLoanSchedule = require('../utils/loanCalculator');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
+const { getSettings } = require('./groupSettingsController');
 const { Parser } = require('json2csv');
 const PdfPrinter = require('pdfmake');
 const fonts = {
@@ -196,7 +197,7 @@ exports.updateLoan = async (req, res) => {
         }
       } else if (!repaymentsStarted) {
         // For new loans, completely recalculate
-        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration);
+        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate);
         loan.installments = schedule;
       }
     }
@@ -227,7 +228,7 @@ exports.updateLoan = async (req, res) => {
 };
 
 exports.createLoan = async (req, res) => {
-  const { username, amount, duration: customDuration, interestRate } = req.body;
+  const { username, amount, duration: customDuration, interestRate: customRate } = req.body;
   if (!username || !amount) return res.status(400).json({ error: 'Missing fields' });
 
   try {
@@ -236,22 +237,12 @@ exports.createLoan = async (req, res) => {
     if (!user) return res.status(400).json({ error: 'User not found' });
     const userId = user._id;
 
-    const parsedDuration = customDuration ? Number(customDuration) : null;
-    const { duration, schedule } = calculateLoanSchedule(amount, parsedDuration);
+    const settings = await getSettings();
 
-    // Apply custom interest rate if provided, otherwise keep default 10%
-    const appliedInterestRate = interestRate !== undefined ? Number(interestRate) : 10;
-    if (appliedInterestRate !== 10) {
-      // Recalculate schedule with custom interest rate
-      const principalPerMonth = +(amount / duration).toFixed(2);
-      let principalBalance = amount;
-      schedule.forEach((inst, i) => {
-        const interest = +(principalBalance * (appliedInterestRate / 100)).toFixed(2);
-        inst.interest = interest;
-        inst.total = +(inst.principal + interest).toFixed(2);
-        principalBalance -= inst.principal;
-      });
-    }
+    const duration = customDuration ? Number(customDuration) : settings.defaultLoanDuration;
+    const appliedInterestRate = customRate !== undefined ? Number(customRate) : settings.interestRate;
+
+    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate);
 
     const loan = new Loan({
       userId,
@@ -337,6 +328,8 @@ exports.getLoansByUser = async (req, res) => {
 exports.repayInstallment = async (req, res) => {
   const { username, loanId, month, paymentDate } = req.body;
   try {
+    const settings = await getSettings();
+
     // Look up user by username
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ error: 'User not found' });
@@ -355,21 +348,21 @@ exports.repayInstallment = async (req, res) => {
 
     // Late payment check
     if (now > dueDate) {
-      installment.penalties.lateInterest = +(installment.total * 0.15).toFixed(2);
+      installment.penalties.lateInterest = +(installment.total * (settings.latePenaltyRate / 100)).toFixed(2);
     }
 
     // Overdue fine (after full term)
     const termEnd = new Date(loan.createdAt);
     termEnd.setMonth(termEnd.getMonth() + loan.durationMonths);
     if (now > termEnd) {
-      installment.penalties.overdueFine = 1000;
+      installment.penalties.overdueFine = settings.overdueFineAmount;
     }
 
     // Early payment check
     if (month === 1 && now < dueDate) {
       const allUnpaid = loan.installments.every(inst => !inst.paid);
       if (allUnpaid) {
-        installment.penalties.earlyPaymentCharge = 200;
+        installment.penalties.earlyPaymentCharge = settings.earlyPaymentCharge;
       }
     }
 

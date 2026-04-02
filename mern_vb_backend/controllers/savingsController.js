@@ -3,6 +3,7 @@ const Loan = require('../models/Loans');
 const User = require('../models/User');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
+const { getSettings } = require('./groupSettingsController');
 const { Parser } = require('json2csv');
 // const PdfPrinter = require('pdfmake');
 // const fonts = {
@@ -17,6 +18,8 @@ const { Parser } = require('json2csv');
 exports.createSaving = async (req, res) => {
   const { username, month, amount, date } = req.body;
   try {
+    const settings = await getSettings();
+
     // Look up user by username
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ error: 'User not found' });
@@ -25,12 +28,12 @@ exports.createSaving = async (req, res) => {
     const savingDate = date ? new Date(date) : new Date();
 
     let fine = 0;
-    let interest = +(amount * 0.10).toFixed(2);
+    let interest = +(amount * (settings.savingsInterestRate / 100)).toFixed(2);
 
     // Required savings check
-    if (month === 1 && amount < 3000) fine = 500;
-    else if (month > 1 && amount < 1000) fine = 500;
-    else if (month <= 3 && amount > 5000) return res.status(400).json({ error: 'Cannot save more than K5,000 in the first 3 months' });
+    if (month === 1 && amount < settings.minimumSavingsMonth1) fine = settings.savingsShortfallFine;
+    else if (month > 1 && amount < settings.minimumSavingsMonthly) fine = settings.savingsShortfallFine;
+    else if (month <= 3 && amount > settings.maximumSavingsFirst3Months) return res.status(400).json({ error: `Cannot save more than K${settings.maximumSavingsFirst3Months.toLocaleString()} in the first 3 months` });
 
     const saving = new Saving({
       userId,
@@ -103,17 +106,18 @@ exports.updateSaving = async (req, res) => {
 
     // Calculate new fine and interest if amount or month changed
     if (updates.amount !== undefined || updates.month !== undefined) {
+      const settings = await getSettings();
       const month = updates.month || saving.month;
       const amount = updates.amount || saving.amount;
-      
+
       let fine = 0;
-      let interest = +(amount * 0.10).toFixed(2);
+      let interest = +(amount * (settings.savingsInterestRate / 100)).toFixed(2);
 
       // Required savings check
-      if (month === 1 && amount < 3000) fine = 500;
-      else if (month > 1 && amount < 1000) fine = 500;
-      else if (month <= 3 && amount > 5000) {
-        return res.status(400).json({ error: 'Cannot save more than K5,000 in the first 3 months' });
+      if (month === 1 && amount < settings.minimumSavingsMonth1) fine = settings.savingsShortfallFine;
+      else if (month > 1 && amount < settings.minimumSavingsMonthly) fine = settings.savingsShortfallFine;
+      else if (month <= 3 && amount > settings.maximumSavingsFirst3Months) {
+        return res.status(400).json({ error: `Cannot save more than K${settings.maximumSavingsFirst3Months.toLocaleString()} in the first 3 months` });
       }
 
       updates.fine = fine;

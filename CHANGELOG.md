@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-04-02
+
+### Added
+- **GroupSettings model** (`models/GroupSettings.js`): Single-document-per-group store for all configurable financial parameters — interest rate, interest method, default loan duration, loan limit multiplier, late penalty rate, overdue fine, early payment charge, savings interest rate, savings minimums/maximums, savings shortfall fine, cycle length, and profit sharing method.
+- **GroupSettings controller** (`controllers/groupSettingsController.js`): `getSettings()` internal helper used by all financial controllers; `GET /api/group-settings` (any authenticated user); `PUT /api/group-settings` (admin only).
+- **GroupSettings route** (`routes/groupSettings.js`): Mounted at `/api/group-settings` in `server.js`.
+- **Seed script** (`scripts/seedGroupSettings.js`): Idempotent — seeds William's group values on first run, prints existing settings if already seeded.
+- **Tests** (`tests/loanCalculator.test.js`, `tests/groupSettings.test.js`): 18 new unit tests covering calculator regression (10%/15%/5% rates), duration parameterisation, reducing balance proof, installment structure, schema validation (invalid enum values, out-of-range interest), and penalty/savings calculation parity.
+
+### Changed
+- **`utils/loanCalculator.js`** — Complete rewrite. New signature: `calculateLoanSchedule(amount, duration, interestRate)`. All three parameters required. Removed amount-based duration threshold logic (group-specific policy moved to controller layer). Replaced hardcoded `0.10` with `interestRate / 100`. Calculator is now a pure math function with no hidden state.
+- **`controllers/loanController.js`** — `createLoan`: reads `defaultLoanDuration` and `interestRate` from GroupSettings instead of hardcoded `DEFAULT_DURATION = 4` / `DEFAULT_INTEREST_RATE = 10`; removed post-hoc schedule recalculation block. `repayInstallment`: reads `latePenaltyRate`, `overdueFineAmount`, and `earlyPaymentCharge` from GroupSettings instead of hardcoded `0.15`, `1000`, `200`. `updateLoan`: passes `loan.interestRate` as third argument to `calculateLoanSchedule`.
+- **`controllers/savingsController.js`** — `createSaving` and `updateSaving`: reads `savingsInterestRate`, `minimumSavingsMonth1`, `minimumSavingsMonthly`, `maximumSavingsFirst3Months`, and `savingsShortfallFine` from GroupSettings instead of hardcoded `0.10`, `3000`, `1000`, `5000`, `500`.
+- **`models/Loans.js`** — `interestRate` field: removed `default: 10`, changed to `required: true`. Rate now always comes from the controller via GroupSettings at loan creation time.
+
+### Technical Notes
+- 17 hardcoded financial values removed across 3 files; all replaced by GroupSettings lookups.
+- `getSettings()` throws a clear error if no GroupSettings document exists — no silent fallbacks that could mask misconfiguration for a new group.
+- Changing GroupSettings does NOT retroactively affect existing loans; each loan document stores its own `interestRate` at creation time.
+- Fields stored in GroupSettings but not yet wired (interestMethod flat rate, loanLimitMultiplier enforcement, profitSharingMethod payout logic, cycleLengthMonths wiring) are ready for future features.
+
 ## [2.1.1] - 2026-04-01
 
 ### Fixed
