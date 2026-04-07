@@ -72,6 +72,7 @@ exports.reverseInstallmentPayment = async (req, res) => {
 
 const Loan = require('../models/Loans');
 const User = require('../models/User');
+const Savings = require('../models/Savings');
 const calculateLoanSchedule = require('../utils/loanCalculator');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
@@ -197,7 +198,7 @@ exports.updateLoan = async (req, res) => {
         }
       } else if (!repaymentsStarted) {
         // For new loans, completely recalculate
-        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate);
+        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate, loan.interestMethod || 'reducing');
         loan.installments = schedule;
       }
     }
@@ -242,13 +243,27 @@ exports.createLoan = async (req, res) => {
     const duration = customDuration ? Number(customDuration) : settings.defaultLoanDuration;
     const appliedInterestRate = customRate !== undefined ? Number(customRate) : settings.interestRate;
 
-    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate);
+    // Enforce loan limit: amount cannot exceed savings × multiplier
+    const totalSavings = await Savings.aggregate([
+      { $match: { userId, archived: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const memberSavings = totalSavings[0]?.total || 0;
+    const maxLoan = memberSavings * settings.loanLimitMultiplier;
+    if (amount > maxLoan) {
+      return res.status(400).json({
+        error: `Loan amount K${amount} exceeds limit of K${maxLoan} (${settings.loanLimitMultiplier}× savings of K${memberSavings})`
+      });
+    }
+
+    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate, settings.interestMethod);
 
     const loan = new Loan({
       userId,
       amount,
       durationMonths: duration,
       interestRate: appliedInterestRate,
+      interestMethod: settings.interestMethod,
       installments: schedule
     });
 

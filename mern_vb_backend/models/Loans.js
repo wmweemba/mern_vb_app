@@ -5,6 +5,7 @@ const loanSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   durationMonths: { type: Number, required: true },
   interestRate: { type: Number, required: true },
+  interestMethod: { type: String, enum: ['reducing', 'flat'], default: 'reducing' },
   installments: [{
     month: Number,
     principal: Number,
