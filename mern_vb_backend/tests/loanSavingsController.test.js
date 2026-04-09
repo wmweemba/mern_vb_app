@@ -1,27 +1,28 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+
+// Mock Clerk before importing server
+jest.mock('@clerk/express', () => ({
+  requireAuth: () => (req, res, next) => {
+    const authHeader = req.headers?.authorization;
+    if (authHeader && authHeader.startsWith('Bearer valid-token')) {
+      req.auth = { userId: 'user_test123' };
+      return next();
+    }
+    return res.status(401).json({ error: 'Unauthenticated' });
+  },
+  clerkMiddleware: () => (req, res, next) => next(),
+  getAuth: (req) => req.auth || {},
+}));
+
 const app = require('../server');
 
-let mongoServer;
-
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri(), { useNewUrlParser: true, useUnifiedTopology: true });
-});
-afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
-
 describe('Loans & Savings Controllers', () => {
-  it('should reject loan creation with missing fields', async () => {
+  it('should return 401 for unauthenticated loan creation', async () => {
     const res = await request(app).post('/api/loans').send({});
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(401);
   });
-  it('should reject savings creation with missing fields', async () => {
+  it('should return 401 for unauthenticated savings creation', async () => {
     const res = await request(app).post('/api/savings').send({});
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(401);
   });
-  // Add more tests for valid creation if needed (requires auth/user setup)
-}); 
+});

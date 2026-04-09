@@ -1,31 +1,28 @@
-const jwt = require('jsonwebtoken');
+const { getAuth } = require('@clerk/express');
 
-function verifyToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) {
-    console.error('No Authorization header:', req.headers);
-    return res.status(401).json({ error: 'No Authorization header provided' });
+// Verifies Clerk session token. Replaces old requireAuth() which redirects to "/"
+// when unauthenticated instead of returning 401 (wrong for API routes).
+// clerkMiddleware() must already be applied globally before this runs.
+const verifyToken = (req, res, next) => {
+  let auth;
+  try {
+    auth = getAuth(req);
+  } catch (e) {
+    return res.status(401).json({ error: 'Unauthenticated' });
   }
-  const token = authHeader.split(' ')[1];
-  if (!token) {
-    console.error('No token found in Authorization header:', authHeader);
-    return res.status(401).json({ error: 'No token found in Authorization header' });
+  if (!auth?.userId) {
+    return res.status(401).json({ error: 'Unauthenticated' });
   }
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      console.error('JWT verification failed:', err.stack || err);
-      return res.status(403).json({ error: 'Invalid or expired token', details: err.message });
-    }
-    req.user = user;
-    next();
-  });
-}
+  next();
+};
 
-exports.verifyToken = verifyToken;
-
-exports.requireRole = (role) => (req, res, next) => {
-  if (req.user.role !== role) {
+// Role checking — reads from req.role (set by resolveGroup middleware)
+const requireRole = (role) => (req, res, next) => {
+  if (req.role !== role) {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
   }
   next();
 };
+
+exports.verifyToken = verifyToken;
+exports.requireRole = requireRole;

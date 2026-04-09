@@ -5,7 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.0] - 2026-04-09
+
+### Added
+- Promotional holding page (`/welcome`): new users see app name, value prop, feature cards, pricing (ZMW 150 Starter / ZMW 250 Standard), and "Start my 15-day free trial" CTA before reaching the onboarding wizard
+- `OnboardingRoute` guard: `/onboarding` only accessible after clicking the CTA (checks `sessionStorage.trialAccepted`); direct URL access redirects to `/welcome`
+- User indicator in Navbar: initials avatar (blue circle) + first name displayed to the left of Logout on all authenticated pages
+
+### Fixed
+- `resolveGroup` middleware was using `req.auth?.userId` (always `undefined` on Clerk's callable auth object) instead of `getAuth(req)` — root cause of all 401 errors on group-scoped API routes after authentication
+- Super admin who is also a group member (William) now gets both `isSuperAdmin: true` AND full group scoping resolved, so they see their own group data instead of 500 errors
+- Zombie Jest test process from a previous test run was holding port 5000 with stale 2-day-old code, causing 401s and 404 on diagnostic endpoint — killed and replaced with correct nodemon process
+- `OnboardingRoute` converted from inline JSX expression to a proper component function so `sessionStorage` is read at render time (not element-creation time), fixing the CTA button doing nothing
+
+### Changed
+- `ProtectedRoute` redirects `needsOnboarding` users to `/welcome` instead of directly to `/onboarding`
+
+---
+
+## [2.5.0] - 2026-04-09
+
+### Added
+- Free trial system: `Group` model gains `trialExpiresAt` (15 days) and `isPaid` fields
+- `checkTrial` middleware: blocks write operations (POST/PUT/DELETE) for expired unpaid groups, allows GETs (read-only)
+- Wired `checkTrial` into all 9 group-scoped route files after `resolveGroup`
+- `SuperAdmin` model for platform-level admin bypass
+- `resolveGroup` now checks SuperAdmin first; super admins skip group membership requirement
+- `GET /api/admin/groups` and `GET /api/admin/groups/:groupId` routes for super admin group listing
+- `GET /api/auth/test` diagnostic endpoint (to be removed after auth confirmed)
+- 4-step onboarding wizard: Step 1 (group info + cycle), Step 2 (loan settings), Step 3 (fines), Step 4 (confirm)
+- `TrialBanner` component shown when trial is expired
+- Super admin bypass in `ProtectedRoute` (no onboarding redirect)
+- `trialActive` and `isSuperAdmin` state in auth store; 403 `trial_expired` global response interceptor
+- `scripts/seedSuperAdmin.js` — idempotent super admin seed script
+- `scripts/markWilliamPaid.js` — one-time script to set William's group as paid/permanent
+
+### Changed
+- `/auth/me` response now includes `trialActive`, `trialExpiresAt`, `isPaid`, `isSuperAdmin`
+- `POST /api/groups` accepts full wizard fields: `meetingDay`, `cycleStartDate`, `cycleLengthMonths`, `interestRate`, `interestMethod`, `loanLimitMultiplier`, `lateFineAmount`, `lateFineType`; sets `trialExpiresAt` on group creation
+- Onboarding success shows welcome screen before redirecting to dashboard
+- `auth.jsx` `/auth/me` call now passes token explicitly to avoid race condition on first load
+- Removed debug aids: `GET /api/debug-auth`, `console.error` logging in `verifyToken`
+
+---
+
+## [2.4.0] - 2026-04-07
+
+### Added — Clerk Auth + Multi-Group Foundation (Day 4 Sprint)
+
+**Backend**
+- **`models/GroupMember.js`**: New model replacing the old `User` model for auth purposes. Stores `clerkUserId`, `name`, `email`, `phone`, `role`, `groupId`, `active` flag. Links Clerk identity to group membership.
+- **`models/Group.js`**: New model for group records (`name`, `description`, `createdBy`, `createdAt`).
+- **`controllers/authController.js`**: `GET /auth/me` — resolves Clerk userId to a GroupMember record; returns `{ _id, name, role, groupId, phone, email }` or `{ code: 'NO_GROUP' }` 403 if no membership exists.
+- **`routes/auth.js`**, **`routes/groups.js`**, **`routes/invites.js`**: New route files for auth, group management, and invite-based onboarding flows.
+- **`middleware/auth.js`** — `verifyToken`: replaced custom JWT verify with Clerk's `getAuth(req)` check. `requireRole`: unchanged, reads from `req.role` set by group-resolution middleware.
+- **`middleware/resolveGroup.js`**: Reads Clerk userId from `getAuth(req)`, looks up GroupMember, attaches `req.groupMember`, `req.groupId`, `req.role` to every protected request.
+
+**Frontend**
+- **`@clerk/clerk-react`** installed and wired into `main.jsx` via `<ClerkProvider>`.
+- **`src/store/auth.jsx`** rewritten: replaced localStorage JWT pattern with Clerk hooks (`useClerkAuth`, `useUser`). Axios interceptor now calls `getToken()` (auto-refreshes the 2-min JWT) before every request. `authLoading` state prevents race conditions between interceptor setup and first API call.
+- **`src/pages/SignIn.jsx`**, **`src/pages/SignUp.jsx`**: Clerk-hosted sign-in/sign-up pages using `<SignIn>` and `<SignUp>` components.
+- **`src/pages/Onboarding.jsx`**: 4-step wizard — group name, member details, review, confirm. Creates a new Group + GroupMember in MongoDB after Clerk sign-up.
+- **`src/pages/InviteAccept.jsx`**: Accepts invite tokens, links a signed-in Clerk user to an existing group as a new GroupMember.
+- **`src/App.jsx`** — `ProtectedRoute` updated to gate on `isLoaded && !authLoading` rather than `user` being set, so the spinner resolves even if the `/auth/me` call fails.
+
+### Changed
+- `server.js`: replaced `express-jwt` / custom JWT middleware with `clerkMiddleware({ secretKey })` from `@clerk/express`. Added `allowedHeaders: ['Authorization']` to CORS config.
+- `mern-vb-frontend/.env`: `VITE_CLERK_PUBLISHABLE_KEY` added alongside `VITE_API_URL`.
+
+### Removed
+- Old `authController.js` login endpoint (username + bcrypt password flow) — replaced by Clerk-managed sign-in.
+- `JWT_SECRET` from backend `.env` — no longer needed.
+
+---
+
+## [2.3.0] - 2026-04-03
+
+### Added
+- **`interestMethod` wiring**: `createLoan` now reads `interestMethod` from GroupSettings and passes it to `calculateLoanSchedule`. Flat-rate and reducing-balance schedules are now fully driven by per-group configuration.
+- **`loanLimitMultiplier` enforcement**: `createLoan` reads `loanLimitMultiplier` from GroupSettings and rejects loan requests that exceed the member's savings × multiplier cap, returning a descriptive 400 error.
+
+### Changed
+- `utils/loanCalculator.js` — added `interestMethod` parameter to `calculateLoanSchedule`; flat-rate branch computes `originalAmount × (rate/100) / durationMonths` per installment; reducing-balance branch unchanged.
+
+---
 
 ## [2.2.0] - 2026-04-02
 

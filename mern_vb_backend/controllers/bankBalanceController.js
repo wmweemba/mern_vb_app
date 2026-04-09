@@ -5,9 +5,9 @@ const Fine = require('../models/Fine');
 // Get current bank balance
 exports.getBankBalance = async (req, res) => {
   try {
-    let doc = await BankBalance.findOne();
+    let doc = await BankBalance.findOne({ groupId: req.groupId });
     if (!doc) {
-      doc = await BankBalance.create({ balance: 0 });
+      doc = await BankBalance.create({ balance: 0, groupId: req.groupId });
     }
     res.json({ balance: doc.balance });
   } catch (err) {
@@ -20,9 +20,9 @@ exports.setBankBalance = async (req, res) => {
   try {
     const { balance } = req.body;
     if (typeof balance !== 'number') return res.status(400).json({ error: 'Balance must be a number' });
-    let doc = await BankBalance.findOne();
+    let doc = await BankBalance.findOne({ groupId: req.groupId });
     if (!doc) {
-      doc = await BankBalance.create({ balance });
+      doc = await BankBalance.create({ balance, groupId: req.groupId });
     } else {
       doc.balance = balance;
       await doc.save();
@@ -34,10 +34,10 @@ exports.setBankBalance = async (req, res) => {
 };
 
 // Internal helper to update balance by amount (positive or negative)
-exports.updateBankBalance = async (amount, session = null) => {
-  let doc = await BankBalance.findOne().session(session);
+exports.updateBankBalance = async (amount, groupId, session = null) => {
+  let doc = await BankBalance.findOne({ groupId }).session(session);
   if (!doc) {
-    doc = await BankBalance.create([{ balance: 0 }], { session });
+    doc = await BankBalance.create([{ balance: 0, groupId }], { session });
     doc = doc[0]; // create with session returns array
   }
   amount = Number(amount);
@@ -50,7 +50,7 @@ exports.updateBankBalance = async (amount, session = null) => {
 exports.getTotalFines = async (req, res) => {
   try {
     const result = await Fine.aggregate([
-      { $match: { paid: false, archived: { $ne: true } } },
+      { $match: { ...req.groupScope, paid: false, archived: { $ne: true } } },
       { $group: { _id: null, totalFines: { $sum: '$amount' } } }
     ]);
     const totalFines = result[0]?.totalFines || 0;
@@ -58,4 +58,4 @@ exports.getTotalFines = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch total fines', details: err.message });
   }
-}; 
+};

@@ -1,7 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './store/auth';
-import Login from './pages/Login';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { useAuth } from './store/auth';
 import Dashboard from './pages/Dashboard';
 import Loans from './pages/Loans';
 import Savings from './pages/Savings';
@@ -9,80 +9,137 @@ import Thresholds from './pages/Thresholds';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Navbar from './components/layout/Navbar';
+import TrialBanner from './components/TrialBanner';
+import SignInPage from './pages/SignIn';
+import SignUpPage from './pages/SignUp';
+import Onboarding from './pages/Onboarding';
+import Welcome from './pages/Welcome';
+import InviteAccept from './pages/InviteAccept';
 
 // Layout with Navbar
 const Layout = ({ children }) => (
   <div className="min-h-screen flex flex-col bg-background">
     <Navbar />
+    <TrialBanner />
     <main className="flex-1 w-full mx-auto">{children}</main>
   </div>
 );
 
-// Role-based dashboard stubs
-const AdminDashboard = () => <Dashboard title="Admin Dashboard" />;
-const TreasurerDashboard = () => <Dashboard title="Treasurer Dashboard" />;
-const LoanOfficerDashboard = () => <Dashboard title="Loan Officer Dashboard" />;
-const MemberDashboard = () => <Dashboard title="Member Dashboard" />;
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+    </div>
+  );
+}
 
-// Role-based route component
-function RoleRoute({ role, children }) {
+// Protects routes — requires Clerk sign-in AND group membership.
+// Waits for the auth/me fetch to complete (authLoading) before rendering children,
+// so page components never fire API calls before the auth token is set.
+function ProtectedRoute({ children }) {
+  const { isLoaded, isSignedIn, needsOnboarding, authLoading, isSuperAdmin } = useAuth();
+  if (!isLoaded || authLoading) return <LoadingSpinner />;
+  return (
+    <>
+      <SignedIn>
+        {needsOnboarding && !isSuperAdmin ? <Navigate to="/welcome" replace /> : children}
+      </SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
+}
+
+// Onboarding guard — only renders wizard if user passed through /welcome first.
+// Evaluated as a component (not inline JSX) so sessionStorage is read at render time,
+// not at element-creation time during parent render.
+function OnboardingRoute() {
+  if (!sessionStorage.getItem('trialAccepted')) {
+    return <Navigate to="/welcome" replace />;
+  }
+  return <Onboarding />;
+}
+
+// Role-based route guard
+function RoleRoute({ roles, children }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to="/unauthorized" replace />;
+  if (!user) return <LoadingSpinner />;
+  if (!roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
-  // Redirect to role dashboard after login
-  if (!user) {
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  }
-  let dashboard;
-  switch (user.role) {
-    case 'admin':
-      dashboard = <AdminDashboard />;
-      break;
-    case 'treasurer':
-      dashboard = <TreasurerDashboard />;
-      break;
-    case 'loan_officer':
-      dashboard = <LoanOfficerDashboard />;
-      break;
-    case 'member':
-      dashboard = <MemberDashboard />;
-      break;
-    default:
-      dashboard = <div>Unknown role</div>;
-  }
   return (
-    <Layout>
     <Routes>
-      <Route path="/dashboard" element={dashboard} />
-      <Route path="/loans" element={<Loans />} />
-      <Route path="/savings" element={<Savings />} />
-      <Route path="/thresholds" element={<Thresholds />} />
-      <Route path="/reports" element={<Reports />} />
-        <Route path="/users" element={user.role === 'admin' ? <Users /> : <Navigate to="/dashboard" replace />} />
+      {/* Public routes */}
+      <Route path="/sign-in/*" element={<SignInPage />} />
+      <Route path="/sign-up/*" element={<SignUpPage />} />
+      <Route path="/invite" element={<InviteAccept />} />
+
+      {/* Welcome — promotional holding page for new users */}
+      <Route path="/welcome" element={
+        <>
+          <SignedIn><Welcome /></SignedIn>
+          <SignedOut><RedirectToSignIn /></SignedOut>
+        </>
+      } />
+
+      {/* Onboarding wizard — only reachable after clicking CTA on /welcome */}
+      <Route path="/onboarding" element={
+        <>
+          <SignedIn><OnboardingRoute /></SignedIn>
+          <SignedOut><RedirectToSignIn /></SignedOut>
+        </>
+      } />
+
+      {/* Protected app routes */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Layout><Dashboard /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/loans" element={
+        <ProtectedRoute>
+          <Layout><Loans /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/savings" element={
+        <ProtectedRoute>
+          <Layout><Savings /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/thresholds" element={
+        <ProtectedRoute>
+          <Layout><Thresholds /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/reports" element={
+        <ProtectedRoute>
+          <Layout><Reports /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <Layout>
+            <RoleRoute roles={['admin']}>
+              <Users />
+            </RoleRoute>
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      {/* Default redirect */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<Navigate to="/sign-in" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
-    </Layout>
   );
 }
 
+// AuthProvider lives in main.jsx — App.jsx just renders routes
 function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
-  );
+  return <AppRoutes />;
 }
 
 export default App;

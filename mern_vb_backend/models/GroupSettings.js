@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const groupSettingsSchema = new mongoose.Schema({
   groupName: { type: String, required: true },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
 
   // Cycle configuration
   cycleLengthMonths: {
@@ -91,6 +92,8 @@ const groupSettingsSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
+
+groupSettingsSchema.index({ groupId: 1 }, { unique: true });
 
 groupSettingsSchema.pre('save', function (next) {
   this.updatedAt = new Date();

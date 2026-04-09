@@ -1,12 +1,11 @@
 const GroupSettings = require('../models/GroupSettings');
 
-// Internal helper — used by other controllers to get settings
-// Returns the first GroupSettings document (single-group for now)
+// Internal helper — used by other controllers to get settings for a specific group
 // Throws if no settings document exists
-exports.getSettings = async () => {
-  const settings = await GroupSettings.findOne();
+exports.getSettings = async (groupId) => {
+  const settings = await GroupSettings.findOne({ groupId });
   if (!settings) {
-    throw new Error('GroupSettings not configured. Run the seed script or create settings via the API.');
+    throw new Error('GroupSettings not configured for this group.');
   }
   return settings;
 };
@@ -14,7 +13,7 @@ exports.getSettings = async () => {
 // GET /api/group-settings
 exports.getGroupSettings = async (req, res) => {
   try {
-    const settings = await GroupSettings.findOne();
+    const settings = await GroupSettings.findOne({ groupId: req.groupId });
     if (!settings) {
       return res.status(404).json({ error: 'Group settings not found' });
     }
@@ -27,9 +26,9 @@ exports.getGroupSettings = async (req, res) => {
 // PUT /api/group-settings
 exports.updateGroupSettings = async (req, res) => {
   try {
-    let settings = await GroupSettings.findOne();
+    let settings = await GroupSettings.findOne({ groupId: req.groupId });
     if (!settings) {
-      return res.status(404).json({ error: 'Group settings not found. Run seed script first.' });
+      return res.status(404).json({ error: 'Group settings not found.' });
     }
 
     const allowedFields = [

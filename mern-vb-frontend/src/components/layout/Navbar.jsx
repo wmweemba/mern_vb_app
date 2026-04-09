@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { useAuth } from '../../store/auth';
+import { useClerk } from '@clerk/clerk-react';
 import { FaTachometerAlt, FaMoneyCheckAlt, FaPiggyBank, FaChartBar, FaSignOutAlt, FaCog, FaRecycle, FaTools } from 'react-icons/fa';
 import ManageBankBalanceModal from '../ui/ManageBankBalanceModal';
 import ChangePasswordModal from '../ui/ChangePasswordModal';
@@ -22,7 +23,8 @@ const navItems = [
 const canAccessOperations = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
 const Navbar = () => {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
+  const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
   const [showSettings, setShowSettings] = useState(false);
@@ -60,8 +62,7 @@ const Navbar = () => {
   }, [showSettings, showOperations]);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    signOut(() => navigate('/sign-in'));
   };
 
   const handleDeleteAllFines = async () => {
@@ -153,8 +154,22 @@ const Navbar = () => {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <InstallPWAButton />
+            {user && (() => {
+              const initials = user.name
+                ? user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+                : '?';
+              const firstName = user.name?.split(' ')[0] || '';
+              return (
+                <div className="flex items-center gap-1.5" title={user.name}>
+                  <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    {initials}
+                  </span>
+                  <span className="hidden md:inline text-sm font-medium text-gray-700">{firstName}</span>
+                </div>
+              );
+            })()}
             <Button variant="destructive" size="sm" onClick={handleLogout} className="flex items-center gap-1">
               <FaSignOutAlt />
               <span className="hidden sm:inline">Logout</span>

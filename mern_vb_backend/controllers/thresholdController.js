@@ -1,6 +1,6 @@
 const Threshold = require('../models/Threshold');
 const Loan = require('../models/Loans');
-const User = require('../models/User');
+const GroupMember = require('../models/GroupMember');
 const { Parser } = require('json2csv');
 
 exports.createThreshold = async (req, res) => {
@@ -9,6 +9,7 @@ exports.createThreshold = async (req, res) => {
     const thresholdPerMember = +((totalBankBalance - retainedAmount - prepaidInterest) / totalMembers).toFixed(2);
 
     const threshold = new Threshold({
+      ...req.groupScope,
       cycle,
       startMonth,
       totalBankBalance,
@@ -27,7 +28,7 @@ exports.createThreshold = async (req, res) => {
 
 exports.getLatestThreshold = async (req, res) => {
   try {
-    const latest = await Threshold.findOne().sort({ createdAt: -1 });
+    const latest = await Threshold.findOne({ ...req.groupScope }).sort({ createdAt: -1 });
     res.json(latest);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch threshold', details: err.message });
@@ -36,22 +37,21 @@ exports.getLatestThreshold = async (req, res) => {
 
 exports.getThresholdDefaulters = async (req, res) => {
   try {
-    const threshold = await Threshold.findOne().sort({ createdAt: -1 });
+    const threshold = await Threshold.findOne({ ...req.groupScope }).sort({ createdAt: -1 });
     if (!threshold) return res.status(404).json({ error: 'No threshold found' });
 
-    const users = await User.find({}, '_id name username email');
-    const loans = await Loan.find();
+    const members = await GroupMember.find({ ...req.groupScope, active: true }, '_id name email');
+    const loans = await Loan.find({ ...req.groupScope });
 
-    const result = users.map(user => {
-      const userLoans = loans.filter(l => l.userId.toString() === user._id.toString());
-      const totalLoan = userLoans.reduce((sum, l) => sum + l.amount, 0);
+    const result = members.map(member => {
+      const memberLoans = loans.filter(l => l.userId.toString() === member._id.toString());
+      const totalLoan = memberLoans.reduce((sum, l) => sum + l.amount, 0);
       const forcedLoan = +(threshold.thresholdPerMember - totalLoan).toFixed(2);
 
       return {
-        userId: user._id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
+        userId: member._id,
+        name: member.name,
+        email: member.email,
         totalLoanObtained: totalLoan,
         threshold: threshold.thresholdPerMember,
         forcedLoan: forcedLoan > 0 ? forcedLoan : 0
@@ -66,19 +66,18 @@ exports.getThresholdDefaulters = async (req, res) => {
 
 exports.exportThresholdDefaulters = async (req, res) => {
   try {
-    const threshold = await Threshold.findOne().sort({ createdAt: -1 });
-    const users = await User.find({}, '_id name username email');
-    const loans = await Loan.find();
+    const threshold = await Threshold.findOne({ ...req.groupScope }).sort({ createdAt: -1 });
+    const members = await GroupMember.find({ ...req.groupScope, active: true }, '_id name email');
+    const loans = await Loan.find({ ...req.groupScope });
 
-    const result = users.map(user => {
-      const userLoans = loans.filter(l => l.userId.toString() === user._id.toString());
-      const totalLoan = userLoans.reduce((sum, l) => sum + l.amount, 0);
+    const result = members.map(member => {
+      const memberLoans = loans.filter(l => l.userId.toString() === member._id.toString());
+      const totalLoan = memberLoans.reduce((sum, l) => sum + l.amount, 0);
       const forcedLoan = +(threshold.thresholdPerMember - totalLoan).toFixed(2);
 
       return {
-        Name: user.name,
-        Username: user.username,
-        Email: user.email,
+        Name: member.name,
+        Email: member.email,
         TotalLoanObtained: totalLoan,
         Threshold: threshold.thresholdPerMember,
         ForcedLoan: forcedLoan > 0 ? forcedLoan : 0
