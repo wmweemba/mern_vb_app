@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-04-10
+
+### Added — Night 2 Sprint: Member Invites, Upgrade/Billing Flow, Webhook
+
+**Backend — Member Invites via Clerk Email**
+- `models/PendingInvite.js` (new): Tracks email-based Clerk invitations. Schema includes `email`, `groupId`, `role`, `invitedBy` (clerkUserId), `name`, `clerkInvitationId`, and `expiresAt` (7-day TTL). MongoDB TTL index auto-deletes expired records. Unique compound index on `email + groupId` prevents duplicate pending invites.
+- `controllers/inviteController.js`: Added `inviteByEmail` — validates role permissions, checks for duplicate pending invite and existing membership, calls Clerk Invitation API to send sign-up email with `groupId/role/name` in `public_metadata`, then stores a `PendingInvite` record. Added `getPendingInvites` — returns non-expired pending invites for the current group.
+- `routes/invites.js`: Added `POST /api/invites/email` and `GET /api/invites/pending` (both require `verifyToken` + `resolveGroup`).
+
+**Backend — Clerk Webhook Handler**
+- `routes/webhookRoutes.js` (new): Handles `POST /api/webhooks/clerk`. Verifies the svix signature using `CLERK_WEBHOOK_SECRET`. On `user.created` event: looks up a `PendingInvite` by the new user's email, creates a `GroupMember` with the role/name from the invite, then deletes the invite. Webhook errors are logged but do not fail the response (Clerk will retry).
+- `server.js`: Webhook route registered **before** `express.json()` middleware — required for svix raw-body signature verification. `POST /api/billing` also added.
+- Dependencies added: `svix` (webhook signature verification), `resend` (transactional email).
+
+**Backend — Billing / Upgrade Request**
+- `controllers/billingController.js` (new): `requestUpgrade` looks up the requesting user's group membership and group name, then fires a Telegram message (always) and a Resend email (if `RESEND_API_KEY` + `ADMIN_EMAIL` are set) with the plan name, price, admin contact, and a reminder to set `isPaid + paidUntil` in Atlas. Gracefully skips email if env vars are absent.
+- `routes/billingRoutes.js` (new): `POST /api/billing/request` (requires `verifyToken`).
+- `config/paymentDetails.js` (new): Airtel Money, MTN MoMo, Access Bank, and WhatsApp contact details config. Fill before deploy.
+
+**Backend — Group model + trial expiry**
+- `models/Group.js`: Added `paidUntil: Date` (default `null`). Supports subscription expiry tracking alongside the existing boolean `isPaid`.
+- `middleware/checkTrial.js`: Updated paid-group bypass logic. Three cases: `isPaid + paidUntil: null` → full access (backwards-compatible with existing paid groups); `isPaid + paidUntil: future` → full access; `isPaid + paidUntil: past` → subscription lapsed, falls through to trial/read-only logic.
+- `scripts/markWilliamPaid.js`: Now also sets `paidUntil: 2099-01-01` when marking William's group as paid.
+
+**Frontend — Members page**
+- `pages/MembersPage.jsx` (new): Replaces legacy `Users.jsx` on the `/members` route. Displays active group members as a list with initials avatars (colour-keyed by first letter per UI Spec §2.3), member name, email, and role badge. Staff roles (admin/treasurer/loan_officer) see a "+ Invite Member" pill button top-right. Clicking opens `SlideoverDrawer` with an invite form (Full Name, Email, Role select). Submit calls `POST /api/invites/email`; success closes drawer + shows toast; errors display inline without closing. Below the member list: "Pending Invites" section (fetched from `GET /api/invites/pending`) shows email, role badge, and amber "Pending" badge.
+- `App.jsx`: `/members` route now renders `MembersPage` instead of `Users`. Role guard widened from `['admin']` to `['admin', 'treasurer', 'loan_officer']`.
+
+**Frontend — Upgrade / Pricing page**
+- `pages/UpgradePage.jsx` (new): Three-state page — plan selection → subscription form → confirmation screen.
+  - Plan selection: two cards (Starter ZMW 150, Standard ZMW 250 recommended) with feature lists and Subscribe buttons. Standard card has `border-2 border-brand-primary` highlight and "Recommended" badge.
+  - Subscription form: pre-fills name (from group membership) and email (from Clerk, read-only); phone number field required. Submits to `POST /api/billing/request`.
+  - Confirmation screen: checkmark icon, thank-you message, full payment instructions box (Airtel Money, MTN MoMo, Access Bank details), reference line (`groupName — planName`), WhatsApp link opens in new tab (`target="_blank" rel="noopener noreferrer"`).
+  - Group name pulled from `user?.groupName` (set in auth context via `/auth/me`).
+- `App.jsx`: `/upgrade` route added as a protected route.
+
+**Frontend — Upgrade button wiring**
+- `components/TrialBanner.jsx`: "Upgrade Now" button added (was just a text banner). Navigates to `/upgrade` via `useNavigate`.
+- `components/layout/DesktopSidebar.jsx`: Sidebar trial card "Upgrade" button wired to `navigate('/upgrade')`.
+- `pages/Settings.jsx`: Both "Upgrade" (trial-active state) and "Upgrade Now" (trial-expired state) buttons wired to `navigate('/upgrade')`.
+
+### Fixed
+- `pages/UpgradePage.jsx`: Confirmation screen reference line now shows the actual group name (`user?.groupName`) instead of the placeholder "My Group".
+- `pages/UpgradePage.jsx`: WhatsApp link opens in a new tab so the user stays logged in to the web app.
+
+---
+
 ## [2.9.0] - 2026-04-10
 
 ### Added — UI Overhaul Night 3: Onboarding/Welcome Polish + Settings Data Fix

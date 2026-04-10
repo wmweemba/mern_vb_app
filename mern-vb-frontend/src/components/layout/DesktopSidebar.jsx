@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, Users, Wallet, DollarSign, FileText, Settings } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
 
 export default function DesktopSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { trialActive } = useAuth();
 
   return (
@@ -57,7 +58,10 @@ export default function DesktopSidebar() {
         <div className="mx-3 mb-4 p-3 rounded-md bg-trial-bg border border-trial-border">
           <p className="text-sm font-semibold text-trial-text">Trial Active</p>
           <p className="text-xs text-text-secondary mt-0.5">15 days remaining</p>
-          <button className="mt-2 w-full text-sm font-medium text-text-primary border border-border-default rounded-full py-1.5 hover:bg-surface-page transition-colors">
+          <button
+            onClick={() => navigate('/upgrade')}
+            className="mt-2 w-full text-sm font-medium text-text-primary border border-border-default rounded-full py-1.5 hover:bg-surface-page transition-colors"
+          >
             Upgrade
           </button>
         </div>

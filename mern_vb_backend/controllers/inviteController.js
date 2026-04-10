@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { getAuth } = require('@clerk/express');
 const InviteToken = require('../models/InviteToken');
 const GroupMember = require('../models/GroupMember');
+const PendingInvite = require('../models/PendingInvite');
 
 const INVITE_SECRET = process.env.INVITE_JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://villagebanking.netlify.app';
@@ -85,4 +86,97 @@ exports.acceptInvite = async (req, res) => {
   res.status(201).json({
     member: { id: member._id, name: member.name, role: member.role, groupId: member.groupId },
   });
+};
+
+exports.inviteByEmail = async (req, res) => {
+  try {
+    const { email, name, role } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: 'email and name are required' });
+    }
+
+    const allowedRoles = ['member', 'treasurer', 'loan_officer'];
+    const inviteRole = allowedRoles.includes(role) ? role : 'member';
+
+    // Only admin, treasurer, loan_officer can invite
+    if (req.role === 'member') {
+      return res.status(403).json({ error: 'Members cannot send invites' });
+    }
+
+    // Check no existing pending invite for this email+group
+    const existingInvite = await PendingInvite.findOne({
+      email: email.toLowerCase().trim(),
+      groupId: req.groupId,
+    });
+    if (existingInvite) {
+      return res.status(409).json({ error: 'An invite is already pending for this email' });
+    }
+
+    // Check email is not already a GroupMember of this group
+    const existingMember = await GroupMember.findOne({
+      email: email.toLowerCase().trim(),
+      groupId: req.groupId,
+    });
+    if (existingMember) {
+      return res.status(409).json({ error: 'This email is already a member of your group' });
+    }
+
+    // Call Clerk Invitation API
+    const frontendUrl = process.env.FRONTEND_URL || 'https://villagebanking.netlify.app';
+    const clerkResponse = await fetch('https://api.clerk.com/v1/invitations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email_address: email.toLowerCase().trim(),
+        redirect_url: `${frontendUrl}/sign-up`,
+        public_metadata: {
+          groupId: req.groupId.toString(),
+          role: inviteRole,
+          name,
+        },
+      }),
+    });
+
+    if (!clerkResponse.ok) {
+      const errData = await clerkResponse.json();
+      return res.status(400).json({
+        error: 'Failed to send Clerk invitation',
+        details: errData.errors?.[0]?.message || 'Unknown Clerk error',
+      });
+    }
+
+    const clerkData = await clerkResponse.json();
+
+    const { userId: clerkUserId } = getAuth(req);
+    await PendingInvite.create({
+      email: email.toLowerCase().trim(),
+      groupId: req.groupId,
+      role: inviteRole,
+      invitedBy: clerkUserId,
+      name,
+      clerkInvitationId: clerkData.id,
+    });
+
+    res.status(201).json({ message: `Invite sent to ${email}` });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'An invite is already pending for this email' });
+    }
+    res.status(500).json({ error: 'Failed to send invite', details: err.message });
+  }
+};
+
+exports.getPendingInvites = async (req, res) => {
+  try {
+    const invites = await PendingInvite.find({
+      groupId: req.groupId,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+    res.json(invites);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pending invites', details: err.message });
+  }
 };

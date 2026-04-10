@@ -11,4 +11,8 @@ router.get('/', verifyToken, resolveGroup, inviteController.getInvites);
 // Member accepts invite (Clerk-authenticated but NO resolveGroup — they don't have a group yet)
 router.post('/accept', verifyToken, inviteController.acceptInvite);
 
+// Clerk email-based invites
+router.post('/email', verifyToken, resolveGroup, inviteController.inviteByEmail);
+router.get('/pending', verifyToken, resolveGroup, inviteController.getPendingInvites);
+
 module.exports = router;

@@ -10,7 +10,7 @@ async function run() {
   await mongoose.connect(process.env.MONGODB_URI, clientOptions);
   const result = await Group.updateOne(
     { slug: 'williams-group' },
-    { $set: { trialExpiresAt: new Date('2099-12-31'), isPaid: true } }
+    { $set: { trialExpiresAt: new Date('2099-12-31'), isPaid: true, paidUntil: new Date('2099-01-01') } }
   );
   console.log('Updated:', result.modifiedCount, 'document(s)');
   await mongoose.disconnect();

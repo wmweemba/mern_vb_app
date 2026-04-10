@@ -8,6 +8,8 @@ import Savings from './pages/Savings';
 import Thresholds from './pages/Thresholds';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import MembersPage from './pages/MembersPage';
+import UpgradePage from './pages/UpgradePage';
 import Settings from './pages/Settings';
 import AppShell from './components/layout/AppShell';
 import SignInPage from './pages/SignIn';
@@ -125,8 +127,8 @@ function AppRoutes() {
       <Route path="/members" element={
         <ProtectedRoute>
           <Layout>
-            <RoleRoute roles={['admin']}>
-              <Users />
+            <RoleRoute roles={['admin', 'treasurer', 'loan_officer']}>
+              <MembersPage />
             </RoleRoute>
           </Layout>
         </ProtectedRoute>
@@ -134,6 +136,11 @@ function AppRoutes() {
       <Route path="/settings" element={
         <ProtectedRoute>
           <Layout><Settings /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/upgrade" element={
+        <ProtectedRoute>
+          <Layout><UpgradePage /></Layout>
         </ProtectedRoute>
       } />
 

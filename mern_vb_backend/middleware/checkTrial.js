@@ -20,10 +20,14 @@ async function checkTrial(req, res, next) {
       return res.status(404).json({ error: 'Group not found' });
     }
 
-    // Paid groups — full access forever
+    // Paid groups — full access unless paidUntil is set and in the past
+    // null paidUntil = legacy paid group, treat as no expiry
     if (group.isPaid) {
-      req.trialActive = true;
-      return next();
+      if (!group.paidUntil || group.paidUntil > new Date()) {
+        req.trialActive = true;
+        return next();
+      }
+      // isPaid but subscription lapsed — fall through to trial/read-only logic
     }
 
     const now = new Date();

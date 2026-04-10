@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Pencil, ExternalLink, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
@@ -35,6 +35,7 @@ const fmtFineType = (v) => v === 'fixed' ? 'Fixed amount' : v === 'percentage' ?
 
 export default function Settings() {
   const { trialActive } = useAuth();
+  const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -115,7 +116,10 @@ export default function Settings() {
                 <p className="text-sm font-semibold text-trial-text">Trial Active</p>
                 <p className="text-xs text-text-secondary mt-0.5">15 days remaining on your free trial</p>
               </div>
-              <button className="bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-full px-4 py-1.5 transition-colors">
+              <button
+                onClick={() => navigate('/upgrade')}
+                className="bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-full px-4 py-1.5 transition-colors"
+              >
                 Upgrade
               </button>
             </div>
@@ -123,7 +127,10 @@ export default function Settings() {
         ) : (
           <div>
             <p className="text-sm text-text-secondary mb-4">Your trial has ended. Upgrade to continue recording new transactions.</p>
-            <button className="bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-full px-5 py-2 transition-colors">
+            <button
+              onClick={() => navigate('/upgrade')}
+              className="bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-full px-5 py-2 transition-colors"
+            >
               Upgrade Now
             </button>
           </div>
