@@ -17,14 +17,11 @@ describe('DashboardStatsCard', () => {
     expect(screen.getByText(/Total Loaned/i)).toBeInTheDocument();
     expect(screen.getByText(/Interest \(Savings\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Interest \(Loans\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bank Balance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Total Group Balance/i)).toBeInTheDocument();
     expect(screen.getByText(/Total Fines/i)).toBeInTheDocument();
     expect(screen.getByText('K10,000')).toBeInTheDocument();
     expect(screen.getByText('K5,000')).toBeInTheDocument();
-    // expect(screen.getByText('K500')).toBeInTheDocument(); // For Interest (Savings) - update this after debug
-    // expect(screen.getByText('K300')).toBeInTheDocument(); // For Interest (Loans) - update this after debug
     expect(screen.getByText('K12,000')).toBeInTheDocument();
     expect(screen.getByText('K200')).toBeInTheDocument();
-    screen.debug(); // Inspect the DOM output for interest values
   });
 }); 

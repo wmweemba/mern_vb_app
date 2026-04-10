@@ -36,6 +36,7 @@ exports.me = async (req, res) => {
       name: member.name,
       role: member.role,
       groupId: member.groupId,
+      groupName: group?.name || null,
       phone: member.phone,
       email: member.email,
       trialActive,

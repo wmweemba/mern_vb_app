@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
+import MemberSelect from '../../components/ui/MemberSelect';
 
-const AddSavingsForm = ({ onSuccess }) => {
+const inputCls = 'h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
+const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
+
+const AddSavingsForm = ({ onSuccess, formId = 'add-savings-form' }) => {
   const [form, setForm] = useState({
-    username: '', // was userId
+    username: '',
     month: '',
     amount: '',
     date: '',
@@ -12,20 +16,15 @@ const AddSavingsForm = ({ onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
-  const handleChange = e => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess(false);
     try {
-      await axios.post(`${API_BASE_URL}/savings`, { ...form, username: form.username, month: form.month });
-      setSuccess(true);
+      await axios.post(`${API_BASE_URL}/savings`, { ...form });
       setForm({ username: '', month: '', amount: '', date: '', notes: '' });
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -36,18 +35,36 @@ const AddSavingsForm = ({ onSuccess }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">
-      <h2 className="text-lg font-bold mb-2">Add Savings</h2>
-      <input name="username" value={form.username} onChange={handleChange} placeholder="Username" className="border rounded px-3 py-2" required />
-      <input name="month" value={form.month} onChange={handleChange} placeholder="Month (number)" type="number" min="1" className="border rounded px-3 py-2" required />
-      <input name="amount" value={form.amount} onChange={handleChange} placeholder="Amount" type="number" min="0" className="border rounded px-3 py-2" required />
-      <input name="date" value={form.date} onChange={handleChange} placeholder="Date" type="date" className="border rounded px-3 py-2" required />
-      <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Notes (optional)" className="border rounded px-3 py-2" />
-      <button type="submit" className="bg-green-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? 'Adding...' : 'Add Savings'}</button>
-      {success && <div className="text-green-600 text-sm mt-1">Savings added successfully!</div>}
-      {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
+    <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className={labelCls}>Member</label>
+        <MemberSelect
+          value={form.username}
+          onChange={val => setForm({ ...form, username: val })}
+          placeholder="Search member name..."
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Month Number</label>
+        <input name="month" value={form.month} onChange={handleChange} type="number" min="1" placeholder="e.g. 1" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Amount (ZMW)</label>
+        <input name="amount" value={form.amount} onChange={handleChange} type="number" min="0" placeholder="0.00" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Date</label>
+        <input name="date" value={form.date} onChange={handleChange} type="date" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Notes (optional)</label>
+        <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Any notes..." rows={3}
+          className="w-full border border-border-default rounded-md px-3.5 py-3 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted resize-none" />
+      </div>
+      {error && <p className="text-xs text-status-overdue-text">{error}</p>}
+      {loading && <p className="text-xs text-text-secondary">Saving...</p>}
     </form>
   );
 };
 
-export default AddSavingsForm; 
+export default AddSavingsForm;

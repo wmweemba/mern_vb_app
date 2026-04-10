@@ -5,6 +5,112 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-04-10
+
+### Added — UI Overhaul Night 3: Onboarding/Welcome Polish + Settings Data Fix
+
+**Backend — data persistence fixes**
+- `GroupSettings.js` model: added `meetingDay` (String, nullable) and `lateFineType` (String enum `['fixed', 'percentage']`, default `'fixed'`) fields. Both have safe defaults so existing documents are unaffected.
+- `groupController.createGroup`: now persists `meetingDay` and `lateFineType` from the onboarding form into the `GroupSettings` document. Previously both fields were received in `req.body` but silently discarded.
+- `groupSettingsController.updateGroupSettings`: added `meetingDay` and `lateFineType` to the allowlist so they can be edited via the Settings page in future.
+- `authController.me`: `/auth/me` response now includes `groupName: group?.name`. The `Group` document was already being fetched for trial status; this adds the name at no extra DB cost. Makes `user.groupName` available anywhere `useAuth()` is consumed.
+
+### Changed
+
+**Frontend — Settings page data fetching**
+- `Settings.jsx`: replaced all hardcoded `null` / `"6 months"` / `"Reducing Balance"` placeholder values with a live fetch to `GET /api/group-settings` on mount. Displays a "Loading settings..." state while fetching. Field mappings: `groupName`, `meetingDay`, `cycleLengthMonths` (`"{n} months"`), `interestRate` (`"{n}%"`), `interestMethod` (human-readable), `loanLimitMultiplier` (`"{n}× savings"`), `profitSharingMethod` (human-readable), `overdueFineAmount` (`"K{n}"`), `lateFineType` (human-readable). Currency stays hardcoded `"ZMW (Zambian Kwacha)"`. All fields fall back to `"—"` if null/missing.
+
+**Frontend — TopBar group label**
+- `TopBar.jsx`: replaced `"{firstName}'s Group"` (derived from Clerk user's full name) with `user?.groupName` from the auth context. Shows the actual group name created during onboarding. Falls back to `"My Group"` if not yet loaded.
+
+**Frontend — Welcome page reskin**
+- `Welcome.jsx`: full colour system migration from the old blue palette to Night 1/2 design tokens. `bg-gradient-to-b from-blue-50 to-white` → `bg-surface-page`. All CTA buttons: `bg-blue-600` → `bg-brand-primary`, `rounded-xl` → `rounded-full` (spec pill). Feature cards: `bg-white border-gray-100` → `bg-surface-card border-border-default`. Pricing — Starter card: `bg-white border-gray-200` → `bg-surface-card border-border-default`, badge `text-blue-600` → `text-brand-primary`. Pricing — Standard card: `bg-blue-600 text-white` → `bg-surface-dark text-white` (dark hero). All `text-gray-*` classes replaced with spec tokens (`text-text-primary`, `text-text-secondary`, `text-text-muted`).
+
+**Frontend — Onboarding wizard reskin**
+- `Onboarding.jsx`: full spec reskin across all 4 steps and the success screen. No logic changes — only styling.
+  - Outer wrapper: `bg-background` → `bg-surface-page`.
+  - Card: `bg-white rounded-xl shadow` → `bg-surface-card rounded-xl`.
+  - Logo circle added at card top (spec §9.2): 48px circle `bg-brand-primary` with white "C".
+  - Static heading restructured: "Setup Your Chama" (h1) + "Step {n} of 4: {label}" (subtitle) replace the old per-step `<h2>` headings. Step labels updated to spec (Group Details / Lending Rules / Fine Rules / Confirm & Launch).
+  - Step indicator pills (spec §6.12): active pill `w-8 bg-brand-primary`, inactive `w-6 bg-border-default`, `gap-1.5`. Previously all pills were equal `flex-1 bg-blue-600 / bg-gray-200`.
+  - Input and select fields: `border rounded-lg px-3 py-2 text-sm focus:ring-blue-500` → `h-12 border border-border-default rounded-md px-3.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none`.
+  - Labels: `text-sm font-medium text-gray-700` → `text-xs font-medium uppercase tracking-widest text-text-secondary`.
+  - Help text: `text-xs text-gray-500` → `text-xs text-text-muted`.
+  - Primary buttons (Next / Create Group / Go to Dashboard): `bg-blue-600 hover:bg-blue-700 rounded-lg` → `bg-brand-primary hover:bg-brand-hover rounded-md font-semibold py-3`.
+  - Back buttons: `border rounded-lg text-gray-600 hover:bg-gray-50` → `border border-border-default rounded-md text-text-secondary hover:bg-surface-page`.
+  - Step 4 summary box: `bg-gray-50` → `bg-surface-page`, `text-gray-700` → `text-text-primary`.
+  - Error text: `text-red-600` → `text-status-overdue-text`.
+
+---
+
+## [2.8.0] - 2026-04-10
+
+### Added — UI Overhaul Night 2: Forms, Drawers & Colour Polish
+
+**New components**
+- `SlideoverDrawer.jsx` (`src/components/ui/`): Reusable drawer component. Slides in from the right on desktop (fixed 420px width, full height, left border). Slides up from the bottom on mobile (90vh, rounded top corners). Backdrop click and ESC key close it. Body scroll is locked while open. Accepts `title`, `footer` (submit button slot), and `children` props. Footer includes a "Cancel" text link below the primary action.
+- `MemberSelect.jsx` (`src/components/ui/`): Searchable member picker. Fetches `GET /api/users` once on mount. Filters by name or username (case-insensitive). Dropdown shows avatar (initials, AVATAR_COLORS), full name, and role badge per member. On select: avatar appears inside the input, X button clears. Calls `onChange(member.username)` to stay compatible with existing form fields. Role badge colours match spec (admin → brand orange, treasurer → blue, loan_officer → green, member → grey).
+
+**New routes/access**
+- "View Fines & Penalties" added as 6th item in the AppShell Action Sheet, opening `FinesModal`.
+
+### Changed
+
+**Forms**
+- `AddLoanForm.jsx`: Replaced raw username text input with `MemberSelect`. Applied spec field styles (uppercase label + 48px bordered input, `focus:border-brand-primary`). Form is now headless — no wrapper card, no title, no inline submit button. Submit is triggered via `form="add-loan-form"` on the SlideoverDrawer footer button. Error/loading shown as inline text.
+- `AddSavingsForm.jsx`: Same changes as `AddLoanForm`. Form ID `"add-savings-form"`.
+
+**Pages**
+- `Loans.jsx`: Removed inline `AddLoanForm` side column and the `flex-col lg:flex-row` split layout. List is now full-width. Page header has title left + "+ Add Loan" primary pill button right (role-gated). `SlideoverDrawer` mounts at bottom of the component, opens on button click, closes and refreshes list on success. Loan status badges converted to spec pill style (`bg-status-paid-bg/text` and `bg-status-pending-bg/text`). Action buttons (Edit, Delete, Details) restyled to ghost rounded-full pills. Reverse/Delete confirmation dialogs use spec button colours.
+- `Savings.jsx`: Same restructure as `Loans.jsx`. Inline `AddSavingsForm` side column removed. "+ Record Savings" button in page header. `SlideoverDrawer` wraps the form. Savings amounts display in `text-amount-positive`. Entry rows use `border-border-default` instead of `bg-gray-50 shadow`.
+- `Dashboard.jsx`: Removed `AdminActions` quick-link grid (Add Loan / Add Savings / View Reports buttons) — redundant with the new nav and action sheet. Removed unused imports (`Card`, `Button`, `Link`, `FaPlus`, `FaPiggyBank`, `FaFileAlt`, `FaGavel`). Layout simplified to: NewCycleBanner → DashboardStatsCard.
+
+**Stat cards & balance**
+- `DashboardStatsCard.jsx`: Replaced 6-card rainbow colour system with spec unified layout. Bank Balance is now a full-width dark hero card (`bg-surface-dark`, white text, `text-4xl font-bold`). Five remaining stats (Total Saved, Total Loaned, Interest (Loans), Interest (Savings), Total Fines) are white cards in a 2-col (mobile) / 3-col (desktop) grid — no coloured borders, neutral `text-text-secondary` icons, `text-text-primary` values. Switched from react-icons to lucide-react.
+- `BankBalanceCard.jsx`: Restyled to match the dark hero card pattern (`bg-surface-dark`, white balance text, `text-text-on-dark-muted` label). Removed `text-[#2979FF]` brand blue.
+
+**Action Sheet**
+- `AppShell.jsx`: "Add Loan" and "Add Savings" now navigate to `/loans` and `/savings` respectively (drawers live on those pages). Added `useNavigate` import. Added "View Fines & Penalties" as 6th action item.
+
+### Fixed
+- `InstallPWAButton.jsx`: Renamed `aria-label` on the dismiss button from `"Dismiss install banner"` to `"Dismiss"` — the word "install" in the old label caused `findByRole('button', { name: /Install/i })` to match two elements, breaking the test.
+
+### Tests
+- `DashboardStatsCard.test.js`: Updated label assertion from `/Bank Balance/i` to `/Total Group Balance/i` to match the new hero card label. Removed the stale `screen.debug()` call and commented-out interest assertions.
+- All 4 tests now passing (previously 3 passing, 1 pre-existing failure).
+
+---
+
+## [2.7.0] - 2026-04-10
+
+### Added — UI Overhaul Night 1: Nav System + Settings Scaffold
+
+**New components**
+- `DesktopSidebar.jsx`: Fixed 240px left sidebar (≥768px only). Logo mark, 6 nav items (Dashboard, Members, Savings, Loans, Reports, Settings), active state (`bg-brand-light` + `text-brand-primary`), hover state, trial status card at bottom.
+- `MobileBottomNav.jsx`: Pill-shaped floating bottom nav (`bottom-3 left-3 right-3`, `rounded-xl`, `bg-surface-dark`). 5 items — Dashboard, Members, + (Action Sheet trigger), Reports, Settings. Active item uses `bg-brand-primary` rounded square. + button elevated 8px above bar.
+- `TopBar.jsx`: Fixed header (`h-16`), `md:left-60` offset on desktop. Group name left, user avatar right with initials colour-coded via `AVATAR_COLORS` table from spec. Dropdown: Account Settings (→ `/settings`), Sign Out (via Clerk).
+- `AppShell.jsx`: New shell wrapper replacing `Layout` in App.jsx. Composes DesktopSidebar + TopBar + MobileBottomNav + TrialBanner + children. Holds all modal state previously in Navbar (BankBalance, Payment, Fine, Fines, ChangePassword, NewCycle). Includes Action Sheet bottom sheet for the + button.
+- `NewCycleBanner.jsx`: Dashboard-only banner component. Renders when `isVisible` prop is true. Calendar icon + cycle-due message + "Begin New Cycle" primary pill button. Wired to `BeginNewCycleModal` in Dashboard.
+- `pages/Settings.jsx`: `/settings` route — 6 section cards (Group Profile, Financial Rules, Fine Rules, Member Roles, Billing, Danger Zone). Display mode only; each card has a no-op Edit button (editing is a future sprint). Danger Zone card uses destructive colour treatment.
+
+**New routes**
+- `/settings` — Settings page (all authenticated users)
+- `/members` — Points to Users page (admin only, stub until Members page is built)
+
+**Design system**
+- `index.css`: 25 new Tailwind v4 color tokens added to `@theme inline` (`brand-*`, `surface-*`, `text-*`, `status-*`, `border-*`, `trial-*`, `amount-positive`). Font tokens `--font-sans` (DM Sans) and `--font-mono` (DM Mono). Radius values updated to spec (8/12/16/20px).
+- `index.html`: DM Sans + DM Mono loaded from Google Fonts. Title updated to "Chama360".
+
+### Changed
+- `Layout` in `App.jsx` replaced by `AppShell` — old `Navbar` + `TrialBanner` + `<main>` wrapper consolidated into single shell component.
+- `Dashboard.jsx`: `NewCycleBanner` rendered at top of page content, `BeginNewCycleModal` trigger moved here from the old Operations dropdown.
+- `body` now applies `bg-surface-page text-text-primary font-sans` — warm off-white (#F0EDE8) page background across all authenticated pages.
+
+### Removed
+- Old horizontal sticky `Navbar.jsx` (Operations dropdown, Settings dropdown, inline logout button). All operational actions migrated to AppShell's Action Sheet. Sign Out migrated to TopBar dropdown.
+
+---
+
 ## [2.6.0] - 2026-04-09
 
 ### Added

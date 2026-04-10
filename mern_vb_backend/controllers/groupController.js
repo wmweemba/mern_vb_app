@@ -11,7 +11,7 @@ exports.createGroup = async (req, res) => {
     groupName, treasurerName, phone,
     meetingDay, cycleStartDate, cycleLengthMonths,
     interestRate, interestMethod, loanLimitMultiplier,
-    lateFineAmount, lateFineType,
+    lateFineAmount, lateFineType = 'fixed',
   } = req.body;
 
   if (!groupName || !treasurerName) {
@@ -53,6 +53,8 @@ exports.createGroup = async (req, res) => {
       await GroupSettings.create([{
         groupId: group._id,
         groupName,
+        meetingDay: meetingDay || null,
+        lateFineType: lateFineType || 'fixed',
         cycleLengthMonths: cycleLengthMonths || 6,
         interestRate: interestRate || 10,
         interestMethod: interestMethod || 'reducing',

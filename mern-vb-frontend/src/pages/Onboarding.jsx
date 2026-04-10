@@ -13,6 +13,12 @@ const DEFAULTS = {
   lateFineType: 'fixed',
 };
 
+const STEP_LABELS = { 1: 'Group Details', 2: 'Lending Rules', 3: 'Fine Rules', 4: 'Confirm & Launch' };
+
+const fieldClass = "h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors";
+const labelClass = "block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1";
+const helpClass = "text-xs text-text-muted mt-1";
+
 export default function Onboarding() {
   const { refreshMembership } = useAuth();
   const navigate = useNavigate();
@@ -70,14 +76,14 @@ export default function Onboarding() {
 
   if (showWelcome) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md bg-white rounded-xl shadow p-8 space-y-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-surface-page p-4">
+        <div className="w-full max-w-md bg-surface-card rounded-xl p-8 space-y-6 text-center">
           <div className="text-4xl">&#127881;</div>
-          <h1 className="text-2xl font-bold text-gray-900">Your group is ready!</h1>
-          <p className="text-gray-600">Start by adding your first member.</p>
+          <h1 className="text-2xl font-bold text-text-primary">Your group is ready!</h1>
+          <p className="text-text-secondary">Start by adding your first member.</p>
           <button
             onClick={() => navigate('/dashboard', { replace: true })}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors"
           >
             Go to Dashboard
           </button>
@@ -87,56 +93,60 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow p-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to Chama360</h1>
-          <p className="text-sm text-gray-500 mt-1">Set up your group in 4 easy steps</p>
+    <div className="min-h-screen flex items-center justify-center bg-surface-page p-4">
+      <div className="w-full max-w-md bg-surface-card rounded-xl p-8 space-y-6">
+        {/* Logo mark */}
+        <div className="flex justify-center">
+          <div className="w-12 h-12 rounded-full bg-brand-primary flex items-center justify-center text-white text-xl font-bold">C</div>
         </div>
 
-        {/* Step indicators */}
-        <div className="flex gap-2">
+        {/* Heading */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-text-primary">Setup Your Chama</h1>
+          <p className="text-sm text-text-secondary mt-1">Step {step} of 4: {STEP_LABELS[step]}</p>
+        </div>
+
+        {/* Step indicator pills */}
+        <div className="flex justify-center gap-1.5">
           {[1, 2, 3, 4].map(n => (
-            <div key={n} className={`h-1.5 flex-1 rounded-full ${step >= n ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div key={n} className={`h-1.5 rounded-full transition-all ${step === n ? 'w-8 bg-brand-primary' : 'w-6 bg-border-default'}`} />
           ))}
         </div>
 
         {step === 1 && (
           <div className="space-y-4">
-            <h2 className="font-semibold text-gray-800">Step 1: Group info</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Group name</label>
+              <label className={labelClass}>Group name</label>
               <input type="text" placeholder="e.g. Pamodzi Savings Group" value={groupName}
                 onChange={e => setGroupName(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className={fieldClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Meeting day</label>
-              <select value={meetingDay} onChange={e => setMeetingDay(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className={labelClass}>Meeting day</label>
+              <select value={meetingDay} onChange={e => setMeetingDay(e.target.value)} className={fieldClass}>
                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d =>
                   <option key={d} value={d}>{d}</option>
                 )}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cycle start date</label>
+              <label className={labelClass}>Cycle start date</label>
               <input type="date" value={cycleStartDate} onChange={e => setCycleStartDate(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <p className="text-xs text-gray-500 mt-1">When does your current or next savings cycle begin?</p>
+                className={fieldClass} />
+              <p className={helpClass}>When does your current or next savings cycle begin?</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cycle length</label>
-              <select value={cycleLengthMonths} onChange={e => setCycleLengthMonths(Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className={labelClass}>Cycle length</label>
+              <select value={cycleLengthMonths} onChange={e => setCycleLengthMonths(Number(e.target.value))} className={fieldClass}>
                 <option value={6}>6 months</option>
                 <option value={12}>12 months</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">How long is one full savings-and-lending cycle?</p>
+              <p className={helpClass}>How long is one full savings-and-lending cycle?</p>
             </div>
+            {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <button
               onClick={() => { if (groupName.trim()) { setError(''); setStep(2); } else setError('Please enter a group name.'); }}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+              className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
               Next
             </button>
           </div>
@@ -144,54 +154,53 @@ export default function Onboarding() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <h2 className="font-semibold text-gray-800">Step 2: Loan settings</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your display name</label>
+              <label className={labelClass}>Your display name</label>
               <input type="text" placeholder="Your full name (shown to members)" value={treasurerName}
                 onChange={e => setTreasurerName(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className={fieldClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone number (optional)</label>
+              <label className={labelClass}>Phone number (optional)</label>
               <input type="tel" placeholder="+260..." value={phone}
                 onChange={e => setPhone(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className={fieldClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Interest rate (%)</label>
+              <label className={labelClass}>Interest rate (%)</label>
               <input type="number" min="1" max="50" value={interestRate}
                 onChange={e => setInterestRate(Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <p className="text-xs text-gray-500 mt-1">The interest rate charged on loans. E.g. 10 means 10% interest.</p>
+                className={fieldClass} />
+              <p className={helpClass}>The interest rate charged on loans. E.g. 10 means 10% interest.</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Interest method</label>
-              <select value={interestMethod} onChange={e => setInterestMethod(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className={labelClass}>Interest method</label>
+              <select value={interestMethod} onChange={e => setInterestMethod(e.target.value)} className={fieldClass}>
                 <option value="reducing">Reducing balance</option>
                 <option value="flat">Flat rate</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className={helpClass}>
                 {interestMethod === 'reducing'
                   ? 'Interest decreases as the loan is repaid — fairer for borrowers.'
                   : 'Same interest charge every installment — simpler to explain.'}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Loan limit multiplier</label>
+              <label className={labelClass}>Loan limit multiplier</label>
               <input type="number" min="1" max="10" value={loanLimitMultiplier}
                 onChange={e => setLoanLimitMultiplier(Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <p className="text-xs text-gray-500 mt-1">
+                className={fieldClass} />
+              <p className={helpClass}>
                 Members can borrow up to X times their total savings.
                 E.g. 3 means a member with K1,000 saved can borrow up to K3,000.
               </p>
             </div>
+            {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Back</button>
+              <button onClick={() => setStep(1)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
               <button
                 onClick={() => { if (treasurerName.trim()) { setError(''); setStep(3); } else setError('Please enter your name.'); }}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
                 Next
               </button>
             </div>
@@ -200,30 +209,29 @@ export default function Onboarding() {
 
         {step === 3 && (
           <div className="space-y-4">
-            <h2 className="font-semibold text-gray-800">Step 3: Fines</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Late payment fine</label>
+              <label className={labelClass}>Late payment fine</label>
               <input type="number" min="0" value={lateFineAmount}
                 onChange={e => setLateFineAmount(Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <p className="text-xs text-gray-500 mt-1">
+                className={fieldClass} />
+              <p className={helpClass}>
                 {lateFineType === 'fixed'
                   ? `A flat K${lateFineAmount} fine for late payments.`
                   : `${lateFineAmount}% of the overdue amount as a fine.`}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fine type</label>
-              <select value={lateFineType} onChange={e => setLateFineType(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className={labelClass}>Fine type</label>
+              <select value={lateFineType} onChange={e => setLateFineType(e.target.value)} className={fieldClass}>
                 <option value="fixed">Fixed amount (e.g. K500)</option>
                 <option value="percentage">Percentage of overdue amount</option>
               </select>
             </div>
+            {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Back</button>
+              <button onClick={() => setStep(2)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
               <button onClick={() => { setError(''); setStep(4); }}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
                 Next
               </button>
             </div>
@@ -232,8 +240,7 @@ export default function Onboarding() {
 
         {step === 4 && (
           <div className="space-y-4">
-            <h2 className="font-semibold text-gray-800">Step 4: Confirm & create</h2>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm text-gray-700">
+            <div className="bg-surface-page rounded-lg p-4 space-y-2 text-sm text-text-primary">
               <p><span className="font-medium">Group:</span> {groupName}</p>
               <p><span className="font-medium">Meeting day:</span> {meetingDay}</p>
               <p><span className="font-medium">Cycle:</span> {cycleLengthMonths} months{cycleStartDate ? `, starting ${cycleStartDate}` : ''}</p>
@@ -245,18 +252,16 @@ export default function Onboarding() {
               <p><span className="font-medium">Your role:</span> Admin</p>
               <p><span className="font-medium">Free trial:</span> 15 days</p>
             </div>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(3)} className="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Back</button>
+              <button onClick={() => setStep(3)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
               <button onClick={handleSubmit} disabled={loading}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors disabled:opacity-50">
                 {loading ? 'Creating...' : 'Create Group'}
               </button>
             </div>
           </div>
         )}
-
-        {error && step !== 4 && <p className="text-red-600 text-sm">{error}</p>}
       </div>
     </div>
   );

@@ -32,7 +32,7 @@ exports.updateGroupSettings = async (req, res) => {
     }
 
     const allowedFields = [
-      'groupName', 'cycleLengthMonths', 'interestRate', 'interestMethod',
+      'groupName', 'meetingDay', 'lateFineType', 'cycleLengthMonths', 'interestRate', 'interestMethod',
       'defaultLoanDuration', 'loanLimitMultiplier', 'latePenaltyRate',
       'overdueFineAmount', 'earlyPaymentCharge', 'savingsInterestRate',
       'minimumSavingsMonth1', 'minimumSavingsMonthly', 'maximumSavingsFirst3Months',

@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const groupSettingsSchema = new mongoose.Schema({
   groupName: { type: String, required: true },
+  meetingDay: { type: String, default: null },
+  lateFineType: { type: String, enum: ['fixed', 'percentage'], default: 'fixed' },
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
 
   // Cycle configuration

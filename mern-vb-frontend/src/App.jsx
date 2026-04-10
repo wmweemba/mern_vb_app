@@ -8,22 +8,16 @@ import Savings from './pages/Savings';
 import Thresholds from './pages/Thresholds';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
-import Navbar from './components/layout/Navbar';
-import TrialBanner from './components/TrialBanner';
+import Settings from './pages/Settings';
+import AppShell from './components/layout/AppShell';
 import SignInPage from './pages/SignIn';
 import SignUpPage from './pages/SignUp';
 import Onboarding from './pages/Onboarding';
 import Welcome from './pages/Welcome';
 import InviteAccept from './pages/InviteAccept';
 
-// Layout with Navbar
-const Layout = ({ children }) => (
-  <div className="min-h-screen flex flex-col bg-background">
-    <Navbar />
-    <TrialBanner />
-    <main className="flex-1 w-full mx-auto">{children}</main>
-  </div>
-);
+// Layout using AppShell
+const Layout = ({ children }) => <AppShell>{children}</AppShell>;
 
 function LoadingSpinner() {
   return (
@@ -126,6 +120,20 @@ function AppRoutes() {
               <Users />
             </RoleRoute>
           </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/members" element={
+        <ProtectedRoute>
+          <Layout>
+            <RoleRoute roles={['admin']}>
+              <Users />
+            </RoleRoute>
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Layout><Settings /></Layout>
         </ProtectedRoute>
       } />
 
