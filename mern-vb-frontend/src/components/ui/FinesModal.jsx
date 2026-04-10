@@ -3,12 +3,13 @@ import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { API_BASE_URL } from '../../lib/utils';
 import { useAuth } from '../../store/auth';
-import { FaTrash, FaBan, FaPencilAlt, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaTrash, FaBan, FaPencilAlt } from 'react-icons/fa';
 
 const statusBadge = (fine) => {
-  if (fine.cancelled) return <span className="px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600">Cancelled</span>;
-  if (fine.paid) return <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Paid</span>;
-  return <span className="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700">Unpaid</span>;
+  const base = 'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.06em]';
+  if (fine.cancelled) return <span className={`${base} bg-surface-page text-text-secondary`}>Cancelled</span>;
+  if (fine.paid) return <span className={`${base} bg-[#E8F5E8] text-[#2D7A2D]`}>Paid</span>;
+  return <span className={`${base} bg-[#FFF0E0] text-[#B85A00]`}>Unpaid</span>;
 };
 
 const FinesModal = ({ open, onClose }) => {
@@ -107,6 +108,12 @@ const FinesModal = ({ open, onClose }) => {
     }
   };
 
+  const inputClass = 'w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
+  const labelClass = 'block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5';
+  const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white rounded-full px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-60';
+  const btnGhost = 'border border-border-default text-text-primary rounded-full px-5 py-2 text-sm hover:bg-surface-page transition-colors';
+  const btnDestructive = 'bg-status-overdue-bg text-status-overdue-text rounded-full px-5 py-2 text-sm font-semibold border border-status-overdue-text/30 transition-colors disabled:opacity-60';
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
@@ -115,72 +122,72 @@ const FinesModal = ({ open, onClose }) => {
             <DialogTitle>Fines &amp; Penalties</DialogTitle>
           </DialogHeader>
 
-          {loading && <div className="text-center py-4 text-gray-500">Loading...</div>}
-          {fetchError && <div className="text-red-500 text-sm">{fetchError}</div>}
+          {loading && <div className="text-center py-4 text-text-secondary text-sm">Loading…</div>}
+          {fetchError && <div className="text-status-overdue-text text-sm">{fetchError}</div>}
 
           {!loading && !fetchError && fines.length === 0 && (
-            <div className="text-center py-4 text-gray-500">No fines found.</div>
+            <div className="text-center py-4 text-text-secondary text-sm">No fines found.</div>
           )}
 
           {!loading && fines.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-gray-100 text-gray-700">
-                    {isOfficer && <th className="px-3 py-2 text-left">Member</th>}
-                    <th className="px-3 py-2 text-left">Amount</th>
-                    <th className="px-3 py-2 text-left">Reason</th>
-                    <th className="px-3 py-2 text-left">Issued</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                    {isOfficer && <th className="px-3 py-2 text-center">Actions</th>}
+                  <tr className="border-b border-border-default">
+                    {isOfficer && <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-secondary">Member</th>}
+                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-secondary">Amount</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-secondary">Reason</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-secondary">Issued</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-secondary">Status</th>
+                    {isOfficer && <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-text-secondary">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {fines.map((fine) => (
-                    <tr key={fine._id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr key={fine._id} className="border-b border-border-default last:border-b-0">
                       {isOfficer && (
-                        <td className="px-3 py-2 font-medium">{fine.userId?.username || '—'}</td>
+                        <td className="px-3 py-3 font-medium text-text-primary">{fine.userId?.username || '—'}</td>
                       )}
-                      <td className="px-3 py-2">K{Number(fine.amount).toLocaleString()}</td>
-                      <td className="px-3 py-2 max-w-[200px] truncate" title={fine.note}>{fine.note || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-3 py-3 text-text-primary">K{Number(fine.amount).toLocaleString()}</td>
+                      <td className="px-3 py-3 max-w-xs text-text-primary" title={fine.note}>{fine.note || '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-text-secondary">
                         {fine.issuedAt ? new Date(fine.issuedAt).toLocaleDateString() : '—'}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-3">
                         {statusBadge(fine)}
                         {fine.cancelled && fine.cancelReason && (
-                          <div className="text-xs text-gray-500 mt-0.5" title={fine.cancelReason}>
-                            Reason: {fine.cancelReason}
+                          <div className="text-xs text-text-secondary mt-1" title={fine.cancelReason}>
+                            {fine.cancelReason}
                           </div>
                         )}
                       </td>
                       {isOfficer && (
-                        <td className="px-3 py-2">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-3 py-3">
+                          <div className="flex items-center justify-center gap-1">
                             {!fine.paid && !fine.cancelled && (
                               <button
                                 title="Edit fine"
-                                className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-page transition-colors"
                                 onClick={() => startEdit(fine)}
                               >
-                                <FaPencilAlt />
+                                <FaPencilAlt size={13} />
                               </button>
                             )}
                             {!fine.cancelled && (
                               <button
                                 title="Void fine"
-                                className="text-orange-500 hover:text-orange-700 p-1 rounded"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-page transition-colors"
                                 onClick={() => { setVoidingFine(fine); setCancelReason(''); setVoidError(''); }}
                               >
-                                <FaBan />
+                                <FaBan size={13} />
                               </button>
                             )}
                             <button
                               title="Delete fine"
-                              className="text-red-600 hover:text-red-800 p-1 rounded"
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-status-overdue-text hover:bg-status-overdue-bg transition-colors"
                               onClick={() => { setDeletingFine(fine); setDeleteError(''); }}
                             >
-                              <FaTrash />
+                              <FaTrash size={13} />
                             </button>
                           </div>
                         </td>
@@ -201,33 +208,33 @@ const FinesModal = ({ open, onClose }) => {
             <DialogHeader>
               <DialogTitle>Edit Fine — {editingFine.userId?.username}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 mt-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Amount (K)</label>
+            <form onSubmit={handleEditSubmit} className="flex flex-col gap-4 mt-2">
+              <div>
+                <label className={labelClass}>Amount (K)</label>
                 <input
                   type="number"
                   min="0"
                   value={editForm.amount}
                   onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
-                  className="border rounded px-3 py-2"
+                  className={inputClass}
                   required
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Reason / Notes</label>
+              <div>
+                <label className={labelClass}>Reason / Notes</label>
                 <textarea
                   value={editForm.note}
                   onChange={e => setEditForm({ ...editForm, note: e.target.value })}
-                  className="border rounded px-3 py-2 min-h-[80px]"
-                  placeholder="Reason for fine..."
+                  className={`${inputClass} min-h-[80px] resize-none`}
+                  placeholder="Reason for fine…"
                 />
               </div>
-              {editError && <div className="text-red-500 text-sm">{editError}</div>}
-              <div className="flex gap-2 mt-1">
-                <button type="submit" className="bg-blue-600 text-white rounded px-4 py-2" disabled={editLoading}>
-                  {editLoading ? 'Saving...' : 'Save Changes'}
+              {editError && <p className="text-status-overdue-text text-xs">{editError}</p>}
+              <div className="flex gap-3 mt-1">
+                <button type="submit" className={btnPrimary} disabled={editLoading}>
+                  {editLoading ? 'Saving…' : 'Save Changes'}
                 </button>
-                <button type="button" className="bg-gray-300 text-gray-700 rounded px-4 py-2" onClick={() => setEditingFine(null)}>
+                <button type="button" className={btnGhost} onClick={() => setEditingFine(null)}>
                   Cancel
                 </button>
               </div>
@@ -243,35 +250,27 @@ const FinesModal = ({ open, onClose }) => {
             <DialogHeader>
               <DialogTitle>Void Fine — {voidingFine.userId?.username}</DialogTitle>
             </DialogHeader>
-            <div className="mb-2 text-sm text-gray-700">
+            <p className="text-sm text-text-primary mb-3">
               Amount: <strong>K{Number(voidingFine.amount).toLocaleString()}</strong>
               {voidingFine.paid && (
-                <span className="ml-2 text-orange-600 font-medium">(Paid — bank balance will be reversed)</span>
+                <span className="ml-2 font-medium" style={{ color: '#B85A00' }}>(Paid — bank balance will be reversed)</span>
               )}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Cancel Reason <span className="text-red-500">*</span></label>
+            </p>
+            <div>
+              <label className={labelClass}>Cancel Reason <span className="text-status-overdue-text">*</span></label>
               <textarea
                 value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
-                className="border rounded px-3 py-2 min-h-[80px]"
-                placeholder="Explain why this fine is being voided..."
+                className={`${inputClass} min-h-[80px] resize-none`}
+                placeholder="Explain why this fine is being voided…"
               />
             </div>
-            {voidError && <div className="text-red-500 text-sm mt-1">{voidError}</div>}
-            <div className="flex gap-2 mt-3">
-              <button
-                className="bg-orange-500 text-white rounded px-4 py-2"
-                disabled={voidLoading}
-                onClick={handleVoid}
-              >
-                {voidLoading ? 'Voiding...' : 'Void Fine'}
+            {voidError && <p className="text-status-overdue-text text-xs mt-1">{voidError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button className={btnDestructive} disabled={voidLoading} onClick={handleVoid}>
+                {voidLoading ? 'Voiding…' : 'Void Fine'}
               </button>
-              <button
-                className="bg-gray-300 text-gray-700 rounded px-4 py-2"
-                onClick={() => { setVoidingFine(null); setCancelReason(''); }}
-                disabled={voidLoading}
-              >
+              <button className={btnGhost} onClick={() => { setVoidingFine(null); setCancelReason(''); }} disabled={voidLoading}>
                 Cancel
               </button>
             </div>
@@ -286,29 +285,21 @@ const FinesModal = ({ open, onClose }) => {
             <DialogHeader>
               <DialogTitle>Delete Fine</DialogTitle>
             </DialogHeader>
-            <div className="mb-2 text-sm text-gray-700">
+            <p className="text-sm text-text-primary mb-2">
               Permanently delete fine of <strong>K{Number(deletingFine.amount).toLocaleString()}</strong> for{' '}
               <strong>{deletingFine.userId?.username}</strong>?
-              {deletingFine.paid && !deletingFine.cancelled && (
-                <div className="mt-1 text-orange-600 font-medium">
-                  This fine was paid. The collected amount will be reversed from the bank balance.
-                </div>
-              )}
-            </div>
-            {deleteError && <div className="text-red-500 text-sm mb-2">{deleteError}</div>}
-            <div className="flex gap-2 mt-2">
-              <button
-                className="bg-red-600 text-white rounded px-4 py-2"
-                disabled={deleteLoading}
-                onClick={handleDelete}
-              >
-                {deleteLoading ? 'Deleting...' : 'Delete'}
+            </p>
+            {deletingFine.paid && !deletingFine.cancelled && (
+              <p className="text-sm font-medium mb-3" style={{ color: '#B85A00' }}>
+                This fine was paid. The collected amount will be reversed from the bank balance.
+              </p>
+            )}
+            {deleteError && <p className="text-status-overdue-text text-xs mb-2">{deleteError}</p>}
+            <div className="flex gap-3 mt-2">
+              <button className={btnDestructive} disabled={deleteLoading} onClick={handleDelete}>
+                {deleteLoading ? 'Deleting…' : 'Delete'}
               </button>
-              <button
-                className="bg-gray-300 text-gray-700 rounded px-4 py-2"
-                onClick={() => setDeletingFine(null)}
-                disabled={deleteLoading}
-              >
+              <button className={btnGhost} onClick={() => setDeletingFine(null)} disabled={deleteLoading}>
                 Cancel
               </button>
             </div>

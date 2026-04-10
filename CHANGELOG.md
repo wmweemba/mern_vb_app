@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-04-10
+
+### Added
+- `mern_vb_backend/scripts/activateGroup.js` (new): Configurable script to activate any group from trial to paid. Edit the three constants at the top (`GROUP_SLUG`, `PLAN_NAME`, `DURATION_MONTHS`), then run `node scripts/activateGroup.js`. Calculates `paidUntil` as today + duration, sets `isPaid: true` and `trialExpiresAt: 2099-12-31`. Outputs a clear success block with group name, plan, duration, and active-until date — or `❌ Error` with the reason if the slug is not found.
+
+### Fixed
+
+**Reports page — 401 Unauthorized on all non-PDF actions**
+- Root cause: `downloadExcelReport()` in `Reports.jsx` and `fetchAvailableCycles()` in `ReportSelectionModal.jsx` used raw `fetch()` with `localStorage.getItem('token')`. Under Clerk auth that token is always `null`, so every request was rejected. Axios calls worked because the global interceptor in `auth.jsx` auto-attaches fresh Clerk tokens; `fetch()` bypasses the interceptor entirely.
+- `Reports.jsx`: replaced `fetch()` in `downloadExcelReport()` with `axios.get(endpoint, { responseType: 'blob' })`. Replaced `fetch()` in `handleCycleSelected()` with `axios.get(url)`. Removed all stale `localStorage.getItem('token')` lines from the three PDF generator functions.
+- `ReportSelectionModal.jsx`: replaced `fetch()` in `fetchAvailableCycles()` with `axios.get()`. Added `import axios from 'axios'`. Removed `localStorage.getItem('token')` line. Excel exports, in-app report views, and cycle loading now work correctly.
+
+**ReportSelectionModal — UI spec alignment**
+- Restyled from blue/gray palette to full UI spec: `bg-surface-card rounded-xl` container, `text-text-primary`/`text-text-secondary` text, `border-border-default` inputs with `focus:ring-brand-primary`, rounded-full Cancel and Generate buttons using spec colours, `text-status-overdue-text` error state. Close button replaced `×` text with lucide `X` icon using spec ghost button style.
+
+**FinesModal — UI spec alignment**
+- Status badges: replaced `rounded` with `rounded-full`, standardised padding to `px-3 py-1`, added `font-semibold uppercase tracking-[0.06em]`. Colour mapping: `Unpaid` → PENDING colours (`#FFF0E0`/`#B85A00`), `Paid` → PAID colours (`#E8F5E8`/`#2D7A2D`), `Cancelled` → INACTIVE colours (`bg-surface-page text-text-secondary`).
+- Table header: removed `bg-gray-100 text-gray-700` background. Headers now use `text-xs font-medium uppercase tracking-wider text-text-secondary` with only a bottom border.
+- Table rows: removed `hover:bg-gray-50`. Row dividers use `border-border-default`.
+- "Reason" column: removed `truncate` — text now wraps within `max-w-xs`. `title` tooltip retained for long values.
+- Action buttons: Edit and Void now use ghost style (`w-8 h-8 rounded-md text-text-secondary hover:bg-surface-page`). Delete uses destructive style (`text-status-overdue-text hover:bg-status-overdue-bg`).
+- Edit Fine sub-dialog: labels use spec uppercase style, inputs use `border-border-default rounded-xl` style, Save uses `bg-brand-primary rounded-full`, Cancel uses ghost rounded-full.
+- Void Fine sub-dialog: warning text uses `#B85A00`, Void button uses `bg-status-overdue-bg text-status-overdue-text` destructive style.
+- Delete Fine sub-dialog: same destructive button style, spec text colours throughout.
+
+### Scripts
+- Ran `node scripts/markWilliamPaid.js` — William's group `paidUntil` set to 2099, trial banner removed.
+
+---
+
 ## [3.0.0] - 2026-04-10
 
 ### Added — Night 2 Sprint: Member Invites, Upgrade/Billing Flow, Webhook

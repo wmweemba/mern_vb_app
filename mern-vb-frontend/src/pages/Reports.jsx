@@ -8,19 +8,11 @@ import ReportSelectionModal from '../components/ui/ReportSelectionModal';
 import FinesModal from '../components/ui/FinesModal';
 import { useAuth } from '../store/auth';
 
-// Helper to download Excel/CSV from backend
+// Helper to download Excel from backend — uses axios so Clerk token is auto-attached
 async function downloadExcelReport(endpoint, filename) {
   try {
-    const token = localStorage.getItem('token');
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) throw new Error('Failed to download Excel');
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
+    const res = await axios.get(endpoint, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(res.data);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -36,10 +28,7 @@ async function downloadExcelReport(endpoint, filename) {
 // Frontend PDF generator for transactions
 const generateTransactionPDF = async (filename) => {
   try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get(`${API_BASE_URL}/transactions`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await axios.get(`${API_BASE_URL}/transactions`);
     const transactions = res.data;
 
     const doc = new jsPDF();
@@ -71,10 +60,7 @@ const generateTransactionPDF = async (filename) => {
 
 const generateLoansPDF = async (filename) => {
   try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get(`${API_BASE_URL}/loans`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await axios.get(`${API_BASE_URL}/loans`);
     const loans = res.data;
 
     const doc = new jsPDF();
@@ -116,10 +102,7 @@ const generateLoansPDF = async (filename) => {
 
 const generateSavingsPDF = async (filename) => {
   try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get(`${API_BASE_URL}/savings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await axios.get(`${API_BASE_URL}/savings`);
     const savings = res.data;
 
     const doc = new jsPDF();
@@ -287,8 +270,6 @@ const Reports = () => {
     setReportSelectionOpen(false);
     
     try {
-      const token = localStorage.getItem('token');
-      
       // Use enhanced endpoint for cycle-based reporting
       let url = `${API_BASE_URL}/reports/enhanced`;
       const params = new URLSearchParams({
@@ -296,20 +277,15 @@ const Reports = () => {
         cycleType: cycleType,
         format: 'json'
       });
-      
+
       if (cycleNumber) {
         params.append('cycleNumber', cycleNumber);
       }
-      
+
       url += `?${params.toString()}`;
-      
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      
-      if (!res.ok) throw new Error('Failed to load report');
-      
-      const result = await res.json();
+
+      const res = await axios.get(url);
+      const result = res.data;
       let data = result.data || [];
       
       // Apply existing transformation if needed
