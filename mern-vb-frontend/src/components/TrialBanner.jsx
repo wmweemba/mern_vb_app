@@ -2,10 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 
 export default function TrialBanner() {
-  const { trialActive, user } = useAuth();
+  const { trialActive, user, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
-  if (!user || trialActive) return null;
+  if (!user || trialActive || isSuperAdmin) return null;
 
   return (
     <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-sm text-amber-800">

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] - 2026-04-12
+
+### Fixed
+- `components/TrialBanner.jsx`: added `isSuperAdmin` check to the early-return guard. Previously setting `trialActive(false)` for super admins (v3.1.1 fix) caused the top trial banner to render for them — since the banner shows when `trialActive === false`. Super admins now bypass both the sidebar trial card and the top banner.
+
+---
+
 ## [3.1.1] - 2026-04-12
 
 ### Fixed
