@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-04-12
+
+### Fixed
+
+**Trial banner showing for super admin**
+- `store/auth.jsx`: super admin branch in both `useEffect` and `refreshMembership` now calls `setTrialActive(false)`. Previously `trialActive` was never set in the super admin path, so it stayed at its initial value of `true`, causing the trial card to appear in the sidebar.
+- `components/layout/DesktopSidebar.jsx`: added `!isSuperAdmin` guard to the trial card render condition as belt-and-suspenders.
+
+**Member invite email not sending**
+- Root cause: the app runs on Clerk development keys. Clerk's invitation API (`POST /v1/invitations`) creates the invite record (explaining why it appeared in Pending Invites) but does not dispatch real emails in dev mode — they only appear in the Clerk dashboard.
+- `controllers/inviteController.js`: removed the Clerk invitation API call entirely. Invite emails are now sent directly via Resend (already installed and confirmed working). Email includes the invitee's name, group name, role, a "Create Your Account" button linking to `/sign-up`, and a reminder to use the same email address so the webhook auto-adds them to the group. The `PendingInvite` record is now created before the email send (not after), so the DB record exists even if Resend fails. Added `require('resend')` and `require('../models/Group')` to the controller.
+
+---
+
 ## [3.1.0] - 2026-04-10
 
 ### Added

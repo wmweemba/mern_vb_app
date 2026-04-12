@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
           if (res.data.isSuperAdmin) {
             setIsSuperAdmin(true);
             setGroupMember(res.data);
+            setTrialActive(false); // super admins never see the trial banner
             setNeedsOnboarding(false);
           } else {
             setGroupMember(res.data);
@@ -89,6 +90,7 @@ export const AuthProvider = ({ children }) => {
         if (res.data.isSuperAdmin) {
           setIsSuperAdmin(true);
           setGroupMember(res.data);
+          setTrialActive(false);
         } else {
           setGroupMember(res.data);
           setTrialActive(res.data.trialActive);

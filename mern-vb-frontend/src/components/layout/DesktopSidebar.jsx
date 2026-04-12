@@ -14,7 +14,7 @@ const NAV_ITEMS = [
 export default function DesktopSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { trialActive } = useAuth();
+  const { trialActive, isSuperAdmin } = useAuth();
 
   return (
     <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-60 bg-surface-card border-r border-border-default z-50">
@@ -54,7 +54,7 @@ export default function DesktopSidebar() {
       </nav>
 
       {/* Trial status card */}
-      {trialActive && (
+      {trialActive && !isSuperAdmin && (
         <div className="mx-3 mb-4 p-3 rounded-md bg-trial-bg border border-trial-border">
           <p className="text-sm font-semibold text-trial-text">Trial Active</p>
           <p className="text-xs text-text-secondary mt-0.5">15 days remaining</p>
