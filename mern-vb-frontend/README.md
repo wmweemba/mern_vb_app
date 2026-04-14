@@ -1,12 +1,25 @@
-# React + Vite
+# Chama360 — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite PWA frontend for the Chama360 village banking app.
 
-Currently, two official plugins are available:
+**Live:** https://chama360.nxhub.online
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+See the [root README](../README.md) for full project documentation.
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+pnpm dev       # start Vite dev server (http://localhost:5173)
+pnpm build     # production build → dist/
+pnpm test      # run Jest + Testing Library tests
+```
+
+## Environment Variables
+
+Create `mern-vb-frontend/.env`:
+```
+VITE_API_URL=http://localhost:5000/api
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+> These are baked into the bundle at build time. Set them as build-time env vars in Coolify for production.
