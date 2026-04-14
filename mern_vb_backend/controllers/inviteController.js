@@ -6,8 +6,6 @@ const GroupMember = require('../models/GroupMember');
 const Group = require('../models/Group');
 const PendingInvite = require('../models/PendingInvite');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const INVITE_SECRET = process.env.INVITE_JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://villagebanking.netlify.app';
 
@@ -144,6 +142,7 @@ exports.inviteByEmail = async (req, res) => {
     });
 
     // Send invite email via Resend
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: 'Chama360 <onboarding@resend.dev>',
       to: email.toLowerCase().trim(),

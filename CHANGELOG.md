@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.3] - 2026-04-14
+
+### Fixed
+- `controllers/inviteController.js`: moved `new Resend()` from module-level initialisation into the `inviteByEmail` function body. Previously, a missing `RESEND_API_KEY` env var caused the constructor to throw at require-time, crashing the server on every startup before it could bind to a port.
+
+---
+
 ## [3.1.2] - 2026-04-14 — Production Deployment
 
 ### Deployed
