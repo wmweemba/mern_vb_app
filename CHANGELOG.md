@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.4] - 2026-04-14
+
+### Fixed
+- `controllers/billingController.js`: same lazy-init Resend fix as inviteController. `new Resend()` was at module level (line 6); moved inside `requestUpgrade` function body inside the `if (RESEND_API_KEY && ADMIN_EMAIL)` guard. An empty or absent `RESEND_API_KEY` previously crashed the server on startup since `billingRoutes` is required synchronously in `server.js`.
+
+### Added
+- `scripts/diagnoseProd.js` (new): production DB health-check script. Verifies SuperAdmin record, GroupMember record, and Group document for a given Clerk user ID. Shows exact fix commands if any record is missing or misconfigured. Run with `CLERK_USER_ID=user_xxx node scripts/diagnoseProd.js` via Coolify terminal.
+
+---
+
 ## [3.1.3] - 2026-04-14
 
 ### Fixed

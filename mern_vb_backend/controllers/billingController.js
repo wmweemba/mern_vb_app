@@ -3,8 +3,6 @@ const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const { getAuth } = require('@clerk/express');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 exports.requestUpgrade = async (req, res) => {
   try {
     const { planName, planPrice, phone } = req.body;
@@ -51,6 +49,7 @@ exports.requestUpgrade = async (req, res) => {
 
     // Send email via Resend (optional — only if vars are set)
     if (process.env.RESEND_API_KEY && process.env.ADMIN_EMAIL) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from: 'Chama360 <onboarding@resend.dev>',
         to: process.env.ADMIN_EMAIL,
