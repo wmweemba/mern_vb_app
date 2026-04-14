@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.5] - 2026-04-14
+
+### Fixed
+- **Frontend env var**: `VITE_API_URL` in the Coolify frontend service was set to `https://api.chama360.nxhub.online` (missing the `/api` suffix). All API calls were hitting `https://api.chama360.nxhub.online/savings/dashboard` etc. — 404s because Express mounts all routes under `/api/`. The `auth/me` call failed silently (non-NO_GROUP error), so `trialActive` stayed at its React initial value of `true` and the dashboard showed "Failed to load dashboard stats". Fix: set `VITE_API_URL=https://api.chama360.nxhub.online/api` in Coolify frontend env vars and redeploy the frontend to rebuild the bundle with the corrected value.
+
+---
+
 ## [3.1.4] - 2026-04-14
 
 ### Fixed
