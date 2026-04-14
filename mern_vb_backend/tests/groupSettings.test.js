@@ -93,7 +93,9 @@ describe('GroupSettings schema validation', () => {
   });
 
   test('accepts valid William group settings', async () => {
+    const mongoose = require('mongoose');
     const doc = new GroupSettings({
+      groupId: new mongoose.Types.ObjectId(),
       groupName: 'Chama360 Pilot Group',
       cycleLengthMonths: 6,
       interestRate: 10,

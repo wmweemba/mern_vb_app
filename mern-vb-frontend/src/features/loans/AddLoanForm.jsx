@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
+import MemberSelect from '../../components/ui/MemberSelect';
 
-const AddLoanForm = ({ onSuccess }) => {
+const inputCls = 'h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
+const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
+
+const AddLoanForm = ({ onSuccess, formId = 'add-loan-form' }) => {
   const [form, setForm] = useState({
-    username: '', // was userId
+    username: '',
     amount: '',
     interest: '',
     startDate: '',
@@ -13,20 +17,15 @@ const AddLoanForm = ({ onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
-  const handleChange = e => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess(false);
     try {
-      await axios.post(`${API_BASE_URL}/loans`, { ...form, username: form.username });
-      setSuccess(true);
+      await axios.post(`${API_BASE_URL}/loans`, { ...form });
       setForm({ username: '', amount: '', interest: '', startDate: '', duration: '', notes: '' });
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -37,19 +36,40 @@ const AddLoanForm = ({ onSuccess }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">
-      <h2 className="text-lg font-bold mb-2">Add New Loan</h2>
-      <input name="username" value={form.username} onChange={handleChange} placeholder="Username" className="border rounded px-3 py-2" required />
-      <input name="amount" value={form.amount} onChange={handleChange} placeholder="Amount" type="number" min="0" className="border rounded px-3 py-2" required />
-      <input name="interest" value={form.interest} onChange={handleChange} placeholder="Interest Rate (%)" type="number" min="0" step="0.01" className="border rounded px-3 py-2" required />
-      <input name="startDate" value={form.startDate} onChange={handleChange} placeholder="Start Date" type="date" className="border rounded px-3 py-2" required />
-      <input name="duration" value={form.duration} onChange={handleChange} placeholder="Duration (months)" type="number" min="1" className="border rounded px-3 py-2" required />
-      <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Notes (optional)" className="border rounded px-3 py-2" />
-      <button type="submit" className="bg-blue-600 text-white rounded py-2 mt-2" disabled={loading}>{loading ? 'Adding...' : 'Add Loan'}</button>
-      {success && <div className="text-green-600 text-sm mt-1">Loan added successfully!</div>}
-      {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
+    <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className={labelCls}>Member</label>
+        <MemberSelect
+          value={form.username}
+          onChange={val => setForm({ ...form, username: val })}
+          placeholder="Search member name..."
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Amount (ZMW)</label>
+        <input name="amount" value={form.amount} onChange={handleChange} type="number" min="0" placeholder="0.00" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Interest Rate (%)</label>
+        <input name="interest" value={form.interest} onChange={handleChange} type="number" min="0" step="0.01" placeholder="e.g. 10" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Start Date</label>
+        <input name="startDate" value={form.startDate} onChange={handleChange} type="date" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Duration (months)</label>
+        <input name="duration" value={form.duration} onChange={handleChange} type="number" min="1" placeholder="e.g. 6" className={inputCls} required />
+      </div>
+      <div>
+        <label className={labelCls}>Notes (optional)</label>
+        <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Any notes..." rows={3}
+          className="w-full border border-border-default rounded-md px-3.5 py-3 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted resize-none" />
+      </div>
+      {error && <p className="text-xs text-status-overdue-text">{error}</p>}
+      {loading && <p className="text-xs text-text-secondary">Saving...</p>}
     </form>
   );
 };
 
-export default AddLoanForm; 
+export default AddLoanForm;

@@ -5,7 +5,294 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.1.2] - 2026-04-12
+
+### Fixed
+- `components/TrialBanner.jsx`: added `isSuperAdmin` check to the early-return guard. Previously setting `trialActive(false)` for super admins (v3.1.1 fix) caused the top trial banner to render for them — since the banner shows when `trialActive === false`. Super admins now bypass both the sidebar trial card and the top banner.
+
+---
+
+## [3.1.1] - 2026-04-12
+
+### Fixed
+
+**Trial banner showing for super admin**
+- `store/auth.jsx`: super admin branch in both `useEffect` and `refreshMembership` now calls `setTrialActive(false)`. Previously `trialActive` was never set in the super admin path, so it stayed at its initial value of `true`, causing the trial card to appear in the sidebar.
+- `components/layout/DesktopSidebar.jsx`: added `!isSuperAdmin` guard to the trial card render condition as belt-and-suspenders.
+
+**Member invite email not sending**
+- Root cause: the app runs on Clerk development keys. Clerk's invitation API (`POST /v1/invitations`) creates the invite record (explaining why it appeared in Pending Invites) but does not dispatch real emails in dev mode — they only appear in the Clerk dashboard.
+- `controllers/inviteController.js`: removed the Clerk invitation API call entirely. Invite emails are now sent directly via Resend (already installed and confirmed working). Email includes the invitee's name, group name, role, a "Create Your Account" button linking to `/sign-up`, and a reminder to use the same email address so the webhook auto-adds them to the group. The `PendingInvite` record is now created before the email send (not after), so the DB record exists even if Resend fails. Added `require('resend')` and `require('../models/Group')` to the controller.
+
+---
+
+## [3.1.0] - 2026-04-10
+
+### Added
+- `mern_vb_backend/scripts/activateGroup.js` (new): Configurable script to activate any group from trial to paid. Edit the three constants at the top (`GROUP_SLUG`, `PLAN_NAME`, `DURATION_MONTHS`), then run `node scripts/activateGroup.js`. Calculates `paidUntil` as today + duration, sets `isPaid: true` and `trialExpiresAt: 2099-12-31`. Outputs a clear success block with group name, plan, duration, and active-until date — or `❌ Error` with the reason if the slug is not found.
+
+### Fixed
+
+**Reports page — 401 Unauthorized on all non-PDF actions**
+- Root cause: `downloadExcelReport()` in `Reports.jsx` and `fetchAvailableCycles()` in `ReportSelectionModal.jsx` used raw `fetch()` with `localStorage.getItem('token')`. Under Clerk auth that token is always `null`, so every request was rejected. Axios calls worked because the global interceptor in `auth.jsx` auto-attaches fresh Clerk tokens; `fetch()` bypasses the interceptor entirely.
+- `Reports.jsx`: replaced `fetch()` in `downloadExcelReport()` with `axios.get(endpoint, { responseType: 'blob' })`. Replaced `fetch()` in `handleCycleSelected()` with `axios.get(url)`. Removed all stale `localStorage.getItem('token')` lines from the three PDF generator functions.
+- `ReportSelectionModal.jsx`: replaced `fetch()` in `fetchAvailableCycles()` with `axios.get()`. Added `import axios from 'axios'`. Removed `localStorage.getItem('token')` line. Excel exports, in-app report views, and cycle loading now work correctly.
+
+**ReportSelectionModal — UI spec alignment**
+- Restyled from blue/gray palette to full UI spec: `bg-surface-card rounded-xl` container, `text-text-primary`/`text-text-secondary` text, `border-border-default` inputs with `focus:ring-brand-primary`, rounded-full Cancel and Generate buttons using spec colours, `text-status-overdue-text` error state. Close button replaced `×` text with lucide `X` icon using spec ghost button style.
+
+**FinesModal — UI spec alignment**
+- Status badges: replaced `rounded` with `rounded-full`, standardised padding to `px-3 py-1`, added `font-semibold uppercase tracking-[0.06em]`. Colour mapping: `Unpaid` → PENDING colours (`#FFF0E0`/`#B85A00`), `Paid` → PAID colours (`#E8F5E8`/`#2D7A2D`), `Cancelled` → INACTIVE colours (`bg-surface-page text-text-secondary`).
+- Table header: removed `bg-gray-100 text-gray-700` background. Headers now use `text-xs font-medium uppercase tracking-wider text-text-secondary` with only a bottom border.
+- Table rows: removed `hover:bg-gray-50`. Row dividers use `border-border-default`.
+- "Reason" column: removed `truncate` — text now wraps within `max-w-xs`. `title` tooltip retained for long values.
+- Action buttons: Edit and Void now use ghost style (`w-8 h-8 rounded-md text-text-secondary hover:bg-surface-page`). Delete uses destructive style (`text-status-overdue-text hover:bg-status-overdue-bg`).
+- Edit Fine sub-dialog: labels use spec uppercase style, inputs use `border-border-default rounded-xl` style, Save uses `bg-brand-primary rounded-full`, Cancel uses ghost rounded-full.
+- Void Fine sub-dialog: warning text uses `#B85A00`, Void button uses `bg-status-overdue-bg text-status-overdue-text` destructive style.
+- Delete Fine sub-dialog: same destructive button style, spec text colours throughout.
+
+### Scripts
+- Ran `node scripts/markWilliamPaid.js` — William's group `paidUntil` set to 2099, trial banner removed.
+
+---
+
+## [3.0.0] - 2026-04-10
+
+### Added — Night 2 Sprint: Member Invites, Upgrade/Billing Flow, Webhook
+
+**Backend — Member Invites via Clerk Email**
+- `models/PendingInvite.js` (new): Tracks email-based Clerk invitations. Schema includes `email`, `groupId`, `role`, `invitedBy` (clerkUserId), `name`, `clerkInvitationId`, and `expiresAt` (7-day TTL). MongoDB TTL index auto-deletes expired records. Unique compound index on `email + groupId` prevents duplicate pending invites.
+- `controllers/inviteController.js`: Added `inviteByEmail` — validates role permissions, checks for duplicate pending invite and existing membership, calls Clerk Invitation API to send sign-up email with `groupId/role/name` in `public_metadata`, then stores a `PendingInvite` record. Added `getPendingInvites` — returns non-expired pending invites for the current group.
+- `routes/invites.js`: Added `POST /api/invites/email` and `GET /api/invites/pending` (both require `verifyToken` + `resolveGroup`).
+
+**Backend — Clerk Webhook Handler**
+- `routes/webhookRoutes.js` (new): Handles `POST /api/webhooks/clerk`. Verifies the svix signature using `CLERK_WEBHOOK_SECRET`. On `user.created` event: looks up a `PendingInvite` by the new user's email, creates a `GroupMember` with the role/name from the invite, then deletes the invite. Webhook errors are logged but do not fail the response (Clerk will retry).
+- `server.js`: Webhook route registered **before** `express.json()` middleware — required for svix raw-body signature verification. `POST /api/billing` also added.
+- Dependencies added: `svix` (webhook signature verification), `resend` (transactional email).
+
+**Backend — Billing / Upgrade Request**
+- `controllers/billingController.js` (new): `requestUpgrade` looks up the requesting user's group membership and group name, then fires a Telegram message (always) and a Resend email (if `RESEND_API_KEY` + `ADMIN_EMAIL` are set) with the plan name, price, admin contact, and a reminder to set `isPaid + paidUntil` in Atlas. Gracefully skips email if env vars are absent.
+- `routes/billingRoutes.js` (new): `POST /api/billing/request` (requires `verifyToken`).
+- `config/paymentDetails.js` (new): Airtel Money, MTN MoMo, Access Bank, and WhatsApp contact details config. Fill before deploy.
+
+**Backend — Group model + trial expiry**
+- `models/Group.js`: Added `paidUntil: Date` (default `null`). Supports subscription expiry tracking alongside the existing boolean `isPaid`.
+- `middleware/checkTrial.js`: Updated paid-group bypass logic. Three cases: `isPaid + paidUntil: null` → full access (backwards-compatible with existing paid groups); `isPaid + paidUntil: future` → full access; `isPaid + paidUntil: past` → subscription lapsed, falls through to trial/read-only logic.
+- `scripts/markWilliamPaid.js`: Now also sets `paidUntil: 2099-01-01` when marking William's group as paid.
+
+**Frontend — Members page**
+- `pages/MembersPage.jsx` (new): Replaces legacy `Users.jsx` on the `/members` route. Displays active group members as a list with initials avatars (colour-keyed by first letter per UI Spec §2.3), member name, email, and role badge. Staff roles (admin/treasurer/loan_officer) see a "+ Invite Member" pill button top-right. Clicking opens `SlideoverDrawer` with an invite form (Full Name, Email, Role select). Submit calls `POST /api/invites/email`; success closes drawer + shows toast; errors display inline without closing. Below the member list: "Pending Invites" section (fetched from `GET /api/invites/pending`) shows email, role badge, and amber "Pending" badge.
+- `App.jsx`: `/members` route now renders `MembersPage` instead of `Users`. Role guard widened from `['admin']` to `['admin', 'treasurer', 'loan_officer']`.
+
+**Frontend — Upgrade / Pricing page**
+- `pages/UpgradePage.jsx` (new): Three-state page — plan selection → subscription form → confirmation screen.
+  - Plan selection: two cards (Starter ZMW 150, Standard ZMW 250 recommended) with feature lists and Subscribe buttons. Standard card has `border-2 border-brand-primary` highlight and "Recommended" badge.
+  - Subscription form: pre-fills name (from group membership) and email (from Clerk, read-only); phone number field required. Submits to `POST /api/billing/request`.
+  - Confirmation screen: checkmark icon, thank-you message, full payment instructions box (Airtel Money, MTN MoMo, Access Bank details), reference line (`groupName — planName`), WhatsApp link opens in new tab (`target="_blank" rel="noopener noreferrer"`).
+  - Group name pulled from `user?.groupName` (set in auth context via `/auth/me`).
+- `App.jsx`: `/upgrade` route added as a protected route.
+
+**Frontend — Upgrade button wiring**
+- `components/TrialBanner.jsx`: "Upgrade Now" button added (was just a text banner). Navigates to `/upgrade` via `useNavigate`.
+- `components/layout/DesktopSidebar.jsx`: Sidebar trial card "Upgrade" button wired to `navigate('/upgrade')`.
+- `pages/Settings.jsx`: Both "Upgrade" (trial-active state) and "Upgrade Now" (trial-expired state) buttons wired to `navigate('/upgrade')`.
+
+### Fixed
+- `pages/UpgradePage.jsx`: Confirmation screen reference line now shows the actual group name (`user?.groupName`) instead of the placeholder "My Group".
+- `pages/UpgradePage.jsx`: WhatsApp link opens in a new tab so the user stays logged in to the web app.
+
+---
+
+## [2.9.0] - 2026-04-10
+
+### Added — UI Overhaul Night 3: Onboarding/Welcome Polish + Settings Data Fix
+
+**Backend — data persistence fixes**
+- `GroupSettings.js` model: added `meetingDay` (String, nullable) and `lateFineType` (String enum `['fixed', 'percentage']`, default `'fixed'`) fields. Both have safe defaults so existing documents are unaffected.
+- `groupController.createGroup`: now persists `meetingDay` and `lateFineType` from the onboarding form into the `GroupSettings` document. Previously both fields were received in `req.body` but silently discarded.
+- `groupSettingsController.updateGroupSettings`: added `meetingDay` and `lateFineType` to the allowlist so they can be edited via the Settings page in future.
+- `authController.me`: `/auth/me` response now includes `groupName: group?.name`. The `Group` document was already being fetched for trial status; this adds the name at no extra DB cost. Makes `user.groupName` available anywhere `useAuth()` is consumed.
+
+### Changed
+
+**Frontend — Settings page data fetching**
+- `Settings.jsx`: replaced all hardcoded `null` / `"6 months"` / `"Reducing Balance"` placeholder values with a live fetch to `GET /api/group-settings` on mount. Displays a "Loading settings..." state while fetching. Field mappings: `groupName`, `meetingDay`, `cycleLengthMonths` (`"{n} months"`), `interestRate` (`"{n}%"`), `interestMethod` (human-readable), `loanLimitMultiplier` (`"{n}× savings"`), `profitSharingMethod` (human-readable), `overdueFineAmount` (`"K{n}"`), `lateFineType` (human-readable). Currency stays hardcoded `"ZMW (Zambian Kwacha)"`. All fields fall back to `"—"` if null/missing.
+
+**Frontend — TopBar group label**
+- `TopBar.jsx`: replaced `"{firstName}'s Group"` (derived from Clerk user's full name) with `user?.groupName` from the auth context. Shows the actual group name created during onboarding. Falls back to `"My Group"` if not yet loaded.
+
+**Frontend — Welcome page reskin**
+- `Welcome.jsx`: full colour system migration from the old blue palette to Night 1/2 design tokens. `bg-gradient-to-b from-blue-50 to-white` → `bg-surface-page`. All CTA buttons: `bg-blue-600` → `bg-brand-primary`, `rounded-xl` → `rounded-full` (spec pill). Feature cards: `bg-white border-gray-100` → `bg-surface-card border-border-default`. Pricing — Starter card: `bg-white border-gray-200` → `bg-surface-card border-border-default`, badge `text-blue-600` → `text-brand-primary`. Pricing — Standard card: `bg-blue-600 text-white` → `bg-surface-dark text-white` (dark hero). All `text-gray-*` classes replaced with spec tokens (`text-text-primary`, `text-text-secondary`, `text-text-muted`).
+
+**Frontend — Onboarding wizard reskin**
+- `Onboarding.jsx`: full spec reskin across all 4 steps and the success screen. No logic changes — only styling.
+  - Outer wrapper: `bg-background` → `bg-surface-page`.
+  - Card: `bg-white rounded-xl shadow` → `bg-surface-card rounded-xl`.
+  - Logo circle added at card top (spec §9.2): 48px circle `bg-brand-primary` with white "C".
+  - Static heading restructured: "Setup Your Chama" (h1) + "Step {n} of 4: {label}" (subtitle) replace the old per-step `<h2>` headings. Step labels updated to spec (Group Details / Lending Rules / Fine Rules / Confirm & Launch).
+  - Step indicator pills (spec §6.12): active pill `w-8 bg-brand-primary`, inactive `w-6 bg-border-default`, `gap-1.5`. Previously all pills were equal `flex-1 bg-blue-600 / bg-gray-200`.
+  - Input and select fields: `border rounded-lg px-3 py-2 text-sm focus:ring-blue-500` → `h-12 border border-border-default rounded-md px-3.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none`.
+  - Labels: `text-sm font-medium text-gray-700` → `text-xs font-medium uppercase tracking-widest text-text-secondary`.
+  - Help text: `text-xs text-gray-500` → `text-xs text-text-muted`.
+  - Primary buttons (Next / Create Group / Go to Dashboard): `bg-blue-600 hover:bg-blue-700 rounded-lg` → `bg-brand-primary hover:bg-brand-hover rounded-md font-semibold py-3`.
+  - Back buttons: `border rounded-lg text-gray-600 hover:bg-gray-50` → `border border-border-default rounded-md text-text-secondary hover:bg-surface-page`.
+  - Step 4 summary box: `bg-gray-50` → `bg-surface-page`, `text-gray-700` → `text-text-primary`.
+  - Error text: `text-red-600` → `text-status-overdue-text`.
+
+---
+
+## [2.8.0] - 2026-04-10
+
+### Added — UI Overhaul Night 2: Forms, Drawers & Colour Polish
+
+**New components**
+- `SlideoverDrawer.jsx` (`src/components/ui/`): Reusable drawer component. Slides in from the right on desktop (fixed 420px width, full height, left border). Slides up from the bottom on mobile (90vh, rounded top corners). Backdrop click and ESC key close it. Body scroll is locked while open. Accepts `title`, `footer` (submit button slot), and `children` props. Footer includes a "Cancel" text link below the primary action.
+- `MemberSelect.jsx` (`src/components/ui/`): Searchable member picker. Fetches `GET /api/users` once on mount. Filters by name or username (case-insensitive). Dropdown shows avatar (initials, AVATAR_COLORS), full name, and role badge per member. On select: avatar appears inside the input, X button clears. Calls `onChange(member.username)` to stay compatible with existing form fields. Role badge colours match spec (admin → brand orange, treasurer → blue, loan_officer → green, member → grey).
+
+**New routes/access**
+- "View Fines & Penalties" added as 6th item in the AppShell Action Sheet, opening `FinesModal`.
+
+### Changed
+
+**Forms**
+- `AddLoanForm.jsx`: Replaced raw username text input with `MemberSelect`. Applied spec field styles (uppercase label + 48px bordered input, `focus:border-brand-primary`). Form is now headless — no wrapper card, no title, no inline submit button. Submit is triggered via `form="add-loan-form"` on the SlideoverDrawer footer button. Error/loading shown as inline text.
+- `AddSavingsForm.jsx`: Same changes as `AddLoanForm`. Form ID `"add-savings-form"`.
+
+**Pages**
+- `Loans.jsx`: Removed inline `AddLoanForm` side column and the `flex-col lg:flex-row` split layout. List is now full-width. Page header has title left + "+ Add Loan" primary pill button right (role-gated). `SlideoverDrawer` mounts at bottom of the component, opens on button click, closes and refreshes list on success. Loan status badges converted to spec pill style (`bg-status-paid-bg/text` and `bg-status-pending-bg/text`). Action buttons (Edit, Delete, Details) restyled to ghost rounded-full pills. Reverse/Delete confirmation dialogs use spec button colours.
+- `Savings.jsx`: Same restructure as `Loans.jsx`. Inline `AddSavingsForm` side column removed. "+ Record Savings" button in page header. `SlideoverDrawer` wraps the form. Savings amounts display in `text-amount-positive`. Entry rows use `border-border-default` instead of `bg-gray-50 shadow`.
+- `Dashboard.jsx`: Removed `AdminActions` quick-link grid (Add Loan / Add Savings / View Reports buttons) — redundant with the new nav and action sheet. Removed unused imports (`Card`, `Button`, `Link`, `FaPlus`, `FaPiggyBank`, `FaFileAlt`, `FaGavel`). Layout simplified to: NewCycleBanner → DashboardStatsCard.
+
+**Stat cards & balance**
+- `DashboardStatsCard.jsx`: Replaced 6-card rainbow colour system with spec unified layout. Bank Balance is now a full-width dark hero card (`bg-surface-dark`, white text, `text-4xl font-bold`). Five remaining stats (Total Saved, Total Loaned, Interest (Loans), Interest (Savings), Total Fines) are white cards in a 2-col (mobile) / 3-col (desktop) grid — no coloured borders, neutral `text-text-secondary` icons, `text-text-primary` values. Switched from react-icons to lucide-react.
+- `BankBalanceCard.jsx`: Restyled to match the dark hero card pattern (`bg-surface-dark`, white balance text, `text-text-on-dark-muted` label). Removed `text-[#2979FF]` brand blue.
+
+**Action Sheet**
+- `AppShell.jsx`: "Add Loan" and "Add Savings" now navigate to `/loans` and `/savings` respectively (drawers live on those pages). Added `useNavigate` import. Added "View Fines & Penalties" as 6th action item.
+
+### Fixed
+- `InstallPWAButton.jsx`: Renamed `aria-label` on the dismiss button from `"Dismiss install banner"` to `"Dismiss"` — the word "install" in the old label caused `findByRole('button', { name: /Install/i })` to match two elements, breaking the test.
+
+### Tests
+- `DashboardStatsCard.test.js`: Updated label assertion from `/Bank Balance/i` to `/Total Group Balance/i` to match the new hero card label. Removed the stale `screen.debug()` call and commented-out interest assertions.
+- All 4 tests now passing (previously 3 passing, 1 pre-existing failure).
+
+---
+
+## [2.7.0] - 2026-04-10
+
+### Added — UI Overhaul Night 1: Nav System + Settings Scaffold
+
+**New components**
+- `DesktopSidebar.jsx`: Fixed 240px left sidebar (≥768px only). Logo mark, 6 nav items (Dashboard, Members, Savings, Loans, Reports, Settings), active state (`bg-brand-light` + `text-brand-primary`), hover state, trial status card at bottom.
+- `MobileBottomNav.jsx`: Pill-shaped floating bottom nav (`bottom-3 left-3 right-3`, `rounded-xl`, `bg-surface-dark`). 5 items — Dashboard, Members, + (Action Sheet trigger), Reports, Settings. Active item uses `bg-brand-primary` rounded square. + button elevated 8px above bar.
+- `TopBar.jsx`: Fixed header (`h-16`), `md:left-60` offset on desktop. Group name left, user avatar right with initials colour-coded via `AVATAR_COLORS` table from spec. Dropdown: Account Settings (→ `/settings`), Sign Out (via Clerk).
+- `AppShell.jsx`: New shell wrapper replacing `Layout` in App.jsx. Composes DesktopSidebar + TopBar + MobileBottomNav + TrialBanner + children. Holds all modal state previously in Navbar (BankBalance, Payment, Fine, Fines, ChangePassword, NewCycle). Includes Action Sheet bottom sheet for the + button.
+- `NewCycleBanner.jsx`: Dashboard-only banner component. Renders when `isVisible` prop is true. Calendar icon + cycle-due message + "Begin New Cycle" primary pill button. Wired to `BeginNewCycleModal` in Dashboard.
+- `pages/Settings.jsx`: `/settings` route — 6 section cards (Group Profile, Financial Rules, Fine Rules, Member Roles, Billing, Danger Zone). Display mode only; each card has a no-op Edit button (editing is a future sprint). Danger Zone card uses destructive colour treatment.
+
+**New routes**
+- `/settings` — Settings page (all authenticated users)
+- `/members` — Points to Users page (admin only, stub until Members page is built)
+
+**Design system**
+- `index.css`: 25 new Tailwind v4 color tokens added to `@theme inline` (`brand-*`, `surface-*`, `text-*`, `status-*`, `border-*`, `trial-*`, `amount-positive`). Font tokens `--font-sans` (DM Sans) and `--font-mono` (DM Mono). Radius values updated to spec (8/12/16/20px).
+- `index.html`: DM Sans + DM Mono loaded from Google Fonts. Title updated to "Chama360".
+
+### Changed
+- `Layout` in `App.jsx` replaced by `AppShell` — old `Navbar` + `TrialBanner` + `<main>` wrapper consolidated into single shell component.
+- `Dashboard.jsx`: `NewCycleBanner` rendered at top of page content, `BeginNewCycleModal` trigger moved here from the old Operations dropdown.
+- `body` now applies `bg-surface-page text-text-primary font-sans` — warm off-white (#F0EDE8) page background across all authenticated pages.
+
+### Removed
+- Old horizontal sticky `Navbar.jsx` (Operations dropdown, Settings dropdown, inline logout button). All operational actions migrated to AppShell's Action Sheet. Sign Out migrated to TopBar dropdown.
+
+---
+
+## [2.6.0] - 2026-04-09
+
+### Added
+- Promotional holding page (`/welcome`): new users see app name, value prop, feature cards, pricing (ZMW 150 Starter / ZMW 250 Standard), and "Start my 15-day free trial" CTA before reaching the onboarding wizard
+- `OnboardingRoute` guard: `/onboarding` only accessible after clicking the CTA (checks `sessionStorage.trialAccepted`); direct URL access redirects to `/welcome`
+- User indicator in Navbar: initials avatar (blue circle) + first name displayed to the left of Logout on all authenticated pages
+
+### Fixed
+- `resolveGroup` middleware was using `req.auth?.userId` (always `undefined` on Clerk's callable auth object) instead of `getAuth(req)` — root cause of all 401 errors on group-scoped API routes after authentication
+- Super admin who is also a group member (William) now gets both `isSuperAdmin: true` AND full group scoping resolved, so they see their own group data instead of 500 errors
+- Zombie Jest test process from a previous test run was holding port 5000 with stale 2-day-old code, causing 401s and 404 on diagnostic endpoint — killed and replaced with correct nodemon process
+- `OnboardingRoute` converted from inline JSX expression to a proper component function so `sessionStorage` is read at render time (not element-creation time), fixing the CTA button doing nothing
+
+### Changed
+- `ProtectedRoute` redirects `needsOnboarding` users to `/welcome` instead of directly to `/onboarding`
+
+---
+
+## [2.5.0] - 2026-04-09
+
+### Added
+- Free trial system: `Group` model gains `trialExpiresAt` (15 days) and `isPaid` fields
+- `checkTrial` middleware: blocks write operations (POST/PUT/DELETE) for expired unpaid groups, allows GETs (read-only)
+- Wired `checkTrial` into all 9 group-scoped route files after `resolveGroup`
+- `SuperAdmin` model for platform-level admin bypass
+- `resolveGroup` now checks SuperAdmin first; super admins skip group membership requirement
+- `GET /api/admin/groups` and `GET /api/admin/groups/:groupId` routes for super admin group listing
+- `GET /api/auth/test` diagnostic endpoint (to be removed after auth confirmed)
+- 4-step onboarding wizard: Step 1 (group info + cycle), Step 2 (loan settings), Step 3 (fines), Step 4 (confirm)
+- `TrialBanner` component shown when trial is expired
+- Super admin bypass in `ProtectedRoute` (no onboarding redirect)
+- `trialActive` and `isSuperAdmin` state in auth store; 403 `trial_expired` global response interceptor
+- `scripts/seedSuperAdmin.js` — idempotent super admin seed script
+- `scripts/markWilliamPaid.js` — one-time script to set William's group as paid/permanent
+
+### Changed
+- `/auth/me` response now includes `trialActive`, `trialExpiresAt`, `isPaid`, `isSuperAdmin`
+- `POST /api/groups` accepts full wizard fields: `meetingDay`, `cycleStartDate`, `cycleLengthMonths`, `interestRate`, `interestMethod`, `loanLimitMultiplier`, `lateFineAmount`, `lateFineType`; sets `trialExpiresAt` on group creation
+- Onboarding success shows welcome screen before redirecting to dashboard
+- `auth.jsx` `/auth/me` call now passes token explicitly to avoid race condition on first load
+- Removed debug aids: `GET /api/debug-auth`, `console.error` logging in `verifyToken`
+
+---
+
+## [2.4.0] - 2026-04-07
+
+### Added — Clerk Auth + Multi-Group Foundation (Day 4 Sprint)
+
+**Backend**
+- **`models/GroupMember.js`**: New model replacing the old `User` model for auth purposes. Stores `clerkUserId`, `name`, `email`, `phone`, `role`, `groupId`, `active` flag. Links Clerk identity to group membership.
+- **`models/Group.js`**: New model for group records (`name`, `description`, `createdBy`, `createdAt`).
+- **`controllers/authController.js`**: `GET /auth/me` — resolves Clerk userId to a GroupMember record; returns `{ _id, name, role, groupId, phone, email }` or `{ code: 'NO_GROUP' }` 403 if no membership exists.
+- **`routes/auth.js`**, **`routes/groups.js`**, **`routes/invites.js`**: New route files for auth, group management, and invite-based onboarding flows.
+- **`middleware/auth.js`** — `verifyToken`: replaced custom JWT verify with Clerk's `getAuth(req)` check. `requireRole`: unchanged, reads from `req.role` set by group-resolution middleware.
+- **`middleware/resolveGroup.js`**: Reads Clerk userId from `getAuth(req)`, looks up GroupMember, attaches `req.groupMember`, `req.groupId`, `req.role` to every protected request.
+
+**Frontend**
+- **`@clerk/clerk-react`** installed and wired into `main.jsx` via `<ClerkProvider>`.
+- **`src/store/auth.jsx`** rewritten: replaced localStorage JWT pattern with Clerk hooks (`useClerkAuth`, `useUser`). Axios interceptor now calls `getToken()` (auto-refreshes the 2-min JWT) before every request. `authLoading` state prevents race conditions between interceptor setup and first API call.
+- **`src/pages/SignIn.jsx`**, **`src/pages/SignUp.jsx`**: Clerk-hosted sign-in/sign-up pages using `<SignIn>` and `<SignUp>` components.
+- **`src/pages/Onboarding.jsx`**: 4-step wizard — group name, member details, review, confirm. Creates a new Group + GroupMember in MongoDB after Clerk sign-up.
+- **`src/pages/InviteAccept.jsx`**: Accepts invite tokens, links a signed-in Clerk user to an existing group as a new GroupMember.
+- **`src/App.jsx`** — `ProtectedRoute` updated to gate on `isLoaded && !authLoading` rather than `user` being set, so the spinner resolves even if the `/auth/me` call fails.
+
+### Changed
+- `server.js`: replaced `express-jwt` / custom JWT middleware with `clerkMiddleware({ secretKey })` from `@clerk/express`. Added `allowedHeaders: ['Authorization']` to CORS config.
+- `mern-vb-frontend/.env`: `VITE_CLERK_PUBLISHABLE_KEY` added alongside `VITE_API_URL`.
+
+### Removed
+- Old `authController.js` login endpoint (username + bcrypt password flow) — replaced by Clerk-managed sign-in.
+- `JWT_SECRET` from backend `.env` — no longer needed.
+
+---
+
+## [2.3.0] - 2026-04-03
+
+### Added
+- **`interestMethod` wiring**: `createLoan` now reads `interestMethod` from GroupSettings and passes it to `calculateLoanSchedule`. Flat-rate and reducing-balance schedules are now fully driven by per-group configuration.
+- **`loanLimitMultiplier` enforcement**: `createLoan` reads `loanLimitMultiplier` from GroupSettings and rejects loan requests that exceed the member's savings × multiplier cap, returning a descriptive 400 error.
+
+### Changed
+- `utils/loanCalculator.js` — added `interestMethod` parameter to `calculateLoanSchedule`; flat-rate branch computes `originalAmount × (rate/100) / durationMonths` per installment; reducing-balance branch unchanged.
+
+---
 
 ## [2.2.0] - 2026-04-02
 

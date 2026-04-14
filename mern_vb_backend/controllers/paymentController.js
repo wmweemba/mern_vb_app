@@ -1,30 +1,17 @@
 const { updateBankBalance } = require('./bankBalanceController');
 const { logTransaction } = require('./transactionController');
-const User = require('../models/User');
+const GroupMember = require('../models/GroupMember');
 const Fine = require('../models/Fine');
 const Loan = require('../models/Loans');
 const mongoose = require('mongoose');
 
-// exports.repayment = async (req, res) => {
-//   const { userId, amount, note } = req.body;
-//   try {
-//     await updateBankBalance(amount); // Credit
-//     await logTransaction({ userId, type: 'repayment', amount, note });
-//     res.json({ message: 'Repayment recorded', amount });
-//   } catch (err) {
-//     res.status(500).json({ error: 'Failed to record repayment', details: err.message });
-//   }
-// };
-
 exports.repayment = async (req, res) => {
   const { username, amount, note, loanId } = req.body;
 
-  // Use MongoDB session for atomic transactions
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // 1. Validate inputs
     if (!username || !amount || amount <= 0) {
       await session.abortTransaction();
       return res.status(400).json({ error: 'Invalid username or amount' });
@@ -36,41 +23,36 @@ exports.repayment = async (req, res) => {
       return res.status(400).json({ error: 'Invalid payment amount' });
     }
 
-    // 2. Find user by username (with session)
-    const user = await User.findOne({ username }).session(session);
-    if (!user) {
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope }).session(session);
+    if (!member) {
       await session.abortTransaction();
-      return res.status(404).json({ error: `User '${username}' not found` });
+      return res.status(404).json({ error: `Member '${username}' not found` });
     }
-    const userId = user._id;
+    const userId = member._id;
 
-    // 3. Find active loan (with session)
     let loan;
     if (loanId) {
-      loan = await Loan.findOne({ _id: loanId, userId, archived: { $ne: true } }).session(session);
+      loan = await Loan.findOne({ _id: loanId, userId, ...req.groupScope, archived: { $ne: true } }).session(session);
     } else {
-      loan = await Loan.findOne({ userId, fullyPaid: false, archived: { $ne: true } })
+      loan = await Loan.findOne({ userId, ...req.groupScope, fullyPaid: false, archived: { $ne: true } })
         .sort({ createdAt: -1 })
         .session(session);
     }
     if (!loan) {
       await session.abortTransaction();
-      return res.status(404).json({ error: `No active loan found for user '${username}'` });
+      return res.status(404).json({ error: `No active loan found for member '${username}'` });
     }
 
-    // 4. Find next unpaid or partially paid installment
     const nextInstallment = loan.installments.find(inst => !inst.paid);
     if (!nextInstallment) {
       await session.abortTransaction();
       return res.status(400).json({ error: 'All loan installments are already paid' });
     }
 
-    // 5. Calculate payment effects (validation only - no database changes yet)
     let installmentsToUpdate = [];
     let currentInstallment = nextInstallment;
     let remainingPayment = paymentAmount;
-    
-    // Calculate which installments will be affected
+
     let idx = loan.installments.findIndex(inst => inst.month === currentInstallment.month);
     while (remainingPayment > 0 && idx < loan.installments.length) {
       const inst = loan.installments[idx];
@@ -78,14 +60,14 @@ exports.repayment = async (req, res) => {
         const currentPaid = inst.paidAmount || 0;
         const amountNeeded = inst.total - currentPaid;
         const paymentForThis = Math.min(remainingPayment, amountNeeded);
-        
+
         installmentsToUpdate.push({
           index: idx,
           newPaidAmount: currentPaid + paymentForThis,
           willBePaid: (currentPaid + paymentForThis) >= inst.total,
           paymentApplied: paymentForThis
         });
-        
+
         remainingPayment -= paymentForThis;
         if (remainingPayment <= 0) break;
       }
@@ -97,9 +79,6 @@ exports.repayment = async (req, res) => {
       return res.status(400).json({ error: 'No installments available for payment' });
     }
 
-    // 6. ATOMIC OPERATIONS - All database changes in single transaction
-    
-    // Update loan installments first (most likely to fail)
     installmentsToUpdate.forEach(update => {
       const installment = loan.installments[update.index];
       installment.paidAmount = update.newPaidAmount;
@@ -109,59 +88,47 @@ exports.repayment = async (req, res) => {
       }
     });
 
-    // Update loan fullyPaid status
     const allPaid = loan.installments.every(inst => inst.paid);
     if (allPaid) {
       loan.fullyPaid = true;
     }
 
-    // Save loan (with session)
     await loan.save({ session });
-
-    // Update bank balance (with session)
-    await updateBankBalance(paymentAmount, session);
-
-    // Log transaction (with session) 
-    await logTransaction({ 
-      userId, 
-      type: 'loan_payment', 
-      amount: paymentAmount, 
+    await updateBankBalance(paymentAmount, req.groupId, session);
+    await logTransaction({
+      userId,
+      type: 'loan_payment',
+      amount: paymentAmount,
       note: note || `Payment for ${installmentsToUpdate.length} installment(s)`,
-      referenceId: loan._id 
+      referenceId: loan._id,
+      groupId: req.groupId
     }, session);
 
-    // Commit the transaction - all or nothing
     await session.commitTransaction();
 
-    // Build success response
     const paidInstallments = installmentsToUpdate.map(update => ({
       month: loan.installments[update.index].month,
       amount: update.paymentApplied,
       paid: update.willBePaid
     }));
 
-    res.json({ 
+    res.json({
       message: 'Loan payment recorded successfully',
       paymentAmount,
       installmentsPaid: paidInstallments,
       loanFullyPaid: allPaid,
-      loan 
+      loan
     });
 
   } catch (err) {
-    // Abort transaction on any error
     await session.abortTransaction();
-    console.error('Payment processing error:', err);
-    
-    // Return specific error message
-    res.status(500).json({ 
-      error: 'Failed to process loan payment', 
+    res.status(500).json({
+      error: 'Failed to process loan payment',
       details: err.message,
       username,
-      amount: paymentAmount 
+      amount
     });
   } finally {
-    // Always end the session
     await session.endSession();
   }
 };
@@ -169,8 +136,8 @@ exports.repayment = async (req, res) => {
 exports.payout = async (req, res) => {
   const { userId, amount, note } = req.body;
   try {
-    await updateBankBalance(-amount); // Debit
-    await logTransaction({ userId, type: 'payout', amount, note });
+    await updateBankBalance(-amount, req.groupId);
+    await logTransaction({ userId, type: 'payout', amount, note, groupId: req.groupId });
     res.json({ message: 'Payout recorded', amount });
   } catch (err) {
     res.status(500).json({ error: 'Failed to record payout', details: err.message });
@@ -180,14 +147,15 @@ exports.payout = async (req, res) => {
 exports.fine = async (req, res) => {
   const { username, amount, note } = req.body;
   try {
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ error: 'User not found' });
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    if (!member) return res.status(400).json({ error: 'Member not found' });
     const fine = await Fine.create({
-      userId: user._id,
+      ...req.groupScope,
+      userId: member._id,
       username,
       amount,
       note,
-      issuedBy: req.user.id,
+      issuedBy: req.memberId,
     });
     res.json({ message: 'Fine/Penalty issued', fine });
   } catch (err) {
@@ -198,21 +166,21 @@ exports.fine = async (req, res) => {
 exports.payFine = async (req, res) => {
   const { fineId } = req.body;
   try {
-    const fine = await Fine.findById(fineId);
+    const fine = await Fine.findOne({ _id: fineId, ...req.groupScope });
     if (!fine) return res.status(404).json({ error: 'Fine not found' });
     if (fine.paid) return res.status(400).json({ error: 'Fine already paid' });
     fine.paid = true;
     fine.paidAt = new Date();
-    // Log transaction and update bank balance
     const transaction = await logTransaction({
       userId: fine.userId,
       type: 'fine',
       amount: fine.amount,
       note: fine.note || 'Fine payment',
+      groupId: req.groupId
     });
     fine.paymentTransactionId = transaction?._id;
     await fine.save();
-    await updateBankBalance(fine.amount);
+    await updateBankBalance(fine.amount, req.groupId);
     res.json({ message: 'Fine paid successfully', fine });
   } catch (err) {
     res.status(500).json({ error: 'Failed to pay fine', details: err.message });
@@ -221,7 +189,8 @@ exports.payFine = async (req, res) => {
 
 exports.getUnpaidFines = async (req, res) => {
   try {
-    const fines = await Fine.find({ paid: false }).populate('userId', 'username name');
+    const fines = await Fine.find({ ...req.groupScope, paid: false })
+      .populate('userId', 'name');
     res.json(fines);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch unpaid fines' });
@@ -230,7 +199,7 @@ exports.getUnpaidFines = async (req, res) => {
 
 exports.deleteAllFines = async (req, res) => {
   try {
-    await require('../models/Fine').deleteMany({});
+    await Fine.deleteMany({ ...req.groupScope });
     res.json({ message: 'All fines deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete fines' });
@@ -240,13 +209,13 @@ exports.deleteAllFines = async (req, res) => {
 // Get all fines — officers/admin see all; members see only their own
 exports.getAllFines = async (req, res) => {
   try {
-    let query = { archived: { $ne: true } };
-    if (req.user.role === 'member') {
-      query.userId = req.user.id;
+    let query = { ...req.groupScope, archived: { $ne: true } };
+    if (req.role === 'member') {
+      query.userId = req.memberId;
     }
     const fines = await Fine.find(query)
-      .populate('userId', 'username name')
-      .populate('issuedBy', 'username')
+      .populate('userId', 'name')
+      .populate('issuedBy', 'name')
       .sort({ issuedAt: -1 });
     res.json(fines);
   } catch (err) {
@@ -259,7 +228,7 @@ exports.editFine = async (req, res) => {
   const { fineId } = req.params;
   const { amount, note } = req.body;
   try {
-    const fine = await Fine.findById(fineId);
+    const fine = await Fine.findOne({ _id: fineId, ...req.groupScope });
     if (!fine) return res.status(404).json({ error: 'Fine not found' });
     if (fine.paid) return res.status(400).json({ error: 'Cannot edit a paid fine' });
     if (fine.cancelled) return res.status(400).json({ error: 'Cannot edit a cancelled fine' });
@@ -283,19 +252,19 @@ exports.voidFine = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const fine = await Fine.findById(fineId).session(session);
+      const fine = await Fine.findOne({ _id: fineId, ...req.groupScope }).session(session);
       if (!fine) throw Object.assign(new Error('Fine not found'), { status: 404 });
       if (fine.cancelled) throw Object.assign(new Error('Fine is already cancelled'), { status: 400 });
 
       if (fine.paid) {
-        // Reverse the bank balance since the fine was already paid/collected
-        await updateBankBalance(-fine.amount, session);
+        await updateBankBalance(-fine.amount, req.groupId, session);
         await logTransaction({
           userId: fine.userId,
           type: 'fine',
           amount: -fine.amount,
           referenceId: fine._id,
-          note: `Fine voided: ${cancelReason}. Original amount K${fine.amount} reversed.`
+          note: `Fine voided: ${cancelReason}. Original amount K${fine.amount} reversed.`,
+          groupId: req.groupId
         }, session);
       }
 
@@ -320,18 +289,18 @@ exports.deleteFine = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const fine = await Fine.findById(fineId).session(session);
+      const fine = await Fine.findOne({ _id: fineId, ...req.groupScope }).session(session);
       if (!fine) throw Object.assign(new Error('Fine not found'), { status: 404 });
 
       if (fine.paid && !fine.cancelled) {
-        // Reverse bank balance since the fine payment was collected
-        await updateBankBalance(-fine.amount, session);
+        await updateBankBalance(-fine.amount, req.groupId, session);
         await logTransaction({
           userId: fine.userId,
           type: 'fine',
           amount: -fine.amount,
           referenceId: fine._id,
-          note: `Fine permanently deleted - payment of K${fine.amount} reversed.`
+          note: `Fine permanently deleted - payment of K${fine.amount} reversed.`,
+          groupId: req.groupId
         }, session);
       }
 
@@ -344,4 +313,4 @@ exports.deleteFine = async (req, res) => {
   } finally {
     await session.endSession();
   }
-}; 
+};

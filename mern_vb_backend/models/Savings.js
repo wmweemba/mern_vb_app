@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const savingSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember', required: true },
+    groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true, index: true },
     month: { type: Number, required: true },
     amount: { type: Number, required: true },
     date: { type: Date, default: Date.now },

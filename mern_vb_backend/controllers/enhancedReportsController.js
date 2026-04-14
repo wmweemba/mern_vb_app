@@ -3,13 +3,11 @@ const Loan = require('../models/Loans');
 const Saving = require('../models/Savings');
 const Fine = require('../models/Fine');
 const Transaction = require('../models/Transaction');
-const User = require('../models/User');
 
 // Enhanced report controller with cycle support
 exports.generateEnhancedReport = async (req, res) => {
   const { reportType, cycleType, cycleNumber } = req.query;
-  
-  // Check permissions
+
   const allowedRoles = ['admin', 'treasurer', 'loan_officer'];
   if (!allowedRoles.includes(req.user.role)) {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
@@ -18,10 +16,10 @@ exports.generateEnhancedReport = async (req, res) => {
   try {
     let query = {};
     let reportTitle = '';
-    
-    // Build query based on cycle selection
+
     if (cycleType === 'current') {
-      query = { 
+      query = {
+        groupId: req.groupId,
         $or: [
           { archived: { $ne: true } },
           { archived: { $exists: false } }
@@ -30,18 +28,18 @@ exports.generateEnhancedReport = async (req, res) => {
       reportTitle = 'Current Cycle';
     } else if (cycleType === 'historical' && cycleNumber) {
       const cycleNum = parseInt(cycleNumber);
-      // Simplified query for historical data - try multiple strategies
-      query = { 
+      query = {
+        groupId: req.groupId,
         $or: [
-          { cycleNumber: cycleNum }, // Explicit cycle number match
-          { archived: true }, // All archived data (for dummy data without cycle numbers)
-          { cycleNumber: { $exists: true, $ne: null } } // Any data with cycle numbers
+          { cycleNumber: cycleNum },
+          { archived: true },
+          { cycleNumber: { $exists: true, $ne: null } }
         ]
       };
       reportTitle = `Historical Cycle ${cycleNumber}`;
     } else if (cycleType === 'historical' && !cycleNumber) {
-      // Show all historical data if no specific cycle selected
-      query = { 
+      query = {
+        groupId: req.groupId,
         $or: [
           { archived: true },
           { cycleNumber: { $exists: true, $ne: null } }
@@ -60,33 +58,27 @@ exports.generateEnhancedReport = async (req, res) => {
         data = await generateLoansReportData(query);
         filename = `${reportTitle.toLowerCase().replace(/ /g, '_')}_loans.csv`;
         break;
-      
       case 'savings':
         data = await generateSavingsReportData(query);
         filename = `${reportTitle.toLowerCase().replace(/ /g, '_')}_savings.csv`;
         break;
-      
       case 'transactions':
         data = await generateTransactionsReportData(query);
         filename = `${reportTitle.toLowerCase().replace(/ /g, '_')}_transactions.csv`;
         break;
-      
       default:
         return res.status(400).json({ error: 'Invalid report type' });
     }
 
-    // Return data for view or CSV for download based on request
     const format = req.query.format || 'json';
-    
+
     if (format === 'csv') {
       const parser = new Parser();
       const csv = parser.parse(data);
-      
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.send(csv);
     } else {
-      // Return JSON for frontend display
       res.json({
         data,
         reportType,
@@ -98,24 +90,20 @@ exports.generateEnhancedReport = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Enhanced Report Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to generate report', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to generate report',
+      details: error.message
     });
   }
 };
 
-// Generate loans report data
 async function generateLoansReportData(query) {
-  const loans = await Loan.find(query).populate('userId', 'username name email');
+  const loans = await Loan.find(query).populate('userId', 'name email');
   const data = [];
-  
+
   loans.forEach(loan => {
-    // Handle loans without installments
     if (!loan.installments || loan.installments.length === 0) {
       data.push({
-        Username: loan.userId?.username || 'N/A',
         Name: loan.userId?.name || 'N/A',
         Email: loan.userId?.email || 'N/A',
         LoanAmount: loan.amount || 0,
@@ -137,7 +125,6 @@ async function generateLoansReportData(query) {
     } else {
       loan.installments.forEach(installment => {
         data.push({
-          Username: loan.userId?.username || 'N/A',
           Name: loan.userId?.name || 'N/A',
           Email: loan.userId?.email || 'N/A',
           LoanAmount: loan.amount || 0,
@@ -159,16 +146,13 @@ async function generateLoansReportData(query) {
       });
     }
   });
-  
+
   return data;
 }
 
-// Generate savings report data  
 async function generateSavingsReportData(query) {
-  const savings = await Saving.find(query).populate('userId', 'username name email');
-  
+  const savings = await Saving.find(query).populate('userId', 'name email');
   return savings.map(s => ({
-    Username: s.userId?.username || 'N/A',
     Name: s.userId?.name || 'N/A',
     Email: s.userId?.email || 'N/A',
     Month: s.month || 'N/A',
@@ -180,14 +164,11 @@ async function generateSavingsReportData(query) {
   }));
 }
 
-// Generate transactions report data
 async function generateTransactionsReportData(query) {
   const transactions = await Transaction.find(query)
-    .populate('userId', 'username name')
+    .populate('userId', 'name')
     .sort({ createdAt: -1 });
-  
   return transactions.map(t => ({
-    Username: t.userId?.username || 'N/A',
     Name: t.userId?.name || 'N/A',
     Type: t.type || 'N/A',
     Amount: t.amount || 0,
@@ -205,39 +186,19 @@ exports.getAvailableCyclesForReports = async (req, res) => {
   }
 
   try {
-    // Strategy 1: Get formal cycle reset transactions
-    const cycleResetTransactions = await Transaction.find({ 
+    const cycleResetTransactions = await Transaction.find({
+      groupId: req.groupId,
       type: 'cycle_reset'
     }).sort({ createdAt: -1 });
 
-    // Strategy 2: Look for any archived data with cycle numbers
     const [archivedLoans, archivedSavings, archivedTransactions] = await Promise.all([
-      Loan.find({ 
-        $or: [
-          { archived: true },
-          { cycleNumber: { $exists: true, $ne: null } }
-        ]
-      }).sort({ createdAt: -1 }),
-      
-      Saving.find({ 
-        $or: [
-          { archived: true },
-          { cycleNumber: { $exists: true, $ne: null } }
-        ]
-      }).sort({ createdAt: -1 }),
-      
-      Transaction.find({ 
-        $or: [
-          { archived: true },
-          { cycleNumber: { $exists: true, $ne: null } }
-        ]
-      }).sort({ createdAt: -1 })
+      Loan.find({ groupId: req.groupId, $or: [{ archived: true }, { cycleNumber: { $exists: true, $ne: null } }] }).sort({ createdAt: -1 }),
+      Saving.find({ groupId: req.groupId, $or: [{ archived: true }, { cycleNumber: { $exists: true, $ne: null } }] }).sort({ createdAt: -1 }),
+      Transaction.find({ groupId: req.groupId, $or: [{ archived: true }, { cycleNumber: { $exists: true, $ne: null } }] }).sort({ createdAt: -1 })
     ]);
 
-    // Collect all cycle numbers from various sources
     const allCycleData = new Map();
 
-    // Add from cycle reset transactions
     cycleResetTransactions.forEach(transaction => {
       if (transaction.cycleNumber) {
         allCycleData.set(transaction.cycleNumber, {
@@ -250,7 +211,6 @@ exports.getAvailableCyclesForReports = async (req, res) => {
       }
     });
 
-    // Add from archived loans
     archivedLoans.forEach(loan => {
       if (loan.cycleNumber && !allCycleData.has(loan.cycleNumber)) {
         allCycleData.set(loan.cycleNumber, {
@@ -262,7 +222,6 @@ exports.getAvailableCyclesForReports = async (req, res) => {
       }
     });
 
-    // Add from archived savings
     archivedSavings.forEach(saving => {
       if (saving.cycleNumber && !allCycleData.has(saving.cycleNumber)) {
         allCycleData.set(saving.cycleNumber, {
@@ -274,7 +233,6 @@ exports.getAvailableCyclesForReports = async (req, res) => {
       }
     });
 
-    // Add from archived transactions
     archivedTransactions.forEach(transaction => {
       if (transaction.cycleNumber && !allCycleData.has(transaction.cycleNumber)) {
         allCycleData.set(transaction.cycleNumber, {
@@ -286,17 +244,14 @@ exports.getAvailableCyclesForReports = async (req, res) => {
       }
     });
 
-    // Strategy 3: If no cycle numbers found but there's archived data, 
-    // create a generic "Historical Data" cycle
     if (allCycleData.size === 0 && (archivedLoans.length > 0 || archivedSavings.length > 0 || archivedTransactions.length > 0)) {
-      // Find the oldest archived data
       const oldestDates = [];
       if (archivedLoans.length > 0) oldestDates.push(archivedLoans[archivedLoans.length - 1].createdAt);
       if (archivedSavings.length > 0) oldestDates.push(archivedSavings[archivedSavings.length - 1].createdAt);
       if (archivedTransactions.length > 0) oldestDates.push(archivedTransactions[archivedTransactions.length - 1].createdAt);
-      
+
       const oldestDate = new Date(Math.min(...oldestDates.map(d => d.getTime())));
-      
+
       allCycleData.set(1, {
         cycleNumber: 1,
         createdAt: oldestDate,
@@ -305,43 +260,35 @@ exports.getAvailableCyclesForReports = async (req, res) => {
       });
     }
 
-    // Convert to array and sort
     const availableCycles = Array.from(allCycleData.values())
       .filter(cycle => cycle.cycleNumber > 0)
       .sort((a, b) => b.cycleNumber - a.cycleNumber);
 
-    const currentCycle = await getCurrentCycleNumber() + 1;
-    
+    const currentCycle = await getCurrentCycleNumber(req.groupId) + 1;
+
     res.json({
       availableCycles: availableCycles,
       currentCycle: currentCycle,
-      totalHistoricalCycles: availableCycles.length,
-      debug: {
-        cycleResetCount: cycleResetTransactions.length,
-        archivedLoansCount: archivedLoans.length,
-        archivedSavingsCount: archivedSavings.length,
-        archivedTransactionsCount: archivedTransactions.length
-      }
+      totalHistoricalCycles: availableCycles.length
     });
 
   } catch (error) {
-    console.error('Get Available Cycles Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get available cycles', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to get available cycles',
+      details: error.message
     });
   }
 };
 
-// Helper function to get current cycle number
-async function getCurrentCycleNumber() {
+async function getCurrentCycleNumber(groupId) {
   try {
-    const lastTransaction = await Transaction.findOne({ 
-      type: 'cycle_reset' 
+    const lastTransaction = await Transaction.findOne({
+      groupId,
+      type: 'cycle_reset'
     }).sort({ createdAt: -1 });
-    
+
     if (!lastTransaction) return 0;
-    
+
     const match = lastTransaction.note?.match(/New cycle (\d+) initiated/);
     return match ? parseInt(match[1]) : 0;
   } catch (error) {

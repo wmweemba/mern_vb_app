@@ -1,75 +1,50 @@
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-
-exports.createUser = async (req, res) => {
-  const { username, password, role, name, email, phone } = req.body;
-  try {
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = new User({ username, passwordHash, role, name, email, phone });
-    await user.save();
-    res.status(201).json({ message: 'User created successfully' });
-  } catch (err) {
-    res.status(400).json({ error: 'User creation failed', details: err.message });
-  }
-};
+const GroupMember = require('../models/GroupMember');
 
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-passwordHash');
-    res.json(users);
+    const members = await GroupMember.find({ ...req.groupScope, active: true })
+      .select('-clerkUserId');
+    res.json(members);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 };
 
+// createUser is removed — members are added via the invite flow
+exports.createUser = async (req, res) => {
+  res.status(410).json({ error: 'Direct user creation is disabled. Use the invite flow instead.' });
+};
+
 exports.deleteUser = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User deleted' });
+    const member = await GroupMember.findOne({ _id: req.params.id, ...req.groupScope });
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    member.active = false;
+    await member.save();
+    res.json({ message: 'Member deactivated' });
   } catch (err) {
-    res.status(400).json({ error: 'Failed to delete user' });
+    res.status(400).json({ error: 'Failed to deactivate member' });
   }
 };
 
 exports.changePassword = async (req, res) => {
-  const { id } = req.params;
-  const { oldPassword, newPassword } = req.body;
-  try {
-    // Only allow self or admin
-    if (req.user.id !== id && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (req.user.role !== 'admin') {
-      const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
-      if (!isMatch) return res.status(401).json({ error: 'Old password incorrect' });
-    }
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    await user.save();
-    res.json({ message: 'Password changed successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to change password', details: err.message });
-  }
+  // Password management is now handled by Clerk
+  res.status(410).json({ error: 'Password management is handled by Clerk.' });
 };
 
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, role, username } = req.body;
+  const { name, email, phone, role } = req.body;
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (name !== undefined) user.name = name;
-    if (email !== undefined) user.email = email;
-    if (phone !== undefined) user.phone = phone;
-    if (role !== undefined) user.role = role;
-    if (username !== undefined) user.username = username;
-    await user.save();
-    res.json({ message: 'User updated successfully' });
+    const member = await GroupMember.findOne({ _id: id, ...req.groupScope });
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    if (name !== undefined) member.name = name;
+    if (email !== undefined) member.email = email;
+    if (phone !== undefined) member.phone = phone;
+    if (role !== undefined) member.role = role;
+    await member.save();
+    res.json({ message: 'Member updated successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update user', details: err.message });
+    res.status(500).json({ error: 'Failed to update member', details: err.message });
   }
 };

@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Card, CardHeader, CardTitle, CardContent } from './card';
 import { API_BASE_URL } from '../../lib/utils';
 
 const BankBalanceCard = () => {
@@ -10,12 +9,11 @@ const BankBalanceCard = () => {
 
   useEffect(() => {
     const fetchBalance = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
         const res = await axios.get(`${API_BASE_URL}/bank-balance`);
         setBalance(res.data.balance);
-      } catch (err) {
+      } catch {
         setError('Failed to load bank balance');
       } finally {
         setLoading(false);
@@ -25,19 +23,19 @@ const BankBalanceCard = () => {
   }, []);
 
   return (
-    <Card className="max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle>Bank Balance</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading && <div>Loading...</div>}
-        {error && <div className="text-red-500">{error}</div>}
-        {balance !== null && !loading && !error && (
-          <div className="text-3xl font-bold text-[#2979FF]">K{balance.toLocaleString()}</div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="bg-surface-dark rounded-xl p-5 mb-4">
+      <p className="text-xs font-medium uppercase tracking-widest text-text-on-dark-muted mb-2">
+        Total Group Balance
+      </p>
+      {loading && <p className="text-white text-sm">Loading...</p>}
+      {error && <p className="text-xs text-red-300">{error}</p>}
+      {balance !== null && !loading && !error && (
+        <p className="text-4xl font-bold text-white leading-tight">
+          K{balance.toLocaleString()}
+        </p>
+      )}
+    </div>
   );
 };
 
-export default BankBalanceCard; 
+export default BankBalanceCard;

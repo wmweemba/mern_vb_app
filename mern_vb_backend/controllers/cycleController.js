@@ -4,31 +4,23 @@ const Saving = require('../models/Savings');
 const Fine = require('../models/Fine');
 const Transaction = require('../models/Transaction');
 const BankBalance = require('../models/BankBalance');
-const User = require('../models/User');
+const GroupMember = require('../models/GroupMember');
 
 // Begin new cycle - Reset all balances and generate backup reports
 exports.beginNewCycle = async (req, res) => {
-  // Check permissions - admin, treasurer, and loan_officer can initiate new cycle
   const allowedRoles = ['admin', 'treasurer', 'loan_officer'];
   if (!allowedRoles.includes(req.user.role)) {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
   }
 
   try {
-    // Step 1: Generate backup reports before resetting
-    const backupReports = await generateBackupReports();
-
-    // Step 2: Archive current cycle data (add cycle metadata to existing records)
+    const backupReports = await generateBackupReports(req.groupId);
     const cycleEndDate = new Date();
-    const cycleNumber = await getCurrentCycleNumber() + 1;
-    
-    await archiveCurrentCycleData(cycleEndDate, cycleNumber - 1);
+    const cycleNumber = await getCurrentCycleNumber(req.groupId) + 1;
 
-    // Step 3: Reset all balances and data for new cycle
-    await resetForNewCycle();
-
-    // Step 4: Log the cycle reset transaction
-    await logCycleResetTransaction(req.user._id, cycleNumber);
+    await archiveCurrentCycleData(cycleEndDate, cycleNumber - 1, req.groupId);
+    await resetForNewCycle(req.groupId);
+    await logCycleResetTransaction(req.memberId, cycleNumber, req.groupId);
 
     res.json({
       message: `New cycle ${cycleNumber} has been successfully initiated`,
@@ -44,25 +36,22 @@ exports.beginNewCycle = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('New Cycle Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to begin new cycle', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to begin new cycle',
+      details: error.message
     });
   }
 };
 
 // Generate backup reports before reset
-async function generateBackupReports() {
+async function generateBackupReports(groupId) {
   try {
-    // Generate Loans Report
-    const loans = await Loan.find().populate('userId', 'username name');
+    const loans = await Loan.find({ groupId }).populate('userId', 'name');
     const loansData = [];
-    
+
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
         loansData.push({
-          Username: loan.userId?.username || '',
           Name: loan.userId?.name || '',
           LoanAmount: loan.amount,
           Month: installment.month,
@@ -81,10 +70,8 @@ async function generateBackupReports() {
       });
     });
 
-    // Generate Savings Report  
-    const savings = await Saving.find().populate('userId', 'username name');
+    const savings = await Saving.find({ groupId }).populate('userId', 'name');
     const savingsData = savings.map(s => ({
-      Username: s.userId?.username || '',
       Name: s.userId?.name || '',
       Month: s.month,
       Amount: s.amount,
@@ -93,10 +80,8 @@ async function generateBackupReports() {
       Date: s.date.toISOString().split('T')[0]
     }));
 
-    // Generate Transactions Report
-    const transactions = await Transaction.find().populate('userId', 'username name').sort({ createdAt: 1 });
+    const transactions = await Transaction.find({ groupId }).populate('userId', 'name').sort({ createdAt: 1 });
     const transactionsData = transactions.map(t => ({
-      Username: t.userId?.username || '',
       Name: t.userId?.name || '',
       Type: t.type,
       Amount: t.amount,
@@ -104,21 +89,19 @@ async function generateBackupReports() {
       Date: t.createdAt ? t.createdAt.toISOString().split('T')[0] : ''
     }));
 
-    // Generate Fines Report
-    const fines = await Fine.find().populate('userId', 'username name').populate('issuedBy', 'username name');
+    const fines = await Fine.find({ groupId }).populate('userId', 'name').populate('issuedBy', 'name');
     const finesData = fines.map(f => ({
-      Username: f.userId?.username || '',
       Name: f.userId?.name || '',
       Amount: f.amount,
       Note: f.note || '',
-      IssuedBy: f.issuedBy?.username || '',
+      IssuedBy: f.issuedBy?.name || '',
       IssuedAt: f.issuedAt.toISOString().split('T')[0],
       Paid: f.paid,
       PaidAt: f.paidAt ? f.paidAt.toISOString().split('T')[0] : ''
     }));
 
     const parser = new Parser();
-    
+
     return {
       loansCSV: parser.parse(loansData),
       savingsCSV: parser.parse(savingsData),
@@ -133,100 +116,72 @@ async function generateBackupReports() {
 }
 
 // Archive current cycle data by adding cycle metadata
-async function archiveCurrentCycleData(cycleEndDate, cycleNumber) {
+async function archiveCurrentCycleData(cycleEndDate, cycleNumber, groupId) {
   try {
-    // Add cycle metadata to existing records
-    await Loan.updateMany({}, { 
-      $set: { 
-        cycleNumber, 
-        cycleEndDate,
-        archived: true 
-      } 
+    await Loan.updateMany({ groupId }, {
+      $set: { cycleNumber, cycleEndDate, archived: true }
     });
-    
-    await Saving.updateMany({}, { 
-      $set: { 
-        cycleNumber, 
-        cycleEndDate,
-        archived: true 
-      } 
+    await Saving.updateMany({ groupId }, {
+      $set: { cycleNumber, cycleEndDate, archived: true }
     });
-    
-    await Fine.updateMany({}, { 
-      $set: { 
-        cycleNumber, 
-        cycleEndDate,
-        archived: true 
-      } 
+    await Fine.updateMany({ groupId }, {
+      $set: { cycleNumber, cycleEndDate, archived: true }
     });
-    
-    await Transaction.updateMany({}, { 
-      $set: { 
-        cycleNumber, 
-        cycleEndDate,
-        archived: true 
-      } 
+    await Transaction.updateMany({ groupId }, {
+      $set: { cycleNumber, cycleEndDate, archived: true }
     });
-
   } catch (error) {
     throw new Error(`Failed to archive cycle data: ${error.message}`);
   }
 }
 
 // Reset all data for new cycle
-async function resetForNewCycle() {
+async function resetForNewCycle(groupId) {
   try {
-    // Clear all current cycle data (archived data remains for reports)
-    await Loan.deleteMany({ archived: { $ne: true } });
-    await Saving.deleteMany({ archived: { $ne: true } });
-    await Fine.deleteMany({ archived: { $ne: true } });
-    
-    // Keep transaction history but mark as archived
-    // Don't delete transactions as they're needed for complete audit trail
-    
-    // Reset bank balance to 0
+    await Loan.deleteMany({ groupId, archived: { $ne: true } });
+    await Saving.deleteMany({ groupId, archived: { $ne: true } });
+    await Fine.deleteMany({ groupId, archived: { $ne: true } });
     await BankBalance.findOneAndUpdate(
-      {}, 
-      { balance: 0 }, 
+      { groupId },
+      { balance: 0 },
       { upsert: true }
     );
-
   } catch (error) {
     throw new Error(`Failed to reset data for new cycle: ${error.message}`);
   }
 }
 
-// Get current cycle number
-async function getCurrentCycleNumber() {
+// Get current cycle number for a group
+async function getCurrentCycleNumber(groupId) {
   try {
-    const lastTransaction = await Transaction.findOne({ 
-      note: { $regex: /^New cycle \d+ initiated/ } 
+    const lastTransaction = await Transaction.findOne({
+      groupId,
+      note: { $regex: /^New cycle \d+ initiated/ }
     }).sort({ createdAt: -1 });
-    
-    if (!lastTransaction) return 1; // First cycle
-    
+
+    if (!lastTransaction) return 1;
+
     const match = lastTransaction.note.match(/New cycle (\d+) initiated/);
     return match ? parseInt(match[1]) : 1;
   } catch (error) {
-    return 1; // Default to cycle 1 if error
+    return 1;
   }
 }
 
 // Log cycle reset transaction
-async function logCycleResetTransaction(userId, cycleNumber) {
+async function logCycleResetTransaction(userId, cycleNumber, groupId) {
   try {
     const transaction = new Transaction({
       userId,
+      groupId,
       type: 'cycle_reset',
       amount: 0,
       note: `New cycle ${cycleNumber} initiated - All balances reset to zero`,
       cycleNumber,
       archived: false
     });
-    
     await transaction.save();
   } catch (error) {
-    console.error('Failed to log cycle reset transaction:', error);
     // Don't throw here as the main operation succeeded
   }
 }
@@ -240,8 +195,8 @@ exports.getHistoricalReports = async (req, res) => {
 
   try {
     const { cycleNumber, type } = req.query;
-    let query = { archived: true };
-    
+    let query = { ...req.groupScope, archived: true };
+
     if (cycleNumber) {
       query.cycleNumber = parseInt(cycleNumber);
     }
@@ -251,12 +206,11 @@ exports.getHistoricalReports = async (req, res) => {
 
     switch (type) {
       case 'loans':
-        const loans = await Loan.find(query).populate('userId', 'username name');
+        const loans = await Loan.find(query).populate('userId', 'name');
         loans.forEach(loan => {
           loan.installments.forEach(installment => {
             data.push({
               CycleNumber: loan.cycleNumber || 'N/A',
-              Username: loan.userId?.username || '',
               Name: loan.userId?.name || '',
               LoanAmount: loan.amount,
               Month: installment.month,
@@ -274,10 +228,9 @@ exports.getHistoricalReports = async (req, res) => {
         break;
 
       case 'savings':
-        const savings = await Saving.find(query).populate('userId', 'username name');
+        const savings = await Saving.find(query).populate('userId', 'name');
         data = savings.map(s => ({
           CycleNumber: s.cycleNumber || 'N/A',
-          Username: s.userId?.username || '',
           Name: s.userId?.name || '',
           Month: s.month,
           Amount: s.amount,
@@ -290,10 +243,9 @@ exports.getHistoricalReports = async (req, res) => {
         break;
 
       case 'transactions':
-        const transactions = await Transaction.find(query).populate('userId', 'username name').sort({ createdAt: 1 });
+        const transactions = await Transaction.find(query).populate('userId', 'name').sort({ createdAt: 1 });
         data = transactions.map(t => ({
           CycleNumber: t.cycleNumber || 'N/A',
-          Username: t.userId?.username || '',
           Name: t.userId?.name || '',
           Type: t.type,
           Amount: t.amount,
@@ -310,16 +262,15 @@ exports.getHistoricalReports = async (req, res) => {
 
     const parser = new Parser();
     const csv = parser.parse(data);
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(csv);
 
   } catch (error) {
-    console.error('Historical Reports Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to generate historical report', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to generate historical report',
+      details: error.message
     });
   }
 };
@@ -333,11 +284,12 @@ exports.getAvailableCycles = async (req, res) => {
 
   try {
     const cycles = await Transaction.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
+          groupId: req.groupId,
           note: { $regex: /^New cycle \d+ initiated/ },
-          archived: true 
-        } 
+          archived: true
+        }
       },
       {
         $project: {
@@ -360,18 +312,17 @@ exports.getAvailableCycles = async (req, res) => {
       { $sort: { cycleNumber: -1 } }
     ]);
 
-    const currentCycle = await getCurrentCycleNumber();
-    
+    const currentCycle = await getCurrentCycleNumber(req.groupId);
+
     res.json({
       availableCycles: cycles,
       currentCycle: currentCycle
     });
 
   } catch (error) {
-    console.error('Get Available Cycles Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get available cycles', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to get available cycles',
+      details: error.message
     });
   }
 };

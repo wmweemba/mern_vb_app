@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 
 const thresholdSchema = new mongoose.Schema({
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true, index: true },
   cycle: { type: String, required: true },                 // e.g., "2025-H2"
   startMonth: { type: String, required: true },            // "January" or "July"
   totalBankBalance: { type: Number, required: true },

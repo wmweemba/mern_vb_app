@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const transactionSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember', required: true },
+    groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true, index: true },
     type: { type: String, enum: ['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset'], required: true },
     amount: { type: Number, required: true },
     referenceId: { type: mongoose.Schema.Types.ObjectId },

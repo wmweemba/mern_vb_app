@@ -15,6 +15,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.12.1",
   "dependencies": {
+    "@clerk/express": "^2.0.11",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
@@ -25,7 +26,9 @@
     "jspdf-autotable": "^5.0.2",
     "mongoose": "^8.16.1",
     "pdfkit": "^0.17.1",
-    "pdfmake": "^0.2.20"
+    "pdfmake": "^0.2.20",
+    "resend": "^6.10.0",
+    "svix": "^1.90.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

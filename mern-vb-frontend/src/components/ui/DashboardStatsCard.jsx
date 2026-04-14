@@ -1,89 +1,41 @@
 import React from 'react';
-import { FaPiggyBank, FaMoneyCheckAlt, FaPercentage, FaChartLine, FaGavel, FaUniversity } from 'react-icons/fa';
+import { PiggyBank, DollarSign, TrendingUp, BarChart2, AlertCircle } from 'lucide-react';
 
 const statConfig = [
-  {
-    label: 'Total Saved',
-    icon: <FaPiggyBank className="text-green-600 size-6" />,
-    key: 'totalSaved',
-    color: 'border-green-600',
-    valueColor: 'text-green-700',
-    bg: 'bg-green-50',
-    trend: '+12.5% from last month',
-    trendColor: 'text-green-500',
-  },
-  {
-    label: 'Total Loaned',
-    icon: <FaMoneyCheckAlt className="text-blue-600 size-6" />,
-    key: 'totalLoaned',
-    color: 'border-blue-600',
-    valueColor: 'text-blue-700',
-    bg: 'bg-blue-50',
-    trend: '-5.2% from last month',
-    trendColor: 'text-red-500',
-  },
-  {
-    label: 'Interest (Savings)',
-    icon: <FaPercentage className="text-purple-600 size-6" />,
-    key: 'totalInterestSavings',
-    color: 'border-purple-600',
-    valueColor: 'text-purple-700',
-    bg: 'bg-purple-50',
-    trend: '+8.1% from last month',
-    trendColor: 'text-green-500',
-  },
-  {
-    label: 'Interest (Loans)',
-    icon: <FaChartLine className="text-yellow-600 size-6" />,
-    key: 'totalInterestLoans',
-    color: 'border-yellow-600',
-    valueColor: 'text-yellow-700',
-    bg: 'bg-yellow-50',
-    trend: '',
-    trendColor: '',
-  },
-  {
-    label: 'Bank Balance',
-    icon: <FaUniversity className="text-blue-600 size-6" />,
-    key: 'bankBalance',
-    color: 'border-blue-600',
-    valueColor: 'text-blue-700',
-    bg: 'bg-blue-50',
-    trend: '',
-    trendColor: '',
-  },
-  {
-    label: 'Total Fines',
-    icon: <FaGavel className="text-red-600 size-6" />,
-    key: 'totalFines',
-    color: 'border-red-600',
-    valueColor: 'text-red-700',
-    bg: 'bg-red-50',
-    trend: '',
-    trendColor: '',
-  },
+  { label: 'Total Saved',         key: 'totalSaved',          icon: PiggyBank },
+  { label: 'Total Loaned',        key: 'totalLoaned',          icon: DollarSign },
+  { label: 'Interest (Loans)',    key: 'totalInterestLoans',   icon: TrendingUp },
+  { label: 'Interest (Savings)',  key: 'totalInterestSavings', icon: BarChart2 },
+  { label: 'Total Fines',         key: 'totalFines',           icon: AlertCircle },
 ];
 
+const fmt = (val) => val !== undefined && val !== null ? `K${Number(val).toLocaleString()}` : '—';
+
 const DashboardStatsCard = ({ stats }) => (
-  <div className="w-full flex justify-center mb-6">
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl">
-      {statConfig.map(({ label, icon, key, color, valueColor, bg, trend, trendColor }) => (
-        <div
-          key={key}
-          className={`rounded-2xl border-2 ${color} ${bg} shadow-sm p-4 flex flex-col items-start min-h-[110px]`}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            {icon}
-            <span className="font-semibold text-gray-700 text-sm">{label}</span>
+  <div className="w-full space-y-3 mb-6">
+    {/* Hero card — Bank Balance */}
+    <div className="bg-surface-dark rounded-xl p-5">
+      <p className="text-xs font-medium uppercase tracking-widest text-text-on-dark-muted mb-2">
+        Total Group Balance
+      </p>
+      <p className="text-4xl font-bold text-white leading-tight">
+        {fmt(stats.bankBalance)}
+      </p>
+    </div>
+
+    {/* Secondary stat cards — 2 cols mobile, 3 cols desktop */}
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {statConfig.map(({ label, key, icon: Icon }) => (
+        <div key={key} className="bg-surface-card rounded-lg p-4 flex flex-col gap-1 min-h-[90px]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Icon size={15} className="text-text-secondary flex-shrink-0" />
+            <span className="text-xs font-medium uppercase tracking-widest text-text-secondary leading-tight">{label}</span>
           </div>
-          <div className={`text-2xl font-bold ${valueColor}`}>{stats[key] !== undefined ? `K${Number(stats[key]).toLocaleString()}` : '--'}</div>
-          {trend && (
-            <div className={`text-xs mt-1 ${trendColor}`}>{trend}</div>
-          )}
+          <p className="text-xl font-bold text-text-primary">{fmt(stats[key])}</p>
         </div>
       ))}
     </div>
   </div>
 );
 
-export default DashboardStatsCard; 
+export default DashboardStatsCard;

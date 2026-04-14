@@ -48,7 +48,7 @@ const InstallPWAButton = () => {
         <button
           onClick={handleClose}
           className="text-white hover:text-blue-200 text-lg px-2"
-          aria-label="Dismiss install banner"
+          aria-label="Dismiss"
         >
           &times;
         </button>

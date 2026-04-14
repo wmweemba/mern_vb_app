@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 
 const fineSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember', required: true },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true, index: true },
   username: { type: String, required: true },
   amount: { type: Number, required: true },
   note: { type: String },
-  issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember', required: true },
   issuedAt: { type: Date, default: Date.now },
   paid: { type: Boolean, default: false },
   paidAt: { type: Date },

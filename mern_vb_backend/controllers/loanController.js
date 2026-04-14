@@ -9,14 +9,14 @@ exports.reverseInstallmentPayment = async (req, res) => {
   }
 
   const session = await mongoose.startSession();
-  
+
   try {
     await session.withTransaction(async () => {
-      const loan = await Loan.findById(loanId).session(session);
+      const loan = await Loan.findOne({ _id: loanId, ...req.groupScope }).session(session);
       if (!loan) {
         throw new Error('Loan not found');
       }
-      
+
       const installment = loan.installments.find(inst => inst.month === Number(month));
       if (!installment) {
         throw new Error('Installment not found');
@@ -27,43 +27,40 @@ exports.reverseInstallmentPayment = async (req, res) => {
 
       // Get the amount that was paid for this installment
       const paidAmount = installment.paidAmount || installment.total;
-      
+
       // Validate that paidAmount is reasonable (not corrupted data)
-      if (paidAmount > installment.total * 2) { // Allow some overpayment but not extreme corruption
+      if (paidAmount > installment.total * 2) {
         throw new Error(`Cannot reverse: paidAmount (${paidAmount}) appears corrupted for installment total (${installment.total})`);
       }
-      
+
       // Reverse the payment
       installment.paid = false;
       installment.paymentDate = undefined;
-      installment.paidAmount = 0; // Reset paid amount
+      installment.paidAmount = 0;
       installment.penalties = { lateInterest: 0, overdueFine: 0, earlyPaymentCharge: 0 };
 
-      // Update bank balance (subtract the payment amount since we're reversing)
-      await updateBankBalance(-paidAmount, session);
+      await updateBankBalance(-paidAmount, req.groupId, session);
 
-      // Log reversal transaction
       await logTransaction({
         userId: loan.userId,
         type: 'loan_payment',
-        amount: -paidAmount, // Negative amount to indicate reversal
+        amount: -paidAmount,
         note: `Reversed payment for Month ${month} - Amount: K${paidAmount}`,
-        referenceId: loanId
+        referenceId: loanId,
+        groupId: req.groupId
       }, session);
 
-      // Update loan fullyPaid status
-      loan.fullyPaid = false; // Since we reversed a payment, loan is no longer fully paid
-      
+      loan.fullyPaid = false;
+
       await loan.save({ session });
-      
-      res.json({ 
+
+      res.json({
         message: `Installment payment reversed successfully - K${paidAmount} refunded`,
         loan,
         reversedAmount: paidAmount
       });
     });
   } catch (err) {
-    console.error('Reverse payment error:', err);
     res.status(500).json({ error: 'Failed to reverse payment', details: err.message });
   } finally {
     await session.endSession();
@@ -71,7 +68,8 @@ exports.reverseInstallmentPayment = async (req, res) => {
 };
 
 const Loan = require('../models/Loans');
-const User = require('../models/User');
+const GroupMember = require('../models/GroupMember');
+const Savings = require('../models/Savings');
 const calculateLoanSchedule = require('../utils/loanCalculator');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
@@ -96,16 +94,14 @@ exports.updateLoan = async (req, res) => {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
   }
   try {
-    const loan = await Loan.findById(loanId);
+    const loan = await Loan.findOne({ _id: loanId, ...req.groupScope });
     if (!loan) {
       return res.status(404).json({ error: 'Loan not found' });
     }
 
-    // Prevent editing principal and interestRate if repayments have started
-    // Duration can still be changed to extend/reduce loan term
     const repaymentsStarted = loan.installments.some(inst => inst.paid);
     const restrictedFields = ['amount', 'interestRate'];
-    
+
     if (repaymentsStarted) {
       for (const field of restrictedFields) {
         if (updates[field] !== undefined && updates[field] !== loan[field]) {
@@ -114,68 +110,56 @@ exports.updateLoan = async (req, res) => {
       }
     }
 
-    // Store original values for tracking changes
     const originalAmount = loan.amount;
     const originalDuration = loan.durationMonths;
     let amountChanged = false;
     let durationChanged = false;
 
-    // Update loan fields - allow all valid fields to be updated
     const allowedFields = ['amount', 'interestRate', 'durationMonths', 'notes'];
-    
+
     for (const key in updates) {
       if (allowedFields.includes(key) && updates[key] !== undefined) {
-        // If repayments have started, only allow non-restricted fields
         if (repaymentsStarted && restrictedFields.includes(key)) {
-          continue; // Skip restricted fields when repayments have started
+          continue;
         }
-        
-        // Track if amount or duration is being changed
         if (key === 'amount' && updates[key] !== loan[key]) {
           amountChanged = true;
         }
         if (key === 'durationMonths' && updates[key] !== loan[key]) {
           durationChanged = true;
         }
-        
         loan[key] = updates[key];
       }
     }
 
-    // If critical loan parameters were updated, recalculate the loan schedule
     if (amountChanged || durationChanged) {
       const finalAmount = loan.amount;
       const finalDuration = loan.durationMonths;
-      
+
       if (repaymentsStarted && durationChanged) {
-        // For loans with started payments, recalculate from current state
         const paidInstallments = loan.installments.filter(inst => inst.paid);
         const totalPaidPrincipal = paidInstallments.reduce((sum, inst) => sum + inst.principal, 0);
         const remainingPrincipal = finalAmount - totalPaidPrincipal;
         const remainingDuration = finalDuration - paidInstallments.length;
-        
+
         if (remainingDuration > 0 && remainingPrincipal > 0) {
-          // Recalculate only unpaid installments
           const unpaidInstallments = loan.installments.filter(inst => !inst.paid);
           const newInstallmentPrincipal = +(remainingPrincipal / remainingDuration).toFixed(2);
-          
-          // Update existing unpaid installments
+
           let principalBalance = remainingPrincipal;
           unpaidInstallments.forEach((inst, index) => {
-            const currentPrincipal = index === unpaidInstallments.length - 1 ? 
+            const currentPrincipal = index === unpaidInstallments.length - 1 ?
               principalBalance : newInstallmentPrincipal;
             const interest = +(principalBalance * (loan.interestRate / 100)).toFixed(2);
-            
+
             inst.principal = currentPrincipal;
             inst.interest = interest;
             inst.total = +(currentPrincipal + interest).toFixed(2);
             principalBalance -= currentPrincipal;
           });
-          
-          // Add or remove installments if duration changed
+
           const currentInstallmentCount = loan.installments.length;
           if (finalDuration > currentInstallmentCount) {
-            // Add new installments
             for (let month = currentInstallmentCount + 1; month <= finalDuration; month++) {
               loan.installments.push({
                 month,
@@ -191,35 +175,28 @@ exports.updateLoan = async (req, res) => {
               });
             }
           } else if (finalDuration < currentInstallmentCount) {
-            // Remove excess installments (only unpaid ones)
             loan.installments = loan.installments.slice(0, finalDuration);
           }
         }
       } else if (!repaymentsStarted) {
-        // For new loans, completely recalculate
-        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate);
+        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate, loan.interestMethod || 'reducing');
         loan.installments = schedule;
       }
     }
 
-    // Adjust bank balance if loan amount changed
     if (amountChanged && !repaymentsStarted) {
       const amountDifference = updates.amount - originalAmount;
-      
-      // If new amount is higher, debit more from bank (negative adjustment)
-      // If new amount is lower, credit back to bank (positive adjustment)
-      await updateBankBalance(-amountDifference);
-      
-      // Log the bank balance adjustment transaction
+      await updateBankBalance(-amountDifference, req.groupId);
       await logTransaction({
         userId: loan.userId,
         type: 'loan',
         amount: amountDifference,
         referenceId: loan._id,
-        note: `Loan amount adjusted from K${originalAmount} to K${updates.amount} (difference: K${amountDifference})`
+        note: `Loan amount adjusted from K${originalAmount} to K${updates.amount} (difference: K${amountDifference})`,
+        groupId: req.groupId
       });
     }
-    
+
     await loan.save();
     res.json({ message: 'Loan updated successfully', loan });
   } catch (err) {
@@ -232,23 +209,38 @@ exports.createLoan = async (req, res) => {
   if (!username || !amount) return res.status(400).json({ error: 'Missing fields' });
 
   try {
-    // Look up user by username
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ error: 'User not found' });
-    const userId = user._id;
+    // Look up member by name within the group
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    if (!member) return res.status(400).json({ error: 'Member not found' });
+    const userId = member._id;
 
-    const settings = await getSettings();
+    const settings = await getSettings(req.groupId);
 
     const duration = customDuration ? Number(customDuration) : settings.defaultLoanDuration;
     const appliedInterestRate = customRate !== undefined ? Number(customRate) : settings.interestRate;
 
-    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate);
+    // Enforce loan limit: amount cannot exceed savings × multiplier
+    const totalSavings = await Savings.aggregate([
+      { $match: { userId, groupId: req.groupId, archived: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const memberSavings = totalSavings[0]?.total || 0;
+    const maxLoan = memberSavings * settings.loanLimitMultiplier;
+    if (amount > maxLoan) {
+      return res.status(400).json({
+        error: `Loan amount K${amount} exceeds limit of K${maxLoan} (${settings.loanLimitMultiplier}× savings of K${memberSavings})`
+      });
+    }
+
+    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate, settings.interestMethod);
 
     const loan = new Loan({
+      ...req.groupScope,
       userId,
       amount,
       durationMonths: duration,
       interestRate: appliedInterestRate,
+      interestMethod: settings.interestMethod,
       installments: schedule
     });
 
@@ -258,9 +250,10 @@ exports.createLoan = async (req, res) => {
       type: 'loan',
       amount,
       referenceId: loan._id,
-      note: `Loan of K${amount} created for ${duration} month(s).`
+      note: `Loan of K${amount} created for ${duration} month(s).`,
+      groupId: req.groupId
     });
-    await updateBankBalance(-amount); // Debit the bank balance
+    await updateBankBalance(-amount, req.groupId);
     res.status(201).json(loan);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create loan', details: err.message });
@@ -273,7 +266,7 @@ exports.deleteLoan = async (req, res) => {
 
   try {
     await session.withTransaction(async () => {
-      const loan = await Loan.findById(loanId).session(session);
+      const loan = await Loan.findOne({ _id: loanId, ...req.groupScope }).session(session);
       if (!loan) {
         throw Object.assign(new Error('Loan not found'), { status: 404 });
       }
@@ -286,16 +279,15 @@ exports.deleteLoan = async (req, res) => {
         );
       }
 
-      // Restore the disbursed amount back to the bank balance
-      await updateBankBalance(loan.amount, session);
+      await updateBankBalance(loan.amount, req.groupId, session);
 
-      // Log the reversal in transactions for audit trail
       await logTransaction({
         userId: loan.userId,
         type: 'loan',
         amount: -loan.amount,
         referenceId: loan._id,
-        note: `Loan of K${loan.amount} deleted - disbursement reversed.`
+        note: `Loan of K${loan.amount} deleted - disbursement reversed.`,
+        groupId: req.groupId
       }, session);
 
       await Loan.findByIdAndDelete(loanId).session(session);
@@ -314,11 +306,11 @@ exports.getLoansByUser = async (req, res) => {
   try {
     let userId = req.params.id;
     if (req.query.username) {
-      const user = await User.findOne({ username: req.query.username });
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      userId = user._id;
+      const member = await GroupMember.findOne({ name: req.query.username, ...req.groupScope });
+      if (!member) return res.status(404).json({ error: 'Member not found' });
+      userId = member._id;
     }
-    const loans = await Loan.find({ userId, archived: { $ne: true } });
+    const loans = await Loan.find({ userId, ...req.groupScope, archived: { $ne: true } });
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch loans' });
@@ -328,14 +320,13 @@ exports.getLoansByUser = async (req, res) => {
 exports.repayInstallment = async (req, res) => {
   const { username, loanId, month, paymentDate } = req.body;
   try {
-    const settings = await getSettings();
+    const settings = await getSettings(req.groupId);
 
-    // Look up user by username
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ error: 'User not found' });
-    const userId = user._id;
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    if (!member) return res.status(400).json({ error: 'Member not found' });
+    const userId = member._id;
 
-    const loan = await Loan.findOne({ _id: loanId, userId });
+    const loan = await Loan.findOne({ _id: loanId, userId, ...req.groupScope });
     if (!loan) return res.status(404).json({ error: 'Loan not found' });
 
     const installment = loan.installments.find(inst => inst.month === month);
@@ -346,19 +337,16 @@ exports.repayInstallment = async (req, res) => {
     const dueDate = new Date(loan.createdAt);
     dueDate.setMonth(dueDate.getMonth() + month);
 
-    // Late payment check
     if (now > dueDate) {
       installment.penalties.lateInterest = +(installment.total * (settings.latePenaltyRate / 100)).toFixed(2);
     }
 
-    // Overdue fine (after full term)
     const termEnd = new Date(loan.createdAt);
     termEnd.setMonth(termEnd.getMonth() + loan.durationMonths);
     if (now > termEnd) {
       installment.penalties.overdueFine = settings.overdueFineAmount;
     }
 
-    // Early payment check
     if (month === 1 && now < dueDate) {
       const allUnpaid = loan.installments.every(inst => !inst.paid);
       if (allUnpaid) {
@@ -369,7 +357,6 @@ exports.repayInstallment = async (req, res) => {
     installment.paid = true;
     installment.paymentDate = now;
 
-    // Check if all paid
     loan.fullyPaid = loan.installments.every(inst => inst.paid);
     await loan.save();
 
@@ -381,13 +368,13 @@ exports.repayInstallment = async (req, res) => {
 
 exports.exportLoansReport = async (req, res) => {
   try {
-    const loans = await Loan.find({ archived: { $ne: true } }).populate('userId', 'username name email');
+    const loans = await Loan.find({ ...req.groupScope, archived: { $ne: true } })
+      .populate('userId', 'name email');
     const flatData = [];
 
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
         flatData.push({
-          Username: loan.userId.username,
           Name: loan.userId.name,
           Email: loan.userId.email,
           LoanAmount: loan.amount,
@@ -418,12 +405,11 @@ exports.exportLoansReport = async (req, res) => {
 
 exports.exportLoansReportPDF = async (req, res) => {
   try {
-    const loans = await Loan.find().populate('userId', 'username name email');
+    const loans = await Loan.find({ ...req.groupScope }).populate('userId', 'name email');
     const flatData = [];
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
         flatData.push([
-          loan.userId.username,
           loan.userId.name,
           loan.amount,
           loan.durationMonths,
@@ -443,9 +429,9 @@ exports.exportLoansReportPDF = async (req, res) => {
         {
           table: {
             headerRows: 1,
-            widths: ['*', '*', '*', '*', '*', '*', '*', '*', '*', '*'],
+            widths: ['*', '*', '*', '*', '*', '*', '*', '*', '*'],
             body: [
-              ['Username', 'Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total Due', 'Paid', 'Payment Date'],
+              ['Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total Due', 'Paid', 'Payment Date'],
               ...flatData
             ]
           },
@@ -469,7 +455,8 @@ exports.exportLoansReportPDF = async (req, res) => {
 
 exports.getAllLoans = async (req, res) => {
   try {
-    const loans = await Loan.find({ archived: { $ne: true } }).populate('userId', 'username name email');
+    const loans = await Loan.find({ ...req.groupScope, archived: { $ne: true } })
+      .populate('userId', 'name email');
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch all loans' });
