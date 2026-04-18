@@ -18,6 +18,13 @@ import Onboarding from './pages/Onboarding';
 import Welcome from './pages/Welcome';
 import InviteAccept from './pages/InviteAccept';
 import OperationsPage from './pages/OperationsPage';
+import AdminShell from './components/layout/AdminShell';
+import AdminOverview from './pages/admin/AdminOverview';
+import AdminGroupsList from './pages/admin/AdminGroupsList';
+import AdminGroupDetail from './pages/admin/AdminGroupDetail';
+import AdminSuperAdmins from './pages/admin/AdminSuperAdmins';
+import AdminAuditLog from './pages/admin/AdminAuditLog';
+import AdminAcceptInvite from './pages/admin/AdminAcceptInvite';
 
 // Layout using AppShell
 const Layout = ({ children }) => <AppShell>{children}</AppShell>;
@@ -57,6 +64,16 @@ function OnboardingRoute() {
   }
   return <Onboarding />;
 }
+
+// Super admin route guard
+function SuperAdminRoute({ children }) {
+  const { isLoaded, authLoading, isSuperAdmin } = useAuth();
+  if (!isLoaded || authLoading) return <LoadingSpinner />;
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+const AdminLayout = ({ children }) => <AdminShell>{children}</AdminShell>;
 
 // Role-based route guard
 function RoleRoute({ roles, children }) {
@@ -152,6 +169,28 @@ function AppRoutes() {
             </RoleRoute>
           </Layout>
         </ProtectedRoute>
+      } />
+
+      {/* Admin accept invite — only requires auth, not super-admin */}
+      <Route path="/admin/accept-invite" element={
+        <ProtectedRoute><AdminAcceptInvite /></ProtectedRoute>
+      } />
+
+      {/* Platform admin routes */}
+      <Route path="/admin" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminOverview /></AdminLayout></SuperAdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/groups" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminGroupsList /></AdminLayout></SuperAdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/groups/:groupId" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminGroupDetail /></AdminLayout></SuperAdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/super-admins" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminSuperAdmins /></AdminLayout></SuperAdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/audit" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminAuditLog /></AdminLayout></SuperAdminRoute></ProtectedRoute>
       } />
 
       {/* Default redirect */}

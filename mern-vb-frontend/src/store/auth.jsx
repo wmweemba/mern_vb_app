@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(false);
   const [trialActive, setTrialActive] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [adminMode, setAdminMode] = useState(() => sessionStorage.getItem('adminMode') === 'true');
 
   // Interceptor: inject a fresh Clerk token before every axios request.
   // getToken() auto-refreshes when the 2-min JWT is about to expire — so this
@@ -52,6 +53,8 @@ export const AuthProvider = ({ children }) => {
       setNeedsOnboarding(false);
       setAuthLoading(false);
       setIsSuperAdmin(false);
+      setAdminMode(false);
+      sessionStorage.removeItem('adminMode');
       return;
     }
 
@@ -82,6 +85,12 @@ export const AuthProvider = ({ children }) => {
     });
   }, [isSignedIn, isLoaded]);
 
+  const toggleAdminMode = () => {
+    const next = !adminMode;
+    setAdminMode(next);
+    sessionStorage.setItem('adminMode', String(next));
+  };
+
   const refreshMembership = () => {
     return getToken().then(token => {
       return axios.get(`${API_BASE_URL}/auth/me`, {
@@ -110,7 +119,8 @@ export const AuthProvider = ({ children }) => {
     refreshMembership,
     trialActive,
     isSuperAdmin,
-    // Legacy compat shim — old code that calls logout() will just sign out via Clerk
+    adminMode,
+    toggleAdminMode,
     logout: () => {},
   };
 

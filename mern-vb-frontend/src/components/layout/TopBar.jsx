@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
+import { Shield } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import {
   DropdownMenu,
@@ -24,7 +25,7 @@ function getAvatarColor(name) {
 }
 
 export default function TopBar() {
-  const { user, clerkUser } = useAuth();
+  const { user, clerkUser, isSuperAdmin, adminMode, toggleAdminMode } = useAuth();
   const { signOut } = useClerk();
   const navigate = useNavigate();
 
@@ -62,6 +63,18 @@ export default function TopBar() {
             <p className="text-xs text-text-secondary truncate">{user?.role}</p>
           </div>
           <DropdownMenuSeparator />
+          {isSuperAdmin && (
+            <>
+              <DropdownMenuItem
+                onClick={() => { toggleAdminMode(); navigate(adminMode ? '/dashboard' : '/admin'); }}
+                className="flex items-center gap-2"
+              >
+                <Shield size={16} className="text-brand-primary" />
+                {adminMode ? 'Switch to My Group' : 'Switch to Platform Admin'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => navigate('/settings')}>
             Account Settings
           </DropdownMenuItem>
