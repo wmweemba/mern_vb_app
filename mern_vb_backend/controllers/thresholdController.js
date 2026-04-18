@@ -40,7 +40,7 @@ exports.getThresholdDefaulters = async (req, res) => {
     const threshold = await Threshold.findOne({ ...req.groupScope }).sort({ createdAt: -1 });
     if (!threshold) return res.status(404).json({ error: 'No threshold found' });
 
-    const members = await GroupMember.find({ ...req.groupScope, active: true }, '_id name email');
+    const members = await GroupMember.find({ ...req.groupScope, active: true, deletedAt: null }, '_id name email');
     const loans = await Loan.find({ ...req.groupScope });
 
     const result = members.map(member => {
@@ -67,7 +67,7 @@ exports.getThresholdDefaulters = async (req, res) => {
 exports.exportThresholdDefaulters = async (req, res) => {
   try {
     const threshold = await Threshold.findOne({ ...req.groupScope }).sort({ createdAt: -1 });
-    const members = await GroupMember.find({ ...req.groupScope, active: true }, '_id name email');
+    const members = await GroupMember.find({ ...req.groupScope, active: true, deletedAt: null }, '_id name email');
     const loans = await Loan.find({ ...req.groupScope });
 
     const result = members.map(member => {

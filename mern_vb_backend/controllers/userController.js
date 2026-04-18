@@ -2,7 +2,7 @@ const GroupMember = require('../models/GroupMember');
 
 exports.getUsers = async (req, res) => {
   try {
-    const members = await GroupMember.find({ ...req.groupScope, active: true })
+    const members = await GroupMember.find({ ...req.groupScope, active: true, deletedAt: null })
       .select('-clerkUserId');
     res.json(members);
   } catch (err) {
