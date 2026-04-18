@@ -21,9 +21,8 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const { cycleNumber, backupReports, resetData } = response.data;
+      const { cycleNumber, backupReports } = response.data;
 
-      // Download backup reports
       if (backupReports) {
         downloadReport('loans_backup.csv', backupReports.loansCSV);
         downloadReport('savings_backup.csv', backupReports.savingsCSV);
@@ -33,8 +32,7 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
 
       setStep(3);
       toast.success(`New cycle ${cycleNumber} has been successfully initiated!`);
-      
-      // Auto-close after 3 seconds and trigger success callback
+
       setTimeout(() => {
         onClose();
         setStep(1);
@@ -42,7 +40,6 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
       }, 3000);
 
     } catch (error) {
-      console.error('Error beginning new cycle:', error);
       toast.error(error.response?.data?.error || 'Failed to begin new cycle');
       setIsProcessing(false);
       setStep(1);
@@ -72,21 +69,21 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-red-600">
-            {step === 1 && "⚠️ Begin New Cycle"}
-            {step === 2 && "🔄 Processing New Cycle"}
-            {step === 3 && "✅ New Cycle Complete"}
+          <DialogTitle className="text-status-overdue-text">
+            {step === 1 && '⚠️ Begin New Cycle'}
+            {step === 2 && '🔄 Processing New Cycle'}
+            {step === 3 && '✅ New Cycle Complete'}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {step === 1 && (
             <>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h3 className="font-semibold text-red-800 mb-2">
+              <div className="bg-[#FDECEA] border border-status-overdue-text/20 rounded-lg p-4">
+                <h3 className="font-semibold text-status-overdue-text mb-2">
                   This action will reset the entire banking cycle
                 </h3>
-                <ul className="text-sm text-red-700 space-y-1">
+                <ul className="text-sm text-status-overdue-text/80 space-y-1">
                   <li>• All current loans will be reset to zero</li>
                   <li>• All savings balances will be reset to zero</li>
                   <li>• All fines will be cleared</li>
@@ -94,12 +91,12 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
                   <li>• Historical data will be preserved for reports</li>
                 </ul>
               </div>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-800 mb-2">
+
+              <div className="bg-brand-light border border-brand-primary/20 rounded-lg p-4">
+                <h3 className="font-semibold text-brand-primary mb-2">
                   Before proceeding, backup reports will be generated:
                 </h3>
-                <ul className="text-sm text-blue-700 space-y-1">
+                <ul className="text-sm text-brand-primary/80 space-y-1">
                   <li>• Loans report (CSV)</li>
                   <li>• Savings report (CSV)</li>
                   <li>• Transactions report (CSV)</li>
@@ -107,8 +104,8 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
                 </ul>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm text-amber-800">
+              <div className="bg-[#FFF0E0] border border-[#B85A00]/20 rounded-lg p-3">
+                <p className="text-sm text-[#B85A00]">
                   <strong>Warning:</strong> This action cannot be undone. Make sure all end-of-cycle activities are complete.
                 </p>
               </div>
@@ -117,18 +114,18 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
 
           {step === 2 && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Processing new cycle...</p>
-              <p className="text-sm text-gray-500 mt-2">Generating backup reports and resetting balances</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4" />
+              <p className="text-text-primary font-medium">Processing new cycle…</p>
+              <p className="text-sm text-text-secondary mt-2">Generating backup reports and resetting balances</p>
             </div>
           )}
 
           {step === 3 && (
             <div className="text-center py-8">
-              <div className="text-6xl text-green-500 mb-4">✅</div>
-              <p className="text-lg font-semibold text-green-800 mb-2">New Cycle Initiated Successfully!</p>
-              <p className="text-sm text-gray-600">Backup reports have been downloaded</p>
-              <p className="text-sm text-gray-500">This dialog will close automatically</p>
+              <div className="text-6xl mb-4">✅</div>
+              <p className="text-lg font-semibold text-[#2D7A2D] mb-2">New Cycle Initiated Successfully!</p>
+              <p className="text-sm text-text-secondary">Backup reports have been downloaded</p>
+              <p className="text-sm text-text-muted mt-1">This dialog will close automatically</p>
             </div>
           )}
         </div>
@@ -139,8 +136,8 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleBeginNewCycle}
                 disabled={isProcessing}
               >
@@ -149,8 +146,8 @@ const BeginNewCycleModal = ({ isOpen, onClose, onSuccess }) => {
             </>
           )}
           {step === 2 && (
-            <p className="text-sm text-gray-500 w-full text-center">
-              Please wait while the new cycle is being processed...
+            <p className="text-sm text-text-secondary w-full text-center">
+              Please wait while the new cycle is being processed…
             </p>
           )}
           {step === 3 && (

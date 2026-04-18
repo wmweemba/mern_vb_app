@@ -11,7 +11,7 @@ import ManagePaymentModal from '../ui/ManagePaymentModal';
 import AddFineModal from '../ui/AddFineModal';
 import BeginNewCycleModal from '../ui/BeginNewCycleModal';
 import FinesModal from '../ui/FinesModal';
-import { DollarSign, PiggyBank, CreditCard, Landmark, AlertTriangle, Eye, X } from 'lucide-react';
+import { DollarSign, PiggyBank, CreditCard, Landmark, AlertTriangle, Eye, X, ArrowUpRight, RefreshCw } from 'lucide-react';
 
 const canAccessOperations = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
@@ -31,12 +31,14 @@ export default function AppShell({ children }) {
   const [showActionSheet, setShowActionSheet] = useState(false);
 
   const ACTION_ITEMS = [
-    { label: 'Add Loan', icon: DollarSign, action: () => { setShowActionSheet(false); navigate('/loans'); } },
-    { label: 'Add Savings', icon: PiggyBank, action: () => { setShowActionSheet(false); navigate('/savings'); } },
-    { label: 'Manage Payment', icon: CreditCard, action: () => { setShowActionSheet(false); setShowPayment(true); } },
-    { label: 'Manage Bank Balance', icon: Landmark, action: () => { setShowActionSheet(false); setShowBankBalance(true); } },
-    { label: 'Add Fine / Penalty', icon: AlertTriangle, action: () => { setShowActionSheet(false); setShowFine(true); } },
-    { label: 'View Fines & Penalties', icon: Eye, action: () => { setShowActionSheet(false); setShowFinesModal(true); } },
+    { label: 'Add Loan', icon: DollarSign, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); navigate('/loans'); } },
+    { label: 'Add Savings', icon: PiggyBank, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); navigate('/savings'); } },
+    { label: 'Record Payment', icon: CreditCard, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); setShowPayment(true); } },
+    { label: 'Record Payout', icon: ArrowUpRight, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); setShowPayment(true); } },
+    { label: 'Issue Fine / Penalty', icon: AlertTriangle, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); setShowFine(true); } },
+    { label: 'View Fines & Penalties', icon: Eye, roles: ['admin', 'treasurer', 'loan_officer'], action: () => { setShowActionSheet(false); setShowFinesModal(true); } },
+    { label: 'Manage Bank Balance', icon: Landmark, roles: ['admin', 'treasurer'], action: () => { setShowActionSheet(false); setShowBankBalance(true); } },
+    { label: 'Begin New Cycle', icon: RefreshCw, roles: ['admin'], action: () => { setShowActionSheet(false); setShowNewCycle(true); } },
   ];
 
   return (
@@ -68,7 +70,7 @@ export default function AppShell({ children }) {
               </button>
             </div>
             <ul>
-              {ACTION_ITEMS.filter(() => canAccessOperations(user)).map(({ label, icon: Icon, action }) => (
+              {ACTION_ITEMS.filter(({ roles }) => roles.includes(user?.role)).map(({ label, icon: Icon, action }) => (
                 <li key={label}>
                   <button
                     onClick={action}

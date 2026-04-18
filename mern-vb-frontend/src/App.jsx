@@ -17,6 +17,7 @@ import SignUpPage from './pages/SignUp';
 import Onboarding from './pages/Onboarding';
 import Welcome from './pages/Welcome';
 import InviteAccept from './pages/InviteAccept';
+import OperationsPage from './pages/OperationsPage';
 
 // Layout using AppShell
 const Layout = ({ children }) => <AppShell>{children}</AppShell>;
@@ -141,6 +142,15 @@ function AppRoutes() {
       <Route path="/upgrade" element={
         <ProtectedRoute>
           <Layout><UpgradePage /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/operations" element={
+        <ProtectedRoute>
+          <Layout>
+            <RoleRoute roles={['admin', 'treasurer', 'loan_officer']}>
+              <OperationsPage />
+            </RoleRoute>
+          </Layout>
         </ProtectedRoute>
       } />
 

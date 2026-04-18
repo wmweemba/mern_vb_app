@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-04-18
+
+### Added
+- **Operations page** (`/operations`): dedicated page accessible from the desktop sidebar for admin, treasurer, and loan_officer roles. Cards are grouped into three sections — Payments, Fines, and Administration — and only cards the current user has permission to use are shown.
+  - Payments: Record Loan Repayment, Record Payout
+  - Fines: Issue Fine / Penalty, Record Fine Payment, View & Manage Fines
+  - Administration: Manage Bank Balance (admin/treasurer), Begin New Cycle (admin only), Edit Savings Entry
+- **Operations in desktop sidebar**: "Operations" nav item (Zap icon) added between Reports and Settings, hidden from member role.
+- **Mobile action sheet expanded**: added Record Payout and Begin New Cycle to the `+` action sheet; each item is now filtered by its own role list rather than a blanket `canAccessOperations` check, so treasurer no longer sees admin-only items.
+
+### Fixed
+- **Modal UI restyle**: `ManagePaymentModal`, `AddFineModal`, `ManageBankBalanceModal`, and `BeginNewCycleModal` were using old hardcoded Tailwind colours (blue-600, red-600, green-600, amber-50, etc.) that did not match the v3.1.0 design system. All four modals now use brand-primary buttons, spec-compliant inputs (border-border-default, rounded-md, focus:ring-brand-primary), uppercase tracking labels, and status-correct alert colours from UI_SPEC.md.
+- **ManagePaymentModal tab style**: payment type tabs (Loan Payment / Payout / Fine Payment) replaced with pill-style toggle using brand-primary active state instead of coloured background per tab.
+- **BeginNewCycleModal alert colours**: warning box now uses status-overdue palette, info box uses brand-light/brand-primary, caution box uses amber spec colours. Spinner and success state updated to match.
+- **ManagePaymentModal `initialType` prop**: modal now accepts an `initialType` prop so opening it from the Operations page pre-selects the correct tab (repayment, payout, or fine) without requiring the user to switch manually.
+
+---
+
 ## [3.1.5] - 2026-04-14
 
 ### Fixed

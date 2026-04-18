@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, Wallet, DollarSign, FileText, Settings } from 'lucide-react';
+import { LayoutGrid, Users, Wallet, DollarSign, FileText, Settings, Zap } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 
 const NAV_ITEMS = [
@@ -8,13 +8,14 @@ const NAV_ITEMS = [
   { label: 'Savings', to: '/savings', icon: Wallet },
   { label: 'Loans', to: '/loans', icon: DollarSign },
   { label: 'Reports', to: '/reports', icon: FileText },
+  { label: 'Operations', to: '/operations', icon: Zap, roles: ['admin', 'treasurer', 'loan_officer'] },
   { label: 'Settings', to: '/settings', icon: Settings },
 ];
 
 export default function DesktopSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { trialActive, isSuperAdmin } = useAuth();
+  const { trialActive, isSuperAdmin, user } = useAuth();
 
   return (
     <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-60 bg-surface-card border-r border-border-default z-50">
@@ -32,7 +33,7 @@ export default function DesktopSidebar() {
           Menu
         </p>
         <ul className="space-y-0.5">
-          {NAV_ITEMS.map(({ label, to, icon: Icon }) => {
+          {NAV_ITEMS.filter(({ roles }) => !roles || roles.includes(user?.role)).map(({ label, to, icon: Icon }) => {
             const active = location.pathname === to || (to !== '/dashboard' && location.pathname.startsWith(to));
             return (
               <li key={to}>
