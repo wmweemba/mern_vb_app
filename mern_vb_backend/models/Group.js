@@ -7,6 +7,9 @@ const groupSchema = new mongoose.Schema({
   trialExpiresAt: { type: Date, required: true },
   isPaid: { type: Boolean, default: false },
   paidUntil: { type: Date, default: null },
+  deletedAt: { type: Date, default: null },
+  suspendedAt: { type: Date, default: null },
+  suspendedReason: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Group', groupSchema);

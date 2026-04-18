@@ -21,6 +21,7 @@ const groupMemberSchema = new mongoose.Schema({
   phone: { type: String },
   email: { type: String },
   active: { type: Boolean, default: true },
+  deletedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 // A Clerk user can only be in a group once

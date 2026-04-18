@@ -1,6 +1,7 @@
 const { getAuth } = require('@clerk/express');
 const GroupMember = require('../models/GroupMember');
 const SuperAdmin = require('../models/SuperAdmin');
+const Group = require('../models/Group');
 
 /**
  * Looks up the authenticated Clerk user's GroupMember record.
@@ -17,8 +18,8 @@ async function resolveGroup(req, res, next) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // Check super admin first
-    const superAdmin = await SuperAdmin.findOne({ clerkUserId });
+    // Check super admin first (only non-revoked)
+    const superAdmin = await SuperAdmin.findOne({ clerkUserId, revokedAt: null });
     if (superAdmin) {
       req.isSuperAdmin = true;
       // Super admin may also be a group member — resolve their group so they
@@ -37,12 +38,21 @@ async function resolveGroup(req, res, next) {
       return next();
     }
 
-    const member = await GroupMember.findOne({ clerkUserId, active: true });
+    const member = await GroupMember.findOne({ clerkUserId, active: true, deletedAt: null });
     if (!member) {
       return res.status(403).json({
         error: 'No group membership found',
         code: 'NO_GROUP',
       });
+    }
+
+    // Check that the group is not deleted or suspended
+    const group = await Group.findById(member.groupId);
+    if (!group || group.deletedAt) {
+      return res.status(403).json({ error: 'Group has been deleted', code: 'GROUP_DELETED' });
+    }
+    if (group.suspendedAt) {
+      return res.status(403).json({ error: 'Group is suspended', code: 'GROUP_SUSPENDED' });
     }
 
     req.groupId = member.groupId;
