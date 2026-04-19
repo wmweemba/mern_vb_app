@@ -1,3 +1,4 @@
+const { Resend } = require('resend');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const AdminAuditLog = require('../models/AdminAuditLog');
@@ -21,6 +22,40 @@ exports.overview = async (req, res) => {
   res.json({
     totalGroups, paidGroups, trialGroups, expiringThisWeek, totalMembers, mrrEstimate, currency: 'ZMW',
   });
+};
+
+// POST /api/admin/test-email?to=email@example.com
+exports.testEmail = async (req, res) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@chama360.nxhub.online>';
+  const toAddress = req.query.to || req.superAdmin?.email;
+
+  const config = {
+    apiKeySet: !!apiKey,
+    apiKeyPrefix: apiKey ? apiKey.slice(0, 8) + '...' : null,
+    fromAddress,
+    toAddress,
+  };
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'RESEND_API_KEY is not set', config });
+  }
+  if (!toAddress) {
+    return res.status(400).json({ error: 'Provide ?to=email@example.com', config });
+  }
+
+  const resend = new Resend(apiKey);
+  const { data, error } = await resend.emails.send({
+    from: fromAddress,
+    to: toAddress,
+    subject: 'Chama360 — email delivery test',
+    html: `<p>Test email from Chama360 backend. From: <strong>${fromAddress}</strong></p>`,
+  });
+
+  if (error) {
+    return res.status(500).json({ error: error.message, resendError: error, config });
+  }
+  res.json({ success: true, emailId: data.id, config });
 };
 
 // GET /api/admin/audit-log?groupId=&actor=&limit=50&page=1

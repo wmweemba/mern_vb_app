@@ -16,9 +16,10 @@ router.post('/super-admins/accept-invite', verifyToken, superAdmins.acceptInvite
 // All routes below require super admin
 router.use(verifyToken, requireSuperAdmin);
 
-// Overview + audit
+// Overview, audit, diagnostics
 router.get('/overview', platform.overview);
 router.get('/audit-log', platform.auditLog);
+router.post('/test-email', platform.testEmail);
 
 // Groups
 router.get('/groups', groups.listGroups);
