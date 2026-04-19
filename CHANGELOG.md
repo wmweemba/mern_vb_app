@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-04-19
+
+### Added
+- **Platform Admin (Super Admin) mode**: super admins now have a dedicated "Platform Admin" UI accessible via the avatar dropdown ("Switch to Platform Admin"). A separate sidebar, mobile bottom nav, and route namespace (`/admin/*`) keep the admin view completely separate from the group view.
+  - `/admin` — Overview dashboard with stat cards (total groups, active trials, paid groups, expiring this week, MRR estimate) and recent audit activity.
+  - `/admin/groups` — Full groups list with search, status filter pills (Trial / Paid / Expired / Suspended / Deleted), desktop table + mobile cards, and quick actions (Billing, Suspend, Delete, Restore).
+  - `/admin/groups/:id` — Group detail with six tabs: Overview, Members, Settings, Billing, Danger Zone, Activity.
+  - `/admin/super-admins` — Manage super admin access; invite by email, revoke, view pending invites.
+  - `/admin/audit` — Paginated audit log with group/actor filters and metadata expansion.
+  - `/admin/accept-invite` — Token-based super admin promotion flow.
+- **Soft delete + suspend for groups**: groups can be suspended (with reason) or soft-deleted (`deletedAt`). Suspended/deleted groups return `GROUP_SUSPENDED` / `GROUP_DELETED` 403 to regular members. Restore available via admin UI.
+- **Soft delete for group members**: members can be removed (`deletedAt`) by super admins without destroying data. Restore available.
+- **Admin audit log**: every state-changing admin action (group update, billing activate, member remove, super admin revoke, etc.) is written to `AdminAuditLog` with actor, action, target, and before/after metadata snapshot.
+- **Super admin invite flow**: super admins can invite others by email via Resend. One-time-use token, 48h expiry, same pattern as `InviteToken`.
+- **Billing management**: activate/extend paid status with plan select (Starter ZMW 150 / Standard ZMW 250), duration in months, or custom `paidUntil` date. Extend policy: `max(today, existing paidUntil) + duration`. Mark-unpaid action also available.
+- **Group settings editing**: super admins can edit any group's `GroupSettings` (interest rate, method, fine rules, savings rules, profit sharing) directly from the admin UI.
+- **Group creation**: super admins can create groups manually (name, admin name/email, trial days) from the admin UI with default settings seeded automatically.
+- **`TypedConfirmationModal`**: reusable confirmation modal requiring the user to type a specific word before a destructive action is enabled. Used for group delete and member remove.
+- **`BillingActivationDrawer`**: slideover drawer for activating/extending billing with live `paidUntil` preview.
+- **New backend models**: `SuperAdminInvite`, `AdminAuditLog`.
+- **`requireSuperAdmin` middleware**: gates all `/api/admin/*` routes; attaches `req.superAdmin` for downstream use.
+- **New favicon and PWA icons**: replaced the legacy blue bank-building icon with a modern orange Chama360 "C" mark on a gradient rounded square, consistent with the brand palette across `favicon.svg`, `icon-192x192.svg`, and `icon-512x512.svg`.
+
+### Fixed
+- **Member invite emails not sending**: `onboarding@resend.dev` is Resend's shared test sender and only delivers to the Resend account owner. Switched all email senders to `noreply@mynexusgroup.com` (the verified Resend domain). `RESEND_FROM_EMAIL` env var overrides the default in all controllers. Email failure now returns a 201 with `warning` + `signUpUrl` instead of a 500, so the admin receives the sign-up link to share manually.
+- **`resolveGroup` middleware**: now checks `revokedAt: null` on the `SuperAdmin` lookup so revoked super admins cannot pass through as regular members. Also rejects requests from members of deleted or suspended groups before hitting any controller.
+- **`GroupMember` queries**: added `deletedAt: null` filter to `userController.getUsers` and `thresholdController` member lookups so soft-deleted members are excluded from group-facing endpoints.
+
+### Added (backend scripts)
+- `scripts/testResend.js`: runs a live Resend send from the Coolify terminal; prints the exact error with actionable fix hints.
+- `POST /api/admin/test-email?to=email`: super-admin HTTP endpoint for the same diagnostic without needing terminal access.
+
+---
+
 ## [3.2.0] - 2026-04-18
 
 ### Added
