@@ -142,9 +142,21 @@ exports.inviteByEmail = async (req, res) => {
     });
 
     // Send invite email via Resend
+    // RESEND_FROM_EMAIL must be a verified sender in your Resend account.
+    // onboarding@resend.dev only delivers to the Resend account owner — unusable for production.
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(201).json({
+        message: `Invite saved but email not sent — RESEND_API_KEY is not configured.`,
+        warning: 'RESEND_API_KEY missing',
+        signUpUrl,
+      });
+    }
+
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@chama360.nxhub.online>';
+
     const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: 'Chama360 <onboarding@resend.dev>',
+    const { error: resendError } = await resend.emails.send({
+      from: fromAddress,
       to: email.toLowerCase().trim(),
       subject: `You've been invited to join ${groupName} on Chama360`,
       html: `
@@ -172,6 +184,16 @@ exports.inviteByEmail = async (req, res) => {
         </div>
       `,
     });
+
+    if (resendError) {
+      // Invite is already saved — return 201 but flag the email failure so the
+      // frontend can show a copy-link fallback instead of a generic error.
+      return res.status(201).json({
+        message: `Invite saved but email delivery failed: ${resendError.message}`,
+        warning: resendError.message,
+        signUpUrl,
+      });
+    }
 
     res.status(201).json({ message: `Invite sent to ${email}` });
   } catch (err) {

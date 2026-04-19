@@ -87,8 +87,14 @@ function InviteDrawer({ open, onClose, onInvited }) {
     setLoading(true);
     setError('');
     try {
-      await axios.post(`${API_BASE_URL}/invites/email`, form);
-      toast.success(`Invite sent to ${form.email}`);
+      const res = await axios.post(`${API_BASE_URL}/invites/email`, form);
+      if (res.data.warning) {
+        // Invite saved but email not delivered — show the sign-up link so the
+        // admin can share it manually.
+        toast.warning(`Invite saved, but email delivery failed. Share this link manually: ${res.data.signUpUrl}`);
+      } else {
+        toast.success(`Invite sent to ${form.email}`);
+      }
       setForm({ name: '', email: '', role: 'member' });
       onClose();
       onInvited();
