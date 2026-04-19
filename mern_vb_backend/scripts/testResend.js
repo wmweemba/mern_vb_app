@@ -12,7 +12,7 @@ require('dotenv').config();
 const { Resend } = require('resend');
 
 const apiKey = process.env.RESEND_API_KEY;
-const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@chama360.nxhub.online>';
+const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>';
 const toAddress = process.env.TEST_EMAIL || 'wmweemba@gmail.com';
 
 console.log('\n🔍  Resend Email Diagnostics');

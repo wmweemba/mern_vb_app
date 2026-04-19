@@ -152,7 +152,7 @@ exports.inviteByEmail = async (req, res) => {
       });
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@chama360.nxhub.online>';
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>';
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error: resendError } = await resend.emails.send({

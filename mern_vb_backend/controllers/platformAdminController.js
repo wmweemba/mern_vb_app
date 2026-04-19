@@ -27,7 +27,7 @@ exports.overview = async (req, res) => {
 // POST /api/admin/test-email?to=email@example.com
 exports.testEmail = async (req, res) => {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@chama360.nxhub.online>';
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>';
   const toAddress = req.query.to || req.superAdmin?.email;
 
   const config = {
