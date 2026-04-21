@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-04-21
+
+### Fixed
+- **Member invite 404 on chama360.nxhub.online**: clicking the invite email link returned a bare nginx 404 because the Coolify static deployment was not configured for SPA routing. Fix: enabled the "Is it a SPA?" toggle in Coolify (adds `try_files $uri $uri/ /index.html` to nginx) and added `public/_redirects` (`/* /index.html 200`) as a belt-and-suspenders fallback copied into `dist/` at build time.
+
+### Fixed (PWA)
+- **PWA manifest app name**: was still "Village Banking App" / "VB App" — updated to "Chama360" throughout.
+- **PWA manifest icon paths**: manifest referenced `icon-192x192.png` / `icon-512x512.png` which do not exist; corrected to the SVG files that are actually present (`image/svg+xml`, `.svg` paths). Separate `any` and `maskable` entries added for the 512×512 icon per the W3C manifest spec.
+- **PWA theme and background colors**: were hardcoded to `#2979FF` (old blue). Updated to `#C8501A` (brand orange) for `theme_color` and `#F0EDE8` (brand warm beige) for `background_color`.
+- **Workbox API cache URL**: `urlPattern` was a placeholder (`your-api-domain.com`) so API responses were never cached. Now derived from `VITE_API_URL` at build time via `loadEnv`, so the correct origin is baked into the service worker in each environment.
+- **PWA SPA routing for installed app**: added `navigateFallback: '/index.html'` and `navigateFallbackDenylist: [/^\/api\//]` to the Workbox config. Without this, navigating to any route other than `/` inside the installed PWA would fail when the service worker intercepted the request.
+- **PWA asset precaching**: added `includeAssets: ['favicon.svg', 'favicon.ico']` so the favicon is included in the Workbox precache manifest.
+
+---
+
 ## [3.4.0] - 2026-04-19
 
 ### Added
