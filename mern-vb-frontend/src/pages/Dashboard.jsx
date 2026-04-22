@@ -4,8 +4,12 @@ import BeginNewCycleModal from '../components/ui/BeginNewCycleModal';
 import DashboardStatsCard from '../components/ui/DashboardStatsCard';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
+import { useAuth } from '../store/auth';
+
+const CYCLE_ROLES = ['admin', 'treasurer', 'loan_officer'];
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,7 +44,7 @@ const Dashboard = () => {
 
   return (
     <div className="py-4 w-full max-w-2xl mx-auto">
-      <NewCycleBanner isVisible={true} onBeginCycle={() => setShowNewCycle(true)} />
+      <NewCycleBanner isVisible={CYCLE_ROLES.includes(user?.role)} onBeginCycle={() => setShowNewCycle(true)} />
       <BeginNewCycleModal
         isOpen={showNewCycle}
         onClose={() => setShowNewCycle(false)}

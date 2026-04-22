@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-04-22
+
+### Fixed
+- **Members page showing 0 active members**: `MembersPage` was fetching `GET /api/invites` (the legacy InviteToken list) instead of `GET /api/users` (the GroupMember list). Active members created via the webhook-based email invite flow were never shown. Fixed by pointing the members fetch to the correct `/users` endpoint.
+- **"Begin New Cycle" banner visible to members**: The banner was rendered with `isVisible={true}` hardcoded, so all roles — including read-only members — saw the cycle management prompt. Now only shown to `admin`, `treasurer`, and `loan_officer` roles.
+
+---
+
 ## [3.5.0] - 2026-04-21
 
 ### Fixed

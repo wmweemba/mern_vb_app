@@ -182,7 +182,7 @@ export default function MembersPage() {
   async function fetchData() {
     try {
       const [membersRes, pendingRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/invites`),
+        axios.get(`${API_BASE_URL}/users`),
         axios.get(`${API_BASE_URL}/invites/pending`),
       ]);
       setMembers(membersRes.data);
