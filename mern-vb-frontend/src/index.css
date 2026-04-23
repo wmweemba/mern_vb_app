@@ -188,3 +188,47 @@
     }
   }
 }
+
+/* ── Clerk sign-in card overrides — mobile only ── */
+@media (max-width: 1023px) {
+  .cl-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .cl-rootBox {
+    width: 100% !important;
+    background: transparent !important;
+  }
+
+  .cl-main {
+    padding: 0 !important;
+  }
+
+  .cl-header {
+    display: none !important;
+  }
+
+  .cl-footer {
+    display: none !important;
+  }
+
+  .cl-formFieldInput {
+    -webkit-appearance: none !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 8px !important;
+  }
+
+  .cl-socialButtonsBlockButton {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e5e5 !important;
+  }
+
+  .cl-formButtonPrimary {
+    background-color: #C8501A !important;
+  }
+}
