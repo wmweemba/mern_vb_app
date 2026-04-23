@@ -16,9 +16,11 @@ const verifyToken = (req, res, next) => {
   next();
 };
 
-// Role checking — reads from req.role (set by resolveGroup middleware)
+// Role checking — reads from req.role (set by resolveGroup middleware).
+// Accepts a single role string or an array of permitted roles.
 const requireRole = (role) => (req, res, next) => {
-  if (req.role !== role) {
+  const permitted = Array.isArray(role) ? role : [role];
+  if (!permitted.includes(req.role) && !req.isSuperAdmin) {
     return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
   }
   next();
