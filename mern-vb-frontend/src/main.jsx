@@ -50,7 +50,13 @@ function Root() {
   if (clerkError) return <ClerkLoadError />;
 
   return (
-    <ClerkProvider publishableKey={clerkKey} onLoadError={() => setClerkError(true)}>
+    <ClerkProvider
+      publishableKey={clerkKey}
+      onLoadError={() => setClerkError(true)}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-in"
+      afterSignOutUrl="/sign-in"
+    >
       <BrowserRouter>
         <AuthProvider>
           <App />

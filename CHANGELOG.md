@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.6] - 2026-04-23
+
+### Added
+- **Custom branded sign-in page**: replaced the minimal Clerk `<SignIn />` wrapper with a two-column layout. Left panel (desktop only): dark `#1E1A16` background, decorative orange circles, "Chama360" wordmark, and a treasurer testimonial with avatar. Right panel: "Free 15-day trial" eyebrow, value-proposition headline, descriptor copy, and the Clerk form styled with brand orange (`#C8501A`) as the primary colour, no card chrome, and `font-family: inherit` (DM Sans).
+- **`ClerkProvider` redirect props**: added `signInUrl="/sign-in"`, `signUpUrl="/sign-in"`, and `afterSignOutUrl="/sign-in"` to the provider in `main.jsx`. Ensures Clerk-initiated sign-outs (session expiry, etc.) redirect to `/sign-in` rather than `accounts.clerk.com`.
+
+### Changed
+- `src/pages/SignIn.jsx`: full rewrite — two-column branded layout replacing the centred wrapper. Default export name (`SignInPage`) and routing props unchanged.
+- `src/main.jsx`: `<ClerkProvider>` receives three additional URL props; no other changes.
+
+---
+
 ## [3.5.5] - 2026-04-23
 
 ### Added
