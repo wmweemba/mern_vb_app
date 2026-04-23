@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.9] - 2026-04-23
+
+### Fixed
+- **Mobile sign-in — nested Clerk card chrome (Chrome + Safari)**: neutralised Clerk's card background at the `variables` level (`colorBackground: 'transparent'`, `shadowShimmer: 'transparent'`, `colorShimmer: 'transparent'`) rather than only at the `elements` level. Variables are applied before Clerk renders its internal DOM, making this reliable across Chrome and Safari mobile where `elements` overrides were being ignored. Also added `colorInputBackground: '#ffffff'` and `colorInputText: '#1E1A16'` to keep input fields legible against the now-transparent card background.
+- **Mobile sign-in — Safari iOS grey input background**: added a scoped `<style>` tag in `SignInPage.jsx` setting `-webkit-appearance: none` and `background-color: #ffffff !important` on email/text/password inputs to override Safari's default grey system fill.
+- Desktop layout (`lg:` and above) is unchanged.
+
+---
+
 ## [3.5.8] - 2026-04-23
 
 ### Fixed

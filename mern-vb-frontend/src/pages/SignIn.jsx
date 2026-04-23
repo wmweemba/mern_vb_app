@@ -19,31 +19,67 @@ const clerkAppearance = {
 const mobileClerkAppearance = {
   variables: {
     colorPrimary: '#C8501A',
-    colorBackground: '#ffffff',
+    colorBackground: 'transparent',
+    colorInputBackground: '#ffffff',
+    colorInputText: '#1E1A16',
+    shadowShimmer: 'transparent',
+    colorShimmer: 'transparent',
     borderRadius: '8px',
     fontFamily: 'inherit',
+    fontSize: '14px',
+    spacingUnit: '0.85rem',
   },
   elements: {
-    rootBox: { width: '100%' },
+    rootBox: {
+      width: '100%',
+      backgroundColor: 'transparent',
+    },
     card: {
+      backgroundColor: 'transparent',
       boxShadow: 'none',
       border: 'none',
       padding: '0',
       margin: '0',
-      backgroundColor: 'transparent',
       width: '100%',
     },
     headerTitle: { display: 'none' },
     headerSubtitle: { display: 'none' },
     footer: { display: 'none' },
-    main: { padding: '0' },
-    form: { padding: '0' },
+    main: {
+      padding: '0',
+      gap: '12px',
+    },
+    socialButtonsBlockButton: {
+      border: '1px solid #e5e5e5',
+      backgroundColor: '#ffffff',
+    },
+    formButtonPrimary: {
+      backgroundColor: '#C8501A',
+    },
+    formFieldInput: {
+      border: '1px solid #e5e5e5',
+      backgroundColor: '#ffffff',
+      borderRadius: '8px',
+    },
+    dividerLine: {
+      backgroundColor: '#e5e5e5',
+    },
   },
 };
 
 export default function SignInPage() {
   return (
     <>
+      {/* Safari iOS: prevent grey system background on form inputs */}
+      <style>{`
+        input[type="email"],
+        input[type="text"],
+        input[type="password"] {
+          -webkit-appearance: none;
+          background-color: #ffffff !important;
+        }
+      `}</style>
+
       {/* ── MOBILE LAYOUT (below lg / 1024px) ── */}
       <div className="lg:hidden min-h-screen relative overflow-hidden font-sans">
         {/* Layer 1: Split background */}
