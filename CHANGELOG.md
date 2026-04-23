@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.8] - 2026-04-23
+
+### Fixed
+- **Mobile sign-in card position**: moved card `top` from `25%` to `28%` so the top edge sits inside the dark brown zone and the card body straddles the brown/white boundary as intended.
+- **Clerk form card chrome on mobile**: switched `mobileClerkAppearance.elements` from Tailwind className strings to CSS object syntax (`{ boxShadow: 'none', border: 'none', padding: '0', ... }`). Clerk was ignoring the className overrides and rendering its own card shell beneath the copy block. Object-style overrides suppress the nested chrome so the entire page — eyebrow, headline, subtext, and form — sits inside one seamless card.
+- **Testimonial row visibility on mobile**: adjusted `bottom` from `24px` to `20px`; the outer container (`min-h-screen relative overflow-hidden`) was already correctly established as the containing block.
+
+---
+
 ## [3.5.7] - 2026-04-23
 
 ### Changed

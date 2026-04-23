@@ -24,13 +24,20 @@ const mobileClerkAppearance = {
     fontFamily: 'inherit',
   },
   elements: {
-    rootBox: 'w-full',
-    card: 'shadow-none p-0 border-0 bg-transparent',
-    headerTitle: 'hidden',
-    headerSubtitle: 'hidden',
-    footer: 'hidden',
-    socialButtonsBlockButton: 'border border-gray-200 text-sm',
-    formButtonPrimary: 'bg-[#C8501A] hover:bg-[#A8401A] text-sm',
+    rootBox: { width: '100%' },
+    card: {
+      boxShadow: 'none',
+      border: 'none',
+      padding: '0',
+      margin: '0',
+      backgroundColor: 'transparent',
+      width: '100%',
+    },
+    headerTitle: { display: 'none' },
+    headerSubtitle: { display: 'none' },
+    footer: { display: 'none' },
+    main: { padding: '0' },
+    form: { padding: '0' },
   },
 };
 
@@ -94,7 +101,7 @@ export default function SignInPage() {
           className="absolute"
           style={{
             zIndex: 3,
-            top: '25%',
+            top: '28%',
             left: '50%',
             transform: 'translateX(-50%)',
             width: '88%',
@@ -145,7 +152,7 @@ export default function SignInPage() {
           className="absolute"
           style={{
             zIndex: 2,
-            bottom: 24,
+            bottom: 20,
             left: 20,
             right: 20,
             display: 'flex',
