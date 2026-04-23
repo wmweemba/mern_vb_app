@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.5] - 2026-04-23
+
+### Added
+- **Settings page — Group Profile edit**: admin users now see a functional Edit button on the Group Profile card. Clicking opens a slideover drawer (`GroupProfileDrawer`) pre-populated with current values. Fields: Group Name (required, max 60 chars), Meeting Day (Mon–Sun or Not set), Cycle Length (6 or 12 months only). Currency remains read-only. On save, PUTs to the existing `PUT /api/group-settings` route; displayed values update immediately without a page reload. Non-admin roles see no Edit button.
+- **Settings page — Financial Rules edit**: same pattern for the Financial Rules card (`FinancialRulesDrawer`). Fields: Interest Rate (1–50%), Interest Method (Flat Rate / Reducing Balance), Loan Limit Multiplier (1–10×), Profit Sharing Method (Proportional / Equal split). Client-side validation matches schema constraints before submitting.
+- Both drawers use the existing `SlideoverDrawer`, `sonner` toast, and `PUT /api/group-settings` — no new backend routes or utilities added.
+
+### Changed
+- **`SectionCard` in `Settings.jsx`**: refactored to accept an optional `onEdit` prop. The Edit button renders only when `onEdit` is provided, removing the previously non-functional dead Edit button from the Fine Rules card as a side effect.
+
+---
+
 ## [3.5.4] - 2026-04-23
 
 ### Fixed

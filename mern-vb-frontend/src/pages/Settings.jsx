@@ -4,16 +4,24 @@ import { Pencil, ExternalLink, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
+import GroupProfileDrawer from '../components/settings/GroupProfileDrawer';
+import FinancialRulesDrawer from '../components/settings/FinancialRulesDrawer';
 
-function SectionCard({ title, children }) {
+function SectionCard({ title, onEdit, children }) {
   return (
     <div className="bg-surface-card rounded-lg p-6">
       <div className="flex items-center justify-between border-b border-border-default pb-3 mb-5">
         <h2 className="text-xl font-bold text-text-primary">{title}</h2>
-        <button className="flex items-center gap-1.5 text-xs font-medium text-text-secondary border border-border-default rounded-full px-3 py-1.5 hover:bg-surface-page transition-colors">
-          <Pencil size={13} />
-          Edit
-        </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex items-center gap-1.5 text-xs font-medium text-text-secondary border border-border-default rounded-full px-3 py-1.5 hover:bg-surface-page transition-colors"
+          >
+            <Pencil size={13} />
+            Edit
+          </button>
+        )}
       </div>
       {children}
     </div>
@@ -34,10 +42,13 @@ const fmtProfitSharing = (v) => v === 'proportional' ? 'Proportional (savings)' 
 const fmtFineType = (v) => v === 'fixed' ? 'Fixed amount' : v === 'percentage' ? 'Percentage of overdue' : v;
 
 export default function Settings() {
-  const { trialActive } = useAuth();
+  const { trialActive, user } = useAuth();
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.role === 'admin';
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [financialOpen, setFinancialOpen] = useState(false);
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/group-settings`)
@@ -58,7 +69,7 @@ export default function Settings() {
       ) : (
         <>
           {/* Group Profile */}
-          <SectionCard title="Group Profile">
+          <SectionCard title="Group Profile" onEdit={isAdmin ? () => setProfileOpen(true) : undefined}>
             <div className="space-y-4">
               <Field label="Group Name" value={settings?.groupName} />
               <Field label="Meeting Day" value={settings?.meetingDay} />
@@ -68,7 +79,7 @@ export default function Settings() {
           </SectionCard>
 
           {/* Financial Rules */}
-          <SectionCard title="Financial Rules">
+          <SectionCard title="Financial Rules" onEdit={isAdmin ? () => setFinancialOpen(true) : undefined}>
             <div className="space-y-4">
               <Field label="Interest Rate" value={settings?.interestRate != null ? `${settings.interestRate}%` : null} />
               <Field label="Interest Method" value={fmtInterestMethod(settings?.interestMethod)} />
@@ -158,6 +169,19 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      <GroupProfileDrawer
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onSaved={(updated) => setSettings(updated)}
+        settings={settings}
+      />
+      <FinancialRulesDrawer
+        open={financialOpen}
+        onClose={() => setFinancialOpen(false)}
+        onSaved={(updated) => setSettings(updated)}
+        settings={settings}
+      />
     </div>
   );
 }
