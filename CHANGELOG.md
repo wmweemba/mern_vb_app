@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.4] - 2026-04-23
+
+### Fixed
+- **Clerk load failure no longer hangs the app**: added `onLoadError` handler to `ClerkProvider` and a missing-key guard in `main.jsx`. If Clerk's JS times out (e.g. CDN unreachable, invalid key, or domain not authorised in the Clerk dashboard), the app now shows a descriptive error screen with a Retry button instead of an infinite loading spinner.
+
+---
+
 ## [3.5.3] - 2026-04-23
 
 ### Added
