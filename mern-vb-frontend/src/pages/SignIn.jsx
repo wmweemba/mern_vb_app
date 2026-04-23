@@ -30,18 +30,8 @@ const mobileClerkAppearance = {
     spacingUnit: '0.85rem',
   },
   elements: {
-    rootBox: {
-      width: '100%',
-      backgroundColor: 'transparent',
-    },
-    card: {
-      backgroundColor: 'transparent',
-      boxShadow: 'none',
-      border: 'none',
-      padding: '0',
-      margin: '0',
-      width: '100%',
-    },
+    rootBox: { width: '100%' },
+    card: { width: '100%' },
     headerTitle: { display: 'none' },
     headerSubtitle: { display: 'none' },
     footer: { display: 'none' },

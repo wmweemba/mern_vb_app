@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-04-23
+
+### Fixed
+- **Mobile sign-in — Clerk inline card styles**: DOM inspection revealed the card background, box-shadow, border-radius, and padding were being injected as inline `element.style` by our own appearance prop object, not by Clerk's stylesheet. Removed `backgroundColor`, `boxShadow`, `border`, `borderRadius`, `padding`, `margin` from the `card` and `rootBox` entries in `mobileClerkAppearance.elements`, leaving only `{ width: '100%' }` on each. This stops our code from creating the visible nested card.
+- **Mobile sign-in — Clerk internal hashed classes**: updated the `@media (max-width: 1023px)` block in `index.css` to target both stable public classes (`cl-card`, `cl-header`, `cl-footer`, `cl-main`, `cl-rootBox`) and the internal hashed classes observed in the live DOM (`cl-internal-bdl7oi`, `cl-internal-k2c9pa`, `cl-internal-1ts29zt`). `!important` rules override any remaining Clerk-injected inline styles. Removed now-redundant social button and primary button overrides from CSS (handled by the appearance prop variables).
+
+---
+
 ## [3.6.0] - 2026-04-23
 
 ### Fixed
