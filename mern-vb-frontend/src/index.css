@@ -191,6 +191,17 @@
 
 /* ── Clerk sign-in card overrides — mobile only ── */
 @media (max-width: 1023px) {
+  /* cl-cardBox is the actual outer shell with background/shadow/border — was the missing target */
+  .cl-cardBox,
+  .cl-internal-ii7bx9 {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
   .cl-card {
     background: transparent !important;
     box-shadow: none !important;
@@ -200,13 +211,13 @@
     width: 100% !important;
   }
 
-  .cl-header,
-  .cl-internal-bdl7oi {
-    display: none !important;
+  .cl-rootBox {
+    background: transparent !important;
+    width: 100% !important;
   }
 
-  .cl-footer,
-  .cl-internal-k2c9pa {
+  .cl-header,
+  .cl-internal-bdl7oi {
     display: none !important;
   }
 
@@ -216,9 +227,26 @@
     width: 100% !important;
   }
 
-  .cl-rootBox {
+  /* Footer: hide ALL direct children, then selectively restore the sign-up action.
+     This works regardless of Clerk's internal class names for the branding section. */
+  .cl-footer {
     background: transparent !important;
-    width: 100% !important;
+    padding: 0 !important;
+    margin-top: 8px !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .cl-footer > * {
+    display: none !important;
+  }
+
+  .cl-footer > .cl-footerAction {
+    display: flex !important;
+    justify-content: center !important;
+    background: transparent !important;
+    padding: 4px 0 !important;
+    border: none !important;
   }
 
   /* Safari iOS input fix */

@@ -19,11 +19,9 @@ const clerkAppearance = {
 const mobileClerkAppearance = {
   variables: {
     colorPrimary: '#C8501A',
-    colorBackground: 'transparent',
+    colorBackground: '#ffffff',
     colorInputBackground: '#ffffff',
     colorInputText: '#1E1A16',
-    shadowShimmer: 'transparent',
-    colorShimmer: 'transparent',
     borderRadius: '8px',
     fontFamily: 'inherit',
     fontSize: '14px',
@@ -34,7 +32,6 @@ const mobileClerkAppearance = {
     card: { width: '100%' },
     headerTitle: { display: 'none' },
     headerSubtitle: { display: 'none' },
-    footer: { display: 'none' },
     main: {
       padding: '0',
       gap: '12px',
@@ -71,7 +68,7 @@ export default function SignInPage() {
       `}</style>
 
       {/* ── MOBILE LAYOUT (below lg / 1024px) ── */}
-      <div className="lg:hidden min-h-screen relative overflow-hidden font-sans">
+      <div className="lg:hidden min-h-screen relative overflow-x-hidden font-sans">
         {/* Layer 1: Split background */}
         <div className="absolute inset-0">
           <div
@@ -127,10 +124,10 @@ export default function SignInPage() {
           className="absolute"
           style={{
             zIndex: 3,
-            top: '28%',
+            top: '20%',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '88%',
+            width: '86%',
             backgroundColor: '#ffffff',
             borderRadius: 16,
             padding: 20,

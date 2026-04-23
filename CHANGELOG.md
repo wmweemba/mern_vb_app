@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.2] - 2026-04-23
+
+### Fixed
+- **Mobile sign-in — Clerk branding section hidden**: replaced the non-working `.cl-footerPages` class guess with a class-name-agnostic CSS rule: `.cl-footer > * { display: none }` followed by `.cl-footer > .cl-footerAction { display: flex }`. This hides everything in the Clerk footer (including the "Secured by Clerk" badge and "Development mode" notice) while keeping the "Don't have an account? Sign up" link visible, regardless of what internal class names Clerk uses for the branding section.
+- **Mobile sign-in — card shadow clipping on right edge**: narrowed the floating card from `88%` to `86%` screen width. On a 390px screen the card's right edge was only 23px from the container boundary — exactly where the 24px box-shadow blur was being hard-clipped by `overflow-x-hidden`, creating a visible grey line. The 4% reduction gives the shadow room to render cleanly on all sides.
+- **Mobile sign-in — card position**: moved card `top` from `28%` to `20%` so a larger portion of the card sits in the dark brown zone, matching the reference mockup.
+- **Mobile sign-in — Clerk variables corrected**: removed non-standard `shadowShimmer` and `colorShimmer` keys (not valid Clerk v5 variables); changed `colorBackground` from `'transparent'` back to `'#ffffff'` which was causing blue-grey backgrounds on Clerk's internal form surfaces.
+- **Mobile sign-in — container overflow**: changed outer container from `overflow-hidden` to `overflow-x-hidden` so the card's vertical shadow renders cleanly without being clipped while still containing the decorative orange circles within the horizontal viewport.
+
+---
+
 ## [3.6.1] - 2026-04-23
 
 ### Fixed
