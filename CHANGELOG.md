@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.7] - 2026-04-23
+
+### Changed
+- **Sign-in page — responsive breakpoint**: shifted from `md` (768px) to `lg` (1024px). Large tablets in landscape (iPad Pro, etc.) now receive the full two-column desktop split-screen layout instead of the mobile view.
+- **Sign-in page — mobile layout redesign** (below 1024px): replaced the single-column form with a layered full-viewport design:
+  - Split background — top 42% `#1E1A16` dark brown, bottom 58% white.
+  - Two decorative orange circles (`#C8501A`) positioned top-left (130×130px, opacity 0.9) and top-right (80×80px, opacity 0.5), clipped at screen edges.
+  - "Chama360" wordmark anchored top-left in `#F0EDE8`.
+  - Floating white card (88% wide, `border-radius: 16px`, soft shadow) straddling the colour boundary — roughly top third in the dark zone, bottom two thirds in white. Card contains the eyebrow label, headline, descriptor, and the Clerk `<SignIn />` form with brand-orange primary colour.
+  - Testimonial row pinned to the bottom of the screen: William M. avatar, italic quote, attribution.
+- Desktop layout (`lg` and above) is visually identical to 3.5.6 — only the breakpoint prefix changed.
+
+---
+
 ## [3.5.6] - 2026-04-23
 
 ### Added
