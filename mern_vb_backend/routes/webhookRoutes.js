@@ -38,23 +38,40 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req, res
       });
 
       if (invite) {
-        // Check they're not already a member
-        const existing = await GroupMember.findOne({
+        const normalizedEmail = email.toLowerCase().trim();
+
+        // Already linked to this Clerk user in this group — nothing to do
+        const alreadyLinked = await GroupMember.findOne({
           clerkUserId,
           groupId: invite.groupId,
         });
 
-        if (!existing) {
-          await GroupMember.create({
-            clerkUserId,
+        if (!alreadyLinked) {
+          // Look for a legacy unverified record for this email in this group
+          const legacy = await GroupMember.findOne({
             groupId: invite.groupId,
-            role: invite.role,
-            name: invite.name,
-            email: email.toLowerCase().trim(),
+            email: normalizedEmail,
+            isVerified: false,
           });
+
+          if (legacy) {
+            legacy.clerkUserId = clerkUserId;
+            legacy.isVerified = true;
+            if (invite.role && legacy.role !== invite.role) legacy.role = invite.role;
+            if (invite.name && !legacy.name) legacy.name = invite.name;
+            await legacy.save();
+          } else {
+            await GroupMember.create({
+              clerkUserId,
+              groupId: invite.groupId,
+              role: invite.role,
+              name: invite.name,
+              email: normalizedEmail,
+              isVerified: true,
+            });
+          }
         }
 
-        // Delete the pending invite
         await PendingInvite.deleteOne({ _id: invite._id });
       }
     } catch (err) {

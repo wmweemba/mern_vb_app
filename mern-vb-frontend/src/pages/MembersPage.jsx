@@ -40,7 +40,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function MemberRow({ member }) {
+function MemberRow({ member, canSeeStatus }) {
   const color = avatarColor(member.name);
   const initials = member.name
     .split(' ')
@@ -58,7 +58,14 @@ function MemberRow({ member }) {
         {initials}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-text-primary truncate">{member.name}</p>
+        <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-text-primary truncate">{member.name}</p>
+            {canSeeStatus && member.isVerified === false && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text flex-shrink-0">
+                Pending
+              </span>
+            )}
+          </div>
         {member.email && (
           <p className="text-xs text-text-secondary truncate">{member.email}</p>
         )}
@@ -228,7 +235,7 @@ export default function MembersPage() {
             No members yet. Invite your first member to get started.
           </div>
         ) : (
-          members.map(m => <MemberRow key={m._id} member={m} />)
+          members.map(m => <MemberRow key={m._id} member={m} canSeeStatus={canInvite} />)
         )}
       </div>
 

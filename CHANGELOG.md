@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.3] - 2026-04-23
+
+### Added
+- **`isVerified` field on `GroupMember`**: tracks whether a member has signed up through Clerk. `true` = has a Clerk account; `false` = legacy/manually-added record awaiting signup. Backfilled on all 22 existing records based on presence of `clerkUserId`.
+- **"Pending" badge on Members page**: admin, treasurer, and loan_officer roles now see an amber "Pending" badge next to the name of any member who has not yet created a Clerk account. Regular members see no badge.
+- **Re-invite support for unverified members**: `POST /api/invites/email` now allows re-inviting members whose `isVerified` is `false`. Previously any existing GroupMember record blocked the invite with a 409. Verified members are still blocked.
+- **Webhook links legacy records on signup**: `user.created` webhook now detects an existing unverified record for the same email+group and updates it (`clerkUserId`, `isVerified: true`) instead of creating a duplicate. New signups with no legacy record still create a fresh GroupMember as before.
+
+### Fixed
+- **Role and Clerk ID mismatch for William**: William's GroupMember record carried the dev-environment Clerk ID and was set to `loan_officer`. Fixed via `scripts/fixRolesSession1.js`: updated `clerkUserId` to the production ID, promoted role to `admin`, and set `Group.clerkAdminId` to the correct production value.
+- **`admin@vb.com` placeholder GroupMember removed**: the seed account that held the `admin` role in William's group has been hard-deleted from production.
+
+---
+
 ## [3.5.2] - 2026-04-23
 
 ### Fixed

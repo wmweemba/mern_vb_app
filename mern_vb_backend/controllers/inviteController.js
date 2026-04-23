@@ -105,9 +105,11 @@ exports.inviteByEmail = async (req, res) => {
       return res.status(403).json({ error: 'Members cannot send invites' });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Check no existing pending invite for this email+group
     const existingInvite = await PendingInvite.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       groupId: req.groupId,
     });
     if (existingInvite) {
@@ -116,12 +118,15 @@ exports.inviteByEmail = async (req, res) => {
 
     // Check email is not already a GroupMember of this group
     const existingMember = await GroupMember.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       groupId: req.groupId,
     });
-    if (existingMember) {
-      return res.status(409).json({ error: 'This email is already a member of your group' });
+    if (existingMember && existingMember.isVerified) {
+      return res.status(409).json({ error: 'This member already has an active account.' });
     }
+    // If existingMember exists but isVerified is false, this is a re-invite of a
+    // legacy member — proceed. The webhook handler links the Clerk signup back to
+    // this existing record on user.created.
 
     // Look up group name for the email
     const group = await Group.findById(req.groupId);
@@ -134,12 +139,19 @@ exports.inviteByEmail = async (req, res) => {
     // Store PendingInvite first
     const { userId: clerkUserId } = getAuth(req);
     await PendingInvite.create({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       groupId: req.groupId,
       role: inviteRole,
       invitedBy: clerkUserId,
       name,
     });
+
+    // If a legacy unverified member exists with a different name, align the name
+    // on the existing record so the re-invite doesn't create a mismatch.
+    if (existingMember && !existingMember.isVerified && name && existingMember.name !== name) {
+      existingMember.name = name;
+      await existingMember.save();
+    }
 
     // Send invite email via Resend
     // RESEND_FROM_EMAIL must be a verified sender in your Resend account.
@@ -157,7 +169,7 @@ exports.inviteByEmail = async (req, res) => {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error: resendError } = await resend.emails.send({
       from: fromAddress,
-      to: email.toLowerCase().trim(),
+      to: normalizedEmail,
       subject: `You've been invited to join ${groupName} on Chama360`,
       html: `
         <div style="font-family: 'DM Sans', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #F0EDE8;">
