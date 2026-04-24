@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.3] - 2026-04-24
+
+### Added
+- **Sign-up page (`/sign-up`)**: built `SignUpPage.jsx` as a fully branded two-column page matching `SignInPage.jsx` pixel-for-pixel in layout and structure. Desktop shows the dark left panel (eyebrow "TRUSTED BY VILLAGE BANKS IN ZAMBIA.", same testimonial quote and WM avatar) and a white right panel with `<SignUp />`. Mobile replicates the split-background design (42% dark/58% white), orange circle accents, floating white card with sign-up copy, and testimonial row. Copy is conversion-tuned for new admin onboarding: eyebrow "FREE 15-DAY TRIAL · NO CREDIT CARD", headline "Set up your Village Bank in minutes.", subtext focused on replacing Excel. `fallbackRedirectUrl="/dashboard"` passed to both desktop and mobile `<SignUp />` instances. Identical `desktopClerkAppearance` and `mobileClerkAppearance` objects to `SignInPage.jsx` ensure consistent Clerk form styling; global `@media (max-width: 1023px)` overrides in `index.css` already apply.
+- **ClerkProvider `signUpUrl` corrected**: changed from `"/sign-in"` to `"/sign-up"` in `main.jsx`. Clerk's built-in cross-links ("Don't have an account? Sign up" on sign-in, "Already have an account? Sign in" on sign-up) now route to the correct pages automatically.
+
+---
+
 ## [3.6.2] - 2026-04-23
 
 ### Fixed

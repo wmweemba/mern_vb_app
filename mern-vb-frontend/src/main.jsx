@@ -54,7 +54,7 @@ function Root() {
       publishableKey={clerkKey}
       onLoadError={() => setClerkError(true)}
       signInUrl="/sign-in"
-      signUpUrl="/sign-in"
+      signUpUrl="/sign-up"
       afterSignOutUrl="/sign-in"
     >
       <BrowserRouter>
