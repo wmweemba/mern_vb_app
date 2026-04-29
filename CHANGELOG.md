@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.5] - 2026-04-29
+
+### Fixed
+- **Sign-in/sign-up — tablet layout breakpoint**: shifted the mobile/desktop responsive breakpoint from `lg` (1024px) to `md` (768px) in `SignIn.jsx`, `SignUp.jsx`, and `index.css`. Below 768px (phones) the floating-card mobile layout renders; 768px and above (iPad Mini, iPad Air, iPad Pro, laptops, desktops) the branded two-column layout renders. The floating-card design was never intended for 660–706px card widths — at those sizes Clerk internally switches to its wider card component variant, which uses a different class hierarchy that the mobile CSS overrides could not reliably suppress. Moving to the two-column layout at 768px+ eliminates the Clerk card chrome distortion entirely without requiring any additional CSS hacks.
+
+---
+
 ## [3.6.4] - 2026-04-29
 
 ### Fixed

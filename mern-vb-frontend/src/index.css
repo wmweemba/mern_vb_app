@@ -189,8 +189,8 @@
   }
 }
 
-/* ── Clerk sign-in card overrides — mobile only ── */
-@media (max-width: 1023px) {
+/* ── Clerk sign-in card overrides — mobile only (phones below 768px) ── */
+@media (max-width: 767px) {
   /* cl-cardBox is the actual outer shell with background/shadow/border — was the missing target */
   .cl-cardBox,
   .cl-internal-ii7bx9 {

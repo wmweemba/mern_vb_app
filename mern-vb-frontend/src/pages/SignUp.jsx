@@ -67,8 +67,8 @@ export default function SignUpPage() {
         }
       `}</style>
 
-      {/* ── MOBILE LAYOUT (below lg / 1024px) ── */}
-      <div className="lg:hidden min-h-screen relative overflow-x-hidden font-sans">
+      {/* ── MOBILE LAYOUT (below md / 768px) ── */}
+      <div className="md:hidden min-h-screen relative overflow-x-hidden font-sans">
         {/* Layer 1: Split background */}
         <div className="absolute inset-0">
           <div
@@ -210,11 +210,11 @@ export default function SignUpPage() {
         </div>
       </div>
 
-      {/* ── DESKTOP LAYOUT (lg / 1024px and above) ── */}
-      <div className="hidden lg:flex flex-col lg:flex-row font-sans min-h-screen">
+      {/* ── DESKTOP LAYOUT (md / 768px and above) ── */}
+      <div className="hidden md:flex flex-col md:flex-row font-sans min-h-screen">
         {/* LEFT PANEL — branding */}
         <aside
-          className="hidden lg:flex relative overflow-hidden lg:w-1/2 lg:w-[45%] px-12 py-10"
+          className="hidden md:flex relative overflow-hidden md:w-[45%] px-12 py-10"
           style={{ backgroundColor: '#1E1A16' }}
         >
           {/* Decorative orange circles */}
@@ -312,7 +312,7 @@ export default function SignUpPage() {
           <div className="w-full max-w-md">
             {/* Wordmark shown only if left panel is somehow absent */}
             <div
-              className="lg:hidden mb-8 text-text-primary"
+              className="md:hidden mb-8 text-text-primary"
               style={{ fontSize: 18, fontWeight: 700 }}
             >
               Chama360
