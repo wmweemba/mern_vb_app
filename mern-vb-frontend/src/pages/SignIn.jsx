@@ -164,8 +164,7 @@ export default function SignInPage() {
           <SignIn
             routing="path"
             path="/sign-in"
-            afterSignInUrl="/dashboard"
-            afterSignUpUrl="/dashboard"
+            fallbackRedirectUrl="/dashboard"
             appearance={mobileClerkAppearance}
           />
         </div>
@@ -352,8 +351,7 @@ export default function SignInPage() {
             <SignIn
               routing="path"
               path="/sign-in"
-              afterSignInUrl="/dashboard"
-              afterSignUpUrl="/dashboard"
+              fallbackRedirectUrl="/dashboard"
               appearance={clerkAppearance}
             />
           </div>

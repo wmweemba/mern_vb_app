@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.4] - 2026-04-29
+
+### Fixed
+- **Sign-in redirect loop on email/password accounts**: replaced deprecated `afterSignInUrl="/dashboard"` and `afterSignUpUrl="/dashboard"` props on both `<SignIn />` instances (mobile and desktop) in `SignIn.jsx` with `fallbackRedirectUrl="/dashboard"`. In Clerk v5, `afterSignInUrl` is ignored — `signInFallbackRedirectUrl` (resolved to `/sign-in` from `ClerkProvider.signInUrl`) was winning the priority contest, so after a successful password submit Clerk redirected back to `/sign-in` instead of `/dashboard`, creating an infinite reload loop. Google OAuth accounts were unaffected because OAuth uses its own callback URL rather than `fallbackRedirectUrl`.
+
+---
+
 ## [3.6.3] - 2026-04-24
 
 ### Added
