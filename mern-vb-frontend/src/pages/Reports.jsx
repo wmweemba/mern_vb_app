@@ -231,13 +231,13 @@ const ReportModal = ({ open, onClose, data, columns, title }) => {
         </div>
         <div className="flex justify-between items-center mt-4">
           <button
-            className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
+            className="border border-border-default text-text-primary font-medium rounded-full px-4 py-1.5 hover:bg-surface-page transition-colors disabled:opacity-50"
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
           >Previous</button>
-          <span className="text-xs">Page {page + 1} of {pageCount}</span>
+          <span className="text-xs text-text-secondary">Page {page + 1} of {pageCount}</span>
           <button
-            className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
+            className="border border-border-default text-text-primary font-medium rounded-full px-4 py-1.5 hover:bg-surface-page transition-colors disabled:opacity-50"
             onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
             disabled={page >= pageCount - 1}
           >Next</button>
@@ -372,7 +372,7 @@ const Reports = () => {
         </p>
         <div className="flex justify-center">
           <button
-            className="bg-orange-500 hover:bg-orange-600 text-white rounded px-6 py-2 font-medium shadow"
+            className="bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-full px-7 py-3.5 transition-colors"
             onClick={() => setShowFinesModal(true)}
           >
             View Fines &amp; Penalties
@@ -385,21 +385,21 @@ const Reports = () => {
           <div className="font-semibold mb-2 text-center">{config.label}</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mx-auto w-[90%] sm:w-[80%]">
             <button
-              className="bg-[#2979FF] text-white rounded px-4 py-2 font-medium shadow w-full"
+              className="border border-border-default text-text-primary font-medium rounded-full px-6 py-3 hover:bg-surface-page transition-colors w-full disabled:opacity-50"
               onClick={() => handleExport(config, 'excel')}
               disabled={loading}
             >
               Export Excel
             </button>
             <button
-              className="bg-[#4CAF50] text-white rounded px-4 py-2 font-medium shadow w-full"
+              className="border border-border-default text-text-primary font-medium rounded-full px-6 py-3 hover:bg-surface-page transition-colors w-full disabled:opacity-50"
               onClick={() => handleExport(config, 'pdf')}
               disabled={loading}
             >
               Download PDF
             </button>
             <button
-              className="bg-[#6C63FF] text-white rounded px-4 py-2 font-medium shadow w-full"
+              className="bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-full px-7 py-3.5 transition-colors w-full disabled:opacity-50"
               onClick={() => handleViewReport(config)}
               disabled={loading}
             >

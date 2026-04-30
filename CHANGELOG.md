@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.6] - 2026-04-30
+
+### Fixed
+- **Reports page — button colours**: replaced all hardcoded placeholder colours (`#2979FF` blue on Export Excel, `#4CAF50` green on Download PDF, `#6C63FF` purple on Generate & View Report, `orange-500` on View Fines & Penalties) with brand design system styles per UI_SPEC.md §6.7. Primary actions (Generate & View Report, View Fines & Penalties) now use `bg-brand-primary` (#C8501A) with `hover:bg-brand-hover`. Secondary actions (Export Excel, Download PDF) now use the ghost pill style — transparent background, `border-border-default`, `text-text-primary`. ReportModal pagination buttons (Previous/Next) updated from `bg-gray-200` to matching ghost pill style. All buttons are `rounded-full` (pill shape) with `transition-colors` and `disabled:opacity-50`.
+
+---
+
 ## [3.6.5] - 2026-04-29
 
 ### Fixed
