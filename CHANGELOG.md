@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-05-06
+
+### Added
+- **In-app Help & Support — user-facing ticket submission**: a floating `LifeBuoy` FAB button appears in all authenticated shells (regular `AppShell` and `AdminShell`), positioned above the mobile bottom nav (`bottom-24`) and in the viewport corner on desktop (`bottom-6`). Clicking opens a `SupportRequestDrawer` — a `SlideoverDrawer` form that pre-fills Name and Email from Clerk auth, accepts Phone, Category, and Description, then POSTs to `POST /api/support/request`. On success the drawer transitions to a confirmation screen showing the ticket ID. A "Help & Support" menu item was also added to the top-bar avatar dropdown, dispatching a `window.openSupport` event to the same drawer via the event-bus pattern already used in this codebase.
+- **In-app Help & Support — backend endpoint**: `POST /api/support/request` persists a `SupportRequest` MongoDB document (model: `mern_vb_backend/models/SupportRequest.js`) then fires a best-effort Telegram notification and optional Resend email, both mirroring the existing `billingController.js` pattern. The route is intentionally NOT gated by `checkTrial` so expired-trial users can still report billing or access problems. User identity (name, email, role, group) is resolved server-side from `req.member` or Clerk's `clerkClient.users.getUser` for super admins without a group membership. User-supplied text fields are HTML-escaped before interpolation into the Telegram message to prevent parse-mode breakage. Notification failures are recorded on the document (`notifyError`, `notifiedTelegramAt`) without failing the 201 response.
+- **Support admin inbox (`/admin/support`)**: new `AdminSupportInbox` page, accessible to super admins only, showing all support tickets in a desktop table / mobile card layout with debounced full-text search and status filter pills (All / Open / In Progress / Resolved / Closed). Clicking any row opens a `DetailDrawer` that displays all ticket fields and allows the super admin to update the status and add a resolution note via `PATCH /api/admin/support/:id`. First transition to `resolved` or `closed` snapshots `resolvedAt` and `resolvedBy`; subsequent transitions do not overwrite those fields. The "Support" nav item was added to `AdminSidebar` between "All Groups" and "Super Admins".
+- **`SupportRequest` Mongoose model** with full schema: `clerkUserId`, `name`, `email`, `phone`, `role`, `groupName` (snapshot), `category` (enum: `error`, `question`, `feature_request`, `billing`, `other`), `description` (max 4000 chars), `pagePath`, `userAgent`, `status` (enum: `open` → `in_progress` → `resolved` → `closed`), `resolutionNote`, `resolvedAt`, `resolvedBy`, notification audit fields, compound indexes on `status + createdAt`.
+- **Backend tests** (`tests/supportController.test.js`): 13 Jest + Supertest tests covering happy-path creation, Telegram failure tolerance, all validation errors (phone, category, description), 401 unauthenticated, 403 non-super-admin, paginated list with status filter, status transition, idempotent `resolvedAt`, and invalid status 400. Uses `mongodb-memory-server` for DB isolation; mocks `@clerk/express`, `resend`, `fetch`, `resolveGroup`, and `requireSuperAdmin`.
+- **Frontend tests** (`src/__tests__/SupportRequestDrawer.test.js`): 6 tests covering read-only pre-fill, all inline validation errors, confirmation-view transition on success, and error-banner on failure.
+- **`setupTests.js` — `TextEncoder`/`TextDecoder` polyfills**: react-router-dom v7 requires these globals in the jsdom test environment; added to `src/setupTests.js`.
+- **`SlideoverDrawer.jsx` — `React` import added**: required for tests using babel-jest (no automatic JSX runtime configured); does not affect production build.
+
+### Fixed (UI_SPEC.md compliance — new components only)
+- **Drawer footer buttons use `rounded-md` not `rounded-full`** (§6.15): the spec explicitly states footer action buttons must not be pill-shaped (`--radius-md`, not pill). Both the "Send Request" button in `SupportRequestDrawer` and the "Save" button in `AdminSupportInbox`'s `DetailDrawer` were corrected from `rounded-full` to `rounded-md`.
+- **Status badges in `AdminSupportInbox` corrected to spec** (§6.14 / §11.2): updated from `font-medium px-2` to `font-semibold uppercase tracking-wide px-2.5` to match the canonical badge pattern.
+- **Empty state in `AdminSupportInbox` has dashed border** (§6.9): added `border border-dashed border-border-dashed` to the empty-state container as required.
+- **FAB button `shadow-lg` removed** (§5): the spec prohibits box shadows everywhere; removed `shadow-lg` from the floating help button in `HelpSupport.jsx`.
+
+---
+
 ## [3.7.0] - 2026-05-06
 
 ### Fixed

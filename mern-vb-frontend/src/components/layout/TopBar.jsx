@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
-import { Shield } from 'lucide-react';
+import { Shield, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import {
   DropdownMenu,
@@ -77,6 +77,13 @@ export default function TopBar() {
           )}
           <DropdownMenuItem onClick={() => navigate('/settings')}>
             Account Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => window.dispatchEvent(new Event('openSupport'))}
+            className="flex items-center gap-2"
+          >
+            <LifeBuoy size={16} className="text-text-secondary" />
+            Help & Support
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="text-status-overdue-text focus:text-status-overdue-text">

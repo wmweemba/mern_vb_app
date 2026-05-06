@@ -9,6 +9,7 @@ const settings = require('../controllers/adminGroupSettingsController');
 const billing = require('../controllers/adminBillingController');
 const members = require('../controllers/adminMembersController');
 const superAdmins = require('../controllers/superAdminController');
+const supportController = require('../controllers/supportController');
 
 // Public-ish: accept-invite only requires Clerk auth, not super-admin status
 router.post('/super-admins/accept-invite', verifyToken, superAdmins.acceptInvite);
@@ -50,5 +51,9 @@ router.post('/groups/:groupId/members/:memberId/restore', members.restoreMember)
 router.get('/super-admins', superAdmins.list);
 router.post('/super-admins/invite', superAdmins.invite);
 router.delete('/super-admins/:id', superAdmins.revoke);
+
+// Support inbox
+router.get('/support', supportController.listRequests);
+router.patch('/support/:id', supportController.updateStatus);
 
 module.exports = router;

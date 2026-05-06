@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, Shield, FileText } from 'lucide-react';
+import { LayoutGrid, Users, Shield, FileText, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 
 const NAV_ITEMS = [
   { label: 'Overview', to: '/admin', icon: LayoutGrid, exact: true },
   { label: 'All Groups', to: '/admin/groups', icon: Users },
+  { label: 'Support', to: '/admin/support', icon: LifeBuoy },
   { label: 'Super Admins', to: '/admin/super-admins', icon: Shield },
   { label: 'Audit Log', to: '/admin/audit', icon: FileText },
 ];

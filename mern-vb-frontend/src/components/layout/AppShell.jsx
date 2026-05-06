@@ -12,6 +12,7 @@ import AddFineModal from '../ui/AddFineModal';
 import BeginNewCycleModal from '../ui/BeginNewCycleModal';
 import FinesModal from '../ui/FinesModal';
 import { DollarSign, PiggyBank, CreditCard, Landmark, AlertTriangle, Eye, X, ArrowUpRight, RefreshCw } from 'lucide-react';
+import HelpSupport from '../support/HelpSupport';
 
 const canAccessOperations = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
@@ -98,6 +99,7 @@ export default function AppShell({ children }) {
         onClose={() => setShowNewCycle(false)}
         onSuccess={() => window.location.reload()}
       />
+      <HelpSupport />
     </div>
   );
 }

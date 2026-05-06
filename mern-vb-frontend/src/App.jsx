@@ -25,6 +25,7 @@ import AdminGroupDetail from './pages/admin/AdminGroupDetail';
 import AdminSuperAdmins from './pages/admin/AdminSuperAdmins';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import AdminAcceptInvite from './pages/admin/AdminAcceptInvite';
+import AdminSupportInbox from './pages/admin/AdminSupportInbox';
 
 // Layout using AppShell
 const Layout = ({ children }) => <AppShell>{children}</AppShell>;
@@ -191,6 +192,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/audit" element={
         <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminAuditLog /></AdminLayout></SuperAdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/support" element={
+        <ProtectedRoute><SuperAdminRoute><AdminLayout><AdminSupportInbox /></AdminLayout></SuperAdminRoute></ProtectedRoute>
       } />
 
       {/* Default redirect */}

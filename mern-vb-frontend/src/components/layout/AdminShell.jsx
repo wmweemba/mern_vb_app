@@ -1,6 +1,7 @@
 import AdminSidebar from './AdminSidebar';
 import TopBar from './TopBar';
 import AdminMobileBottomNav from './AdminMobileBottomNav';
+import HelpSupport from '../support/HelpSupport';
 
 export default function AdminShell({ children }) {
   return (
@@ -11,6 +12,7 @@ export default function AdminShell({ children }) {
       <main className="md:ml-60 pt-16 pb-28 md:pb-8 px-4 md:px-8">
         {children}
       </main>
+      <HelpSupport />
     </div>
   );
 }

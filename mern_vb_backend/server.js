@@ -32,6 +32,7 @@ app.use('/api/group-settings', require('./routes/groupSettings'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/invites', require('./routes/invites'));
 app.use('/api/billing', require('./routes/billingRoutes'));
+app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 
 const clientOptions = {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export default function SlideoverDrawer({ open, onClose, title, children, footer }) {
