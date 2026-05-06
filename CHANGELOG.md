@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-05-06
+
+### Fixed
+- **Support + upgrade request emails not sending in production**: both `supportController.js` and `billingController.js` resolved the notification recipient as `process.env.ADMIN_EMAIL` only. The Coolify deployment has `SUPER_ADMIN_EMAIL` configured but not `ADMIN_EMAIL`, so the `if (RESEND_API_KEY && ADMIN_EMAIL)` guard was always false and the email block was silently skipped — visible in the admin inbox as "Email: Not sent" with no error recorded. Fixed by resolving the address as `ADMIN_EMAIL || SUPER_ADMIN_EMAIL` in both controllers. No new env var is required on Coolify; `ADMIN_EMAIL` takes precedence if added later.
+
+---
+
 ## [3.8.0] - 2026-05-06
 
 ### Added
