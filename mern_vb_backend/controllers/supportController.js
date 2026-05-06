@@ -124,12 +124,13 @@ exports.createRequest = async (req, res) => {
     }
 
     // Email send (best-effort, only if env vars set)
-    if (process.env.RESEND_API_KEY && process.env.ADMIN_EMAIL) {
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL;
+    if (process.env.RESEND_API_KEY && adminEmail) {
       try {
         const resend = new Resend(process.env.RESEND_API_KEY);
         await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>',
-          to: process.env.ADMIN_EMAIL,
+          to: adminEmail,
           subject: `[Support] ${categoryLabel} — ${groupName || name}`,
           html: messageText.replace(/\n/g, '<br>'),
         });
