@@ -11,7 +11,7 @@ exports.createSaving = async (req, res) => {
   try {
     const settings = await getSettings(req.groupId);
 
-    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope, active: true, deletedAt: null });
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const userId = member._id;
 
@@ -88,7 +88,7 @@ exports.updateSaving = async (req, res) => {
     const amountDifference = newAmount - originalAmount;
 
     if (updates.username) {
-      const member = await GroupMember.findOne({ name: updates.username, ...req.groupScope });
+      const member = await GroupMember.findOne({ name: updates.username, ...req.groupScope, active: true, deletedAt: null });
       if (!member) return res.status(400).json({ error: 'Member not found' });
       updates.userId = member._id;
       delete updates.username;

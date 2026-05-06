@@ -23,7 +23,7 @@ exports.repayment = async (req, res) => {
       return res.status(400).json({ error: 'Invalid payment amount' });
     }
 
-    const member = await GroupMember.findOne({ name: username, ...req.groupScope }).session(session);
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope, active: true, deletedAt: null }).session(session);
     if (!member) {
       await session.abortTransaction();
       return res.status(404).json({ error: `Member '${username}' not found` });
@@ -147,7 +147,7 @@ exports.payout = async (req, res) => {
 exports.fine = async (req, res) => {
   const { username, amount, note } = req.body;
   try {
-    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope, active: true, deletedAt: null });
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const fine = await Fine.create({
       ...req.groupScope,

@@ -210,7 +210,7 @@ exports.createLoan = async (req, res) => {
 
   try {
     // Look up member by name within the group
-    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope, active: true, deletedAt: null });
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const userId = member._id;
 
@@ -306,7 +306,7 @@ exports.getLoansByUser = async (req, res) => {
   try {
     let userId = req.params.id;
     if (req.query.username) {
-      const member = await GroupMember.findOne({ name: req.query.username, ...req.groupScope });
+      const member = await GroupMember.findOne({ name: req.query.username, ...req.groupScope, active: true, deletedAt: null });
       if (!member) return res.status(404).json({ error: 'Member not found' });
       userId = member._id;
     }
@@ -322,7 +322,7 @@ exports.repayInstallment = async (req, res) => {
   try {
     const settings = await getSettings(req.groupId);
 
-    const member = await GroupMember.findOne({ name: username, ...req.groupScope });
+    const member = await GroupMember.findOne({ name: username, ...req.groupScope, active: true, deletedAt: null });
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const userId = member._id;
 
