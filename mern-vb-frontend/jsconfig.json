@@ -2,10 +2,10 @@
     "compilerOptions": {
       "target": "esnext",
       "module": "esnext",
-      "moduleResolution": "node",
-      "baseUrl": ".",
+      "moduleResolution": "bundler",
+      "ignoreDeprecations": "5.0",
       "paths": {
-        "@/*": ["src/*"]
+        "@/*": ["./src/*"]
       },
       "jsx": "react-jsx",
       "allowSyntheticDefaultImports": true

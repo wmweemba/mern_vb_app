@@ -28,7 +28,7 @@ const AddSavingsForm = ({ onSuccess, formId = 'add-savings-form' }) => {
       setForm({ username: '', month: '', amount: '', date: '', notes: '' });
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to add savings');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to add savings');
     } finally {
       setLoading(false);
     }

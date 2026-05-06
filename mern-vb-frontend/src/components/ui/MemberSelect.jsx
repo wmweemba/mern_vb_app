@@ -46,7 +46,7 @@ export default function MemberSelect({ value, onChange, placeholder = 'Search me
   // Sync selected from external value prop
   useEffect(() => {
     if (!value) { setSelected(null); setQuery(''); return; }
-    const match = members.find(m => m.username === value);
+    const match = members.find(m => m.name === value);
     if (match) setSelected(match);
   }, [value, members]);
 
@@ -72,7 +72,7 @@ export default function MemberSelect({ value, onChange, placeholder = 'Search me
     setSelected(member);
     setQuery('');
     setOpen(false);
-    onChange(member.username);
+    onChange(member.name);
   };
 
   const handleClear = (e) => {
@@ -152,7 +152,7 @@ export default function MemberSelect({ value, onChange, placeholder = 'Search me
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">{member.name || member.username}</p>
-                        <p className="text-xs text-text-secondary truncate">@{member.username}</p>
+                        <p className="text-xs text-text-secondary truncate">{member.email || ''}</p>
                       </div>
                       <span className={`text-xs font-medium rounded-full px-2 py-0.5 flex-shrink-0 ${ROLE_BADGE[member.role] || ROLE_BADGE.member}`}>
                         {member.role}

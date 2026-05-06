@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-05-06
+
+### Fixed
+- **Savings — member lookup broken for all groups**: `MemberSelect` was calling `onChange(member.username)` but `GroupMember` has no `username` field, so every selection sent `undefined` to the form. The backend received no member identifier, `findOne({ name: undefined })` returned null, and every savings submission returned 400 "Member not found". Fixed by changing `MemberSelect` to send `member.name` (the actual field) and match on `m.name` in the sync effect. The member email is now shown as subtext in the dropdown instead of the non-existent username. This resolved the "Failed to add savings" error in William's group and the silent failure in Chizu's group.
+- **Savings — generic error hides real backend message**: `AddSavingsForm` read `err.response?.data?.message` but the backend always returns the `error` key. Any API error showed the fallback "Failed to add savings" regardless of the actual cause. Fixed to read `err.response?.data?.error` first so the real message ("Member not found", "Cannot save more than K…") is surfaced to the admin.
+
+### Added
+- **Members page — Edit button for pending members (admin only)**: PENDING GroupMember rows now show a pencil icon for admins. Clicking opens an `EditMemberDrawer` to correct the member's name or email before sending an invite. This is the prevention mechanism for migration-caused duplicate records: once the email on the old record matches the address the member will use to sign up, the Clerk webhook correctly updates the existing record on signup instead of creating a new one.
+- **`scripts/mergeMembers.js`**: one-time migration script to merge legacy PENDING GroupMember records into newly-created active records for Farai Liwewe and Katongo Katwishi. Runs in dry-run mode by default (`node scripts/mergeMembers.js`) — prints a full preview of record pairs and data counts before touching anything. Commits with `DRY_RUN=false node scripts/mergeMembers.js`. Re-points all `Saving`, `Loan`, `Fine`, and `Transaction` documents from the old `_id` to the new `_id`, then soft-deletes the old record. **This script was executed in production on 2026-05-06**: Farai Liwewe (7 savings, 1 fine, 9 transactions) and Katongo Katwishi (7 savings, 1 loan, 2 fines, 11 transactions) were successfully merged. Root cause of duplicate detection: old migrated records had `isVerified` absent from the MongoDB document (not stored as `false`); the script uses `{ isVerified: { $ne: true } }` to correctly match these absent-field records.
+- **`scripts/listPendingMembers.js`**: diagnostic script listing all unverified GroupMembers and their stored email values. Used to identify the real database email values when the merge script initially failed to find records. Safe to re-run at any time.
+- **`mern-vb-frontend/jsconfig.json` — deprecation warnings resolved**: updated `moduleResolution` from `"node"` (aliased to the deprecated `node10` in TS 7) to `"bundler"` (correct for Vite). Removed the now-unnecessary `baseUrl` field and updated the `@/*` path alias to `./src/*` (relative path, required when `baseUrl` is absent). Added `"ignoreDeprecations": "5.0"` as belt-and-suspenders. Both IDE deprecation errors are gone.
+
+### Verified (audit — no code change required)
+- **`loanCalculator.js` — flat rate interest method**: confirmed implemented. The function signature is `calculateLoanSchedule(amount, duration, interestRate, interestMethod = 'reducing')` and the body contains a branch: flat rate uses `amount * (rate/100)` per installment, reducing balance uses `principalBalance * (rate/100)`. The Day 3 plan item is complete.
+- **`loanLimitMultiplier` enforcement**: confirmed implemented in `loanController.js` line 228. At loan creation, `maxLoan = memberSavings * settings.loanLimitMultiplier` is calculated and the request is rejected with a descriptive error if the amount exceeds it. The Day 3 plan item is complete.
+
+---
+
 ## [3.6.6] - 2026-04-30
 
 ### Fixed

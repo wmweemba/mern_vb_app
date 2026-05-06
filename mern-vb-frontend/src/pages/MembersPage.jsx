@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Pencil } from 'lucide-react';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
@@ -40,7 +40,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function MemberRow({ member, canSeeStatus }) {
+function MemberRow({ member, canSeeStatus, canEdit, onEdit }) {
   const color = avatarColor(member.name);
   const initials = member.name
     .split(' ')
@@ -48,6 +48,8 @@ function MemberRow({ member, canSeeStatus }) {
     .slice(0, 2)
     .join('')
     .toUpperCase();
+
+  const isPending = canSeeStatus && member.isVerified === false;
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-border-default last:border-b-0">
@@ -59,19 +61,114 @@ function MemberRow({ member, canSeeStatus }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-text-primary truncate">{member.name}</p>
-            {canSeeStatus && member.isVerified === false && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text flex-shrink-0">
-                Pending
-              </span>
-            )}
-          </div>
+          <p className="text-sm font-semibold text-text-primary truncate">{member.name}</p>
+          {isPending && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text flex-shrink-0">
+              Pending
+            </span>
+          )}
+        </div>
         {member.email && (
           <p className="text-xs text-text-secondary truncate">{member.email}</p>
         )}
       </div>
+      {isPending && canEdit && (
+        <button
+          onClick={() => onEdit(member)}
+          className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-page transition-colors flex-shrink-0"
+          title="Edit member details"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
       <RoleBadge role={member.role} />
     </div>
+  );
+}
+
+function EditMemberDrawer({ member, open, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: '', email: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (member) setForm({ name: member.name || '', email: member.email || '' });
+    setError('');
+  }, [member]);
+
+  function handleChange(e) {
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    setError('');
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) {
+      setError('Name and email are required.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await axios.put(`${API_BASE_URL}/users/${member._id}`, { name: form.name.trim(), email: form.email.trim().toLowerCase() });
+      toast.success('Member details updated.');
+      onClose();
+      onSaved();
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Failed to update member.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const footer = (
+    <button
+      form="edit-member-form"
+      type="submit"
+      disabled={loading}
+      className="w-full bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-full py-2.5 transition-colors disabled:opacity-60"
+    >
+      {loading ? 'Saving…' : 'Save Changes'}
+    </button>
+  );
+
+  return (
+    <SlideoverDrawer open={open} onClose={onClose} title="Edit Member" footer={footer}>
+      <form id="edit-member-form" onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-xs text-text-secondary">
+          Correct the name or email before sending an invite. The email must match the address the member will use to sign up.
+        </p>
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
+            Full Name
+          </label>
+          <input
+            name="name"
+            type="text"
+            value={form.name}
+            onChange={handleChange}
+            className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-text-muted"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
+            Email Address
+          </label>
+          <input
+            name="email"
+            type="email"
+            value={form.email}
+            onChange={handleChange}
+            className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-text-muted"
+          />
+        </div>
+        {error && (
+          <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+      </form>
+    </SlideoverDrawer>
   );
 }
 
@@ -185,6 +282,19 @@ export default function MembersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const canInvite = user && user.role !== 'member';
+  const canEdit = user?.role === 'admin';
+  const [editingMember, setEditingMember] = useState(null);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+
+  function handleEditMember(member) {
+    setEditingMember(member);
+    setEditDrawerOpen(true);
+  }
+
+  function handleEditClose() {
+    setEditDrawerOpen(false);
+    setEditingMember(null);
+  }
 
   async function fetchData() {
     try {
@@ -235,7 +345,15 @@ export default function MembersPage() {
             No members yet. Invite your first member to get started.
           </div>
         ) : (
-          members.map(m => <MemberRow key={m._id} member={m} canSeeStatus={canInvite} />)
+          members.map(m => (
+            <MemberRow
+              key={m._id}
+              member={m}
+              canSeeStatus={canInvite}
+              canEdit={canEdit}
+              onEdit={handleEditMember}
+            />
+          ))
         )}
       </div>
 
@@ -271,6 +389,13 @@ export default function MembersPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onInvited={fetchData}
+      />
+
+      <EditMemberDrawer
+        member={editingMember}
+        open={editDrawerOpen}
+        onClose={handleEditClose}
+        onSaved={fetchData}
       />
     </div>
   );
