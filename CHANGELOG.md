@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.7.1] - 2026-05-06
+
+### Fixed
+- **Savings page — merged member's new entries appear under phantom group**: after the Farai/Katongo record merge, the old soft-deleted `GroupMember` records still existed in the database with earlier ObjectIds. All six `GroupMember.findOne({ name, groupScope })` calls across `savingsController`, `loanController`, and `paymentController` lacked `active: true, deletedAt: null` filters, so MongoDB returned the soft-deleted record first in natural order. New savings, loans, and fines were therefore attached to the deleted record's `_id` instead of the active one — causing data to appear as a separate phantom group on the savings page rather than under the merged member. Fixed by adding `active: true, deletedAt: null` to all six lookup sites.
+- **Farai Liwewe — month 5 saving re-pointed to correct record**: the month 5 saving added during post-merge testing was attached to the old soft-deleted `_id` before the above fix was deployed. Corrected directly in production via `Saving.updateMany({ userId: oldId }, { $set: { userId: newId } })`. Farai's savings page now shows all five months under a single group (K17,000 total).
+
+---
+
 ## [3.7.0] - 2026-05-06
 
 ### Fixed
