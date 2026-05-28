@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-05-28
+
+### Added
+- **Contributions feature — dual-balance backend**: groups can now record member contributions that route to one of two separate pots. "Admin Fee" and similar operational collections credit the main lending pool (`BankBalance`); "Social Fund" contributions credit a separate non-lendable pot (`SocialFundBalance`). The recorder can override the type's default routing per transaction; the override is stored immutably on the `Contribution` row (`overrodeDefault: true`) and never re-derived.
+- **`ContributionType` model**: treasurer-configured catalog of contribution kinds per group. Case-insensitive unique index prevents "Admin fee" / "Admin Fee" duplicates. Types are never hard-deleted — only toggled via `active` — so historical `Contribution` rows always have a valid `contributionTypeId`. Two defaults seeded on every new group: "Admin Fee" (→ main balance) and "Social Fund" (→ social fund pot).
+- **`Contribution` model**: one row per recorded contribution. Stores a denormalized `typeName` snapshot (preserves display even if the type is later renamed) and the resolved `affectsMainBalance` value at record time (self-describing for audit/reports regardless of subsequent type changes — same defensive pattern as `Fine.username`).
+- **`SocialFundBalance` model**: single-document social fund pot per group; structurally mirrors `BankBalance`. `updateSocialFundBalance(amount, groupId, session)` helper in `socialFundController.js` mirrors `updateBankBalance`.
+- **`SocialFundExpense` model**: debit side of the social fund mini-ledger. Amount stored positive; direction implied by the `social_fund_debit` transaction type. Supports optional `beneficiaryMemberId` (internal member) or `beneficiaryName` (external free-text payee). Includes `cancelled`/`cancelledAt`/`cancelReason` fields ready for a future void endpoint.
+- **Transaction type enum extended**: three new types — `contribution` (main-balance credit), `social_fund_credit` (social fund credit), `social_fund_debit` (social fund debit). `social_fund_*` types are explicitly excluded from the main-balance audit to prevent false discrepancies.
+- **API routes** (`POST/GET /api/contribution-types`, `PATCH /api/contribution-types/:id`, `POST/GET /api/contributions`, `GET /api/social-fund/balance`, `POST/GET /api/social-fund/expenses`): full middleware chain (`verifyToken → resolveGroup → checkTrial → allowRoles`). Members are read-only on all contribution endpoints; only admin/treasurer can manage types or record expenses; admin/treasurer/loan_officer can record contributions.
+- **Atomic flows** (`session.withTransaction`): both `recordContribution` and `recordExpense` are fully atomic — Contribution/Expense row → Transaction log → balance mutation → back-link save, all in one session. Any failure rolls back completely; no partial writes are possible.
+- **Overspend guard**: `recordExpense` reads the current `SocialFundBalance` inside the transaction and rejects any expense that would take the balance negative. Returns 400 with the available balance in the error message.
+- **Group seeding**: `groupController.createGroup` and `adminGroupsController.createGroup` both seed a zeroed `SocialFundBalance` and the two default `ContributionType` docs inside their existing `withTransaction`, so a group is never half-provisioned. Uses `{ ordered: true }` on `ContributionType.create` (required by Mongoose 8.x for multi-doc inserts within a session).
+- **`scripts/seedContributionDefaults.js`**: idempotent backfill script for existing groups created before this feature. Iterates all non-deleted groups; creates `SocialFundBalance` and the two default types only if missing. Safe to re-run.
+- **`scripts/auditSocialFund.js`**: dedicated social fund balance audit — replays all `social_fund_credit` / `social_fund_debit` transactions and compares the calculated total to the stored `SocialFundBalance`.
+- **`scripts/auditBankBalance.js` patched**: added explicit `case 'contribution': balanceEffect = amount` and `case 'social_fund_credit': case 'social_fund_debit': balanceEffect = 0` branches. The previous `default: balanceEffect = amount` catch-all would have silently folded social-fund transactions into the main-balance calculation and reported false discrepancies.
+- **Backend tests** (`tests/contributionController.test.js`): 10 Jest tests using `MongoMemoryReplSet` (replica set required for `session.withTransaction`). Covers: main-balance happy path (asserts BankBalance +amount, SocialFundBalance unchanged), social-fund happy path (asserts SocialFundBalance +amount, BankBalance unchanged), per-transaction override toggle (stored `overrodeDefault: true`), rollback/no-partial-writes on invalid type, expense reduces social fund balance, overspend guard 400, member 403 on record and type-create, cross-group isolation, new-group seeding verification.
+
+---
+
 ## [3.8.2] - 2026-05-28
 
 ### Added
