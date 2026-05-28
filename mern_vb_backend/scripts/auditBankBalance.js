@@ -64,8 +64,15 @@ const auditBankBalance = async () => {
         case 'fine':
           balanceEffect = amount; // Fine payments increase bank balance
           break;
+        case 'contribution':
+          balanceEffect = amount; // Main-balance contribution credits the lending pool
+          break;
         case 'cycle_reset':
           balanceEffect = 0; // No immediate effect, just tracking
+          break;
+        case 'social_fund_credit':
+        case 'social_fund_debit':
+          balanceEffect = 0; // Social fund transactions are tracked separately — not part of main balance
           break;
         default:
           balanceEffect = amount; // Default to adding

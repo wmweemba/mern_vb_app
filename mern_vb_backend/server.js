@@ -34,6 +34,9 @@ app.use('/api/invites', require('./routes/invites'));
 app.use('/api/billing', require('./routes/billingRoutes'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/contribution-types', require('./routes/contributionTypes'));
+app.use('/api/contributions', require('./routes/contributions'));
+app.use('/api/social-fund', require('./routes/socialFund'));
 
 const clientOptions = {
   serverApi: {

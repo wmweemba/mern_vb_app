@@ -3,6 +3,8 @@ const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const GroupSettings = require('../models/GroupSettings');
 const BankBalance = require('../models/BankBalance');
+const SocialFundBalance = require('../models/SocialFundBalance');
+const ContributionType = require('../models/ContributionType');
 const { logAdminAction } = require('../utils/auditLog');
 
 // GET /api/admin/groups?includeDeleted=true|false
@@ -115,6 +117,13 @@ exports.createGroup = async (req, res) => {
       }], { session });
 
       await BankBalance.create([{ balance: 0, groupId: group._id }], { session });
+
+      await SocialFundBalance.create([{ balance: 0, groupId: group._id }], { session });
+
+      await ContributionType.create([
+        { groupId: group._id, name: 'Admin Fee',   affectsMainBalance: true,  isDefault: true, active: true },
+        { groupId: group._id, name: 'Social Fund', affectsMainBalance: false, isDefault: true, active: true },
+      ], { session, ordered: true });
 
       result = group;
     });

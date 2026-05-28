@@ -86,29 +86,10 @@ cd mern-vb-frontend && pnpm dev   # frontend only (vite)
 | Transaction | Transaction.js | Full audit trail of all money movement |
 | Fine | Fine.js | Fines/penalties with paid/unpaid status |
 | Threshold | Threshold.js | Loan eligibility thresholds |
-
-### Sprint Goal: Add groupSettings Model
-
-**This is the primary technical goal of Week 1.**
-
-```js
-// mern_vb_backend/models/GroupSettings.js — TO BE BUILT
-{
-  groupId: ObjectId,            // reference to group (future multi-group)
-  cycleLengthMonths: Number,    // 6 or 12
-  interestRate: Number,         // percent per loan (e.g. 10)
-  interestMethod: String,       // "reducing" | "flat"
-  loanLimitMultiplier: Number,  // max loan = X × member savings
-  lateFineAmount: Number,       // ZMW amount or percentage value
-  lateFineType: String,         // "fixed" | "percentage"
-  profitSharingMethod: String   // "proportional" | "equal"
-}
-```
-
-William's group current values (to seed as first GroupSettings document):
-- cycleLengthMonths: 6
-- interestMethod: "reducing"
-- profitSharingMethod: "proportional" (savings) + "equal" (loan interest)
+| ContributionType | ContributionType.js | Treasurer-configured catalog of contribution kinds (e.g. "Admin Fee", "Social Fund"); per-group; soft-deleted only |
+| Contribution | Contribution.js | One row per recorded contribution; denormalized `typeName` snapshot; resolved `affectsMainBalance` + `overrodeDefault` stored at record time |
+| SocialFundBalance | SocialFundBalance.js | Single-doc social fund pot per group (mirrors BankBalance structure) |
+| SocialFundExpense | SocialFundExpense.js | Debit side of social fund mini-ledger; amount stored positive; direction implied by transaction type |
 
 ---
 
@@ -116,16 +97,24 @@ William's group current values (to seed as first GroupSettings document):
 
 ### Bank Balance Formula
 ```
-Bank Balance = Starting Balance (cycle_reset)
-             + All Savings Deposits      (+)
-             + All Loan Payments         (+)
-             + All Fine Payments         (+)
-             - All Loan Disbursements    (-)
-             - All Payouts               (-)
+Bank Balance (lending pool) = Starting Balance (cycle_reset)
+             + All Savings Deposits              (saving)        (+)
+             + All Loan Payments                 (loan_payment)  (+)
+             + All Fine Payments                 (fine, paid)    (+)
+             + All Main-Balance Contributions    (contribution)  (+)  ← NEW
+             - All Loan Disbursements            (loan)          (-)
+             - All Payouts                       (payout)        (-)
+```
+
+**social_fund_credit** and **social_fund_debit** are NOT part of the main balance.
+
+```
+Social Fund Balance = Σ social_fund_credit  (contributions where affectsMainBalance=false)  (+)
+                    - Σ social_fund_debit    (expenses)                                      (-)
 ```
 
 ### Transaction Types (Transaction model enum)
-`['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset']`
+`['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset', 'contribution', 'social_fund_credit', 'social_fund_debit']`
 
 ### Interest Calculation (utils/loanCalculator.js)
 **This is the most critical file in the backend. Treat with extreme care.**
@@ -422,8 +411,33 @@ If anything is not clean, state what failed and fix it first.
 | Global state | `mern-vb-frontend/src/store/` |
 | PDF/Excel export | `mern-vb-frontend/src/lib/export.js` |
 | Balance audit scripts | `mern_vb_backend/scripts/auditBankBalance.js` |
+| Social fund audit | `mern_vb_backend/scripts/auditSocialFund.js` |
+| Contribution recording | `mern_vb_backend/controllers/contributionController.js` |
+| Social fund expense | `mern_vb_backend/controllers/socialFundController.js` |
+| Contribution type config | `mern_vb_backend/controllers/contributionTypeController.js` |
+| Backfill existing groups | `mern_vb_backend/scripts/seedContributionDefaults.js` |
 
 ---
 
-*Last updated: April 1, 2026 — Sprint kickoff*
+## Contributions Feature — Architecture Notes
+
+Added 2026-05-28. Key decisions recorded here to prevent regression:
+
+1. **Dual-balance routing** — each `ContributionType` has `affectsMainBalance` (bool). Contributions route to either `BankBalance` (main lending pool) or `SocialFundBalance` (separate non-lendable pot). The recorder can override per-transaction; the override is stored as `overrodeDefault: true` on the `Contribution` row and never re-derived.
+
+2. **Denormalized `typeName` on Contribution** — same defensive pattern as `Fine.username`. If a type is renamed or deactivated later, historical records still show the name used at record time.
+
+3. **ContributionTypes are never hard-deleted** — only `active` is toggled. Deactivated types can't accept new contributions, but old Contribution rows keep a valid `contributionTypeId`.
+
+4. **Transaction.userId for social-fund expenses** — the schema requires `userId: required: true`. For expenses with no member beneficiary, `userId` is set to `recordedBy` (the recording treasurer). The true beneficiary detail lives on `SocialFundExpense.beneficiaryMemberId`/`beneficiaryName`.
+
+5. **Seeding** — every new group gets a zeroed `SocialFundBalance` and two default `ContributionType` docs ("Admin Fee" → main, "Social Fund" → pot). `scripts/seedContributionDefaults.js` backfills existing groups idempotently.
+
+6. **Mongoose 8.x `create([...], { session })` with multiple docs** — requires `{ session, ordered: true }` or the operation throws. This is why the two ContributionType seed rows use `{ session, ordered: true }`.
+
+7. **Audit script safety** — `auditBankBalance.js` explicitly handles `social_fund_credit`/`social_fund_debit` as `balanceEffect = 0` (excluded from main pool). The prior `default: balanceEffect = amount` catch-all would have silently counted them, producing false discrepancies.
+
+---
+
+*Last updated: 2026-05-28 — contributions feature backend added*
 *Next review: April 7 (Week 1 checkpoint)*
