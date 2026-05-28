@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.2] - 2026-05-28
+
+### Added
+- **Loan repayment schedule — running outstanding balance column**: each installment row in the repayment schedule now shows a "Bal" column — the remaining principal owed after that installment's principal slice is paid. Computed as a running total starting at the full loan amount, subtracting each installment's principal in sequence; the final row always shows K0. The opening loan amount is displayed as a label ("Loan Amount: K[X]") above the table for reference. "Principal:" / "Interest:" labels abbreviated to "P:" / "Int:" to keep the row compact on mobile now that an extra column is present.
+- **Partial payment state indicator**: when an installment has `paidAmount > 0` but `paid = false` (partial payment), a second line appears beneath the row showing `Interest: Paid ✓ | Principal: K[X] remaining` (or `Interest: K[X] paid` if interest itself is partially covered). Replaces the previous undifferentiated "Remaining" figure with an unambiguous breakdown of which portion of the installment has been settled.
+
+---
+
 ## [3.8.1] - 2026-05-06
 
 ### Fixed
