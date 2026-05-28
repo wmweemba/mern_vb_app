@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.1] - 2026-05-28
+
+### Added
+- **Contributions page (`/contributions`)**: new full-page view accessible to all authenticated users. Shows two summary cards (total collected with main/fund split, and current social fund balance), then a two-tab layout — "Member Contributions" and "Social Fund". Contributions tab groups entries by member in an accordion (matching the Savings page pattern) with type badge, routing badge (Main / Social Fund), and an override warning when the recorder flipped the type's default routing. A type-filter dropdown narrows the list by contribution type. Social Fund tab shows a balance hero card with an inline "+ Expense" button for admin/treasurer, plus a combined ledger of all credits and expenses sorted newest-first with a running balance column.
+- **Contribution Types settings panel (`ContributionTypesManager`)**: new settings section visible to admin and treasurer only. Lists all `ContributionType` documents for the group with their routing badge (Main Account / Social Fund) and active/inactive status. Inline "Add Type" form with a two-button routing selector that makes it visually obvious where money goes. Existing non-default types can be renamed inline. Active/inactive is toggled with a single click — deactivated types stop accepting new contributions but historical records remain intact.
+- **Add Contribution form** (`AddContributionForm`): slide-over drawer form matching the `AddSavingsForm` pattern. Member select, type dropdown (fetches active types from `GET /api/contribution-types?active=true`), amount, date, notes. After a type is selected, a routing toggle appears pre-filled from the type's default and is fully editable — a "routing overridden" warning appears when the recorder changes it. Dispatches a `contributionsChanged` window event on success so the dashboard and contributions page refresh automatically.
+- **Record Social Fund Expense form** (`RecordSocialFundExpenseForm`): slide-over drawer form with amount, category dropdown (Birthday / Bereavement / Stationery / Refreshments / Other), required description, date, and an optional member beneficiary via `MemberSelect`. Dispatches `contributionsChanged` on success.
+- **Social Fund Balance card on Dashboard**: `Dashboard.jsx` now fetches `GET /api/social-fund/balance` in its existing `Promise.all` alongside savings, bank balance, and fines. `DashboardStatsCard` updated to show two side-by-side hero cards — "Bank Balance" (lending pool, dark background) and "Social Fund" (light card, blue accent). Hero card relabelled from "Total Group Balance" to "Bank Balance" to disambiguate the two pots. Dashboard listens to both `loanDataChanged` and `contributionsChanged` events to stay current.
+- **Contributions action group in OperationsPage**: new "Contributions" section between Fines and Administration with two action cards — "Record Contribution" (admin/treasurer/loan_officer) and "Record Social Fund Expense" (admin/treasurer only). Both open `SlideoverDrawer` forms inline.
+- **Navigation**: "Contributions" link added to `DesktopSidebar` between Loans and Reports using the `Coins` icon from lucide-react.
+
+### Fixed
+- **`DashboardStatsCard` test updated**: the hero card text changed from "Total Group Balance" to "Bank Balance"; `src/__tests__/DashboardStatsCard.test.js` updated to match.
+
+---
+
 ## [3.9.0] - 2026-05-28
 
 ### Added
