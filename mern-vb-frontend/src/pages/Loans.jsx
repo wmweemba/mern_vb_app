@@ -103,31 +103,50 @@ const Loans = () => {
                     <span>Duration: {loan.durationMonths} months</span>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-widest text-text-secondary mb-2">Repayment Schedule</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium uppercase tracking-widest text-text-secondary">Repayment Schedule</p>
+                      <p className="text-xs text-text-secondary">Loan Amount: <span className="font-semibold text-text-primary">K{Number(loan.amount).toLocaleString()}</span></p>
+                    </div>
                     <div className="rounded-md border border-border-default overflow-hidden">
-                      {loan.installments.map(inst => {
-                        const paidAmount = inst.paidAmount || 0;
-                        const remainingAmount = Math.max(0, (inst.total || 0) - paidAmount);
-                        return (
-                          <div key={inst.month} className="flex flex-wrap justify-between px-3 py-2 border-b border-border-default last:border-b-0 text-xs items-center gap-2 bg-surface-card">
-                            <span className="font-medium text-text-primary">Month {inst.month}</span>
-                            <span className="text-text-secondary">Principal: K{Number(inst.principal).toLocaleString()}</span>
-                            <span className="text-text-secondary">Interest: K{Number(inst.interest).toLocaleString()}</span>
-                            <span className="font-semibold text-text-primary">Total: K{Number(inst.total).toLocaleString()}</span>
-                            <span className={inst.paid ? 'text-status-paid-text' : 'text-status-overdue-text'}>
-                              {inst.paid ? <FaCheckCircle /> : <FaTimesCircle />}
-                            </span>
-                            <span className="text-amount-positive font-semibold">Paid: K{Number(paidAmount).toLocaleString()}</span>
-                            <span className="text-status-pending-text">Remaining: K{Number(remainingAmount).toLocaleString()}</span>
-                            {canEditLoan && inst.paid && (
-                              <button
-                                className="px-2 py-1 bg-status-overdue-bg border border-status-overdue-text text-status-overdue-text rounded text-xs hover:opacity-80 transition-opacity"
-                                onClick={() => setReversing({ loan, month: inst.month })}
-                              >Reverse</button>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {(() => {
+                        let runningBalance = loan.amount;
+                        return loan.installments.map(inst => {
+                          const paidAmount = inst.paidAmount || 0;
+                          const isPartial = paidAmount > 0 && !inst.paid;
+                          const interestPaid = isPartial && paidAmount >= inst.interest;
+                          const principalRemaining = isPartial
+                            ? Math.max(0, inst.principal - Math.max(0, paidAmount - inst.interest))
+                            : 0;
+                          runningBalance -= inst.principal;
+                          const outstandingBalance = Math.max(0, runningBalance);
+                          return (
+                            <div key={inst.month} className="flex flex-wrap justify-between px-3 py-2 border-b border-border-default last:border-b-0 text-xs items-center gap-x-3 gap-y-1 bg-surface-card">
+                              <span className="font-medium text-text-primary">Month {inst.month}</span>
+                              <span className="text-text-secondary">P: K{Number(inst.principal).toLocaleString()}</span>
+                              <span className="text-text-secondary">Int: K{Number(inst.interest).toLocaleString()}</span>
+                              <span className="font-semibold text-text-primary">Total: K{Number(inst.total).toLocaleString()}</span>
+                              <span className={inst.paid ? 'text-status-paid-text' : 'text-status-overdue-text'}>
+                                {inst.paid ? <FaCheckCircle /> : <FaTimesCircle />}
+                              </span>
+                              <span className="text-amount-positive font-semibold">Paid: K{Number(paidAmount).toLocaleString()}</span>
+                              <span className="font-semibold text-text-primary">Bal: K{outstandingBalance.toLocaleString()}</span>
+                              {isPartial && (
+                                <span className="w-full text-status-pending-text mt-0.5">
+                                  Interest: {interestPaid ? 'Paid ✓' : `K${Number(paidAmount).toLocaleString()} paid`}
+                                  {' | '}
+                                  Principal: K{Number(principalRemaining).toLocaleString()} remaining
+                                </span>
+                              )}
+                              {canEditLoan && inst.paid && (
+                                <button
+                                  className="px-2 py-1 bg-status-overdue-bg border border-status-overdue-text text-status-overdue-text rounded text-xs hover:opacity-80 transition-opacity"
+                                  onClick={() => setReversing({ loan, month: inst.month })}
+                                >Reverse</button>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
 
