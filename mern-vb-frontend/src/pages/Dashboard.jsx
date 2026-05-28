@@ -18,15 +18,17 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true); setError('');
     try {
-      const [dashboardRes, balRes, fineRes] = await Promise.all([
+      const [dashboardRes, balRes, fineRes, sfRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/savings/dashboard`),
         axios.get(`${API_BASE_URL}/bank-balance`),
         axios.get(`${API_BASE_URL}/bank-balance/fines`),
+        axios.get(`${API_BASE_URL}/social-fund/balance`),
       ]);
       setStats({
         ...dashboardRes.data,
         bankBalance: balRes.data.balance,
         totalFines: fineRes.data.totalFines,
+        socialFundBalance: sfRes.data.balance,
       });
     } catch {
       setError('Failed to load dashboard stats');
@@ -37,9 +39,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
-    const handleLoanDataChange = () => fetchStats();
-    window.addEventListener('loanDataChanged', handleLoanDataChange);
-    return () => window.removeEventListener('loanDataChanged', handleLoanDataChange);
+    const refresh = () => fetchStats();
+    window.addEventListener('loanDataChanged', refresh);
+    window.addEventListener('contributionsChanged', refresh);
+    return () => {
+      window.removeEventListener('loanDataChanged', refresh);
+      window.removeEventListener('contributionsChanged', refresh);
+    };
   }, []);
 
   return (

@@ -9,6 +9,8 @@ import {
   Landmark,
   RefreshCw,
   PiggyBank,
+  Coins,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../store/auth';
 import ManagePaymentModal from '../components/ui/ManagePaymentModal';
@@ -16,6 +18,9 @@ import AddFineModal from '../components/ui/AddFineModal';
 import FinesModal from '../components/ui/FinesModal';
 import ManageBankBalanceModal from '../components/ui/ManageBankBalanceModal';
 import BeginNewCycleModal from '../components/ui/BeginNewCycleModal';
+import SlideoverDrawer from '../components/ui/SlideoverDrawer';
+import AddContributionForm from '../features/contributions/AddContributionForm';
+import RecordSocialFundExpenseForm from '../features/contributions/RecordSocialFundExpenseForm';
 
 const hasRole = (user, roles) => roles.includes(user?.role);
 
@@ -29,6 +34,8 @@ export default function OperationsPage() {
   const [showFinesModal, setShowFinesModal] = useState(false);
   const [showBankBalance, setShowBankBalance] = useState(false);
   const [showNewCycle, setShowNewCycle] = useState(false);
+  const [showContribution, setShowContribution] = useState(false);
+  const [showExpense, setShowExpense] = useState(false);
 
   const openPayment = (type) => {
     setPaymentType(type);
@@ -78,6 +85,25 @@ export default function OperationsPage() {
           description: 'Review all fines, edit amounts, or void cancelled penalties',
           roles: ['admin', 'treasurer', 'loan_officer'],
           action: () => setShowFinesModal(true),
+        },
+      ],
+    },
+    {
+      label: 'Contributions',
+      items: [
+        {
+          icon: Coins,
+          title: 'Record Contribution',
+          description: 'Record a member\'s contribution — admin fee, social fund, or custom type',
+          roles: ['admin', 'treasurer', 'loan_officer'],
+          action: () => setShowContribution(true),
+        },
+        {
+          icon: Wallet,
+          title: 'Record Social Fund Expense',
+          description: 'Disburse funds from the social fund for group welfare expenses',
+          roles: ['admin', 'treasurer'],
+          action: () => setShowExpense(true),
         },
       ],
     },
@@ -172,6 +198,38 @@ export default function OperationsPage() {
         onClose={() => setShowNewCycle(false)}
         onSuccess={() => window.location.reload()}
       />
+
+      <SlideoverDrawer
+        open={showContribution}
+        onClose={() => setShowContribution(false)}
+        title="Record Contribution"
+        footer={
+          <button type="submit" form="add-contribution-form" className="w-full bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md py-3 text-sm transition-colors">
+            Record Contribution
+          </button>
+        }
+      >
+        <AddContributionForm
+          formId="add-contribution-form"
+          onSuccess={() => setShowContribution(false)}
+        />
+      </SlideoverDrawer>
+
+      <SlideoverDrawer
+        open={showExpense}
+        onClose={() => setShowExpense(false)}
+        title="Record Social Fund Expense"
+        footer={
+          <button type="submit" form="record-expense-form" className="w-full bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md py-3 text-sm transition-colors">
+            Record Expense
+          </button>
+        }
+      >
+        <RecordSocialFundExpenseForm
+          formId="record-expense-form"
+          onSuccess={() => setShowExpense(false)}
+        />
+      </SlideoverDrawer>
     </div>
   );
 }

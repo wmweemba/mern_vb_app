@@ -17,7 +17,7 @@ describe('DashboardStatsCard', () => {
     expect(screen.getByText(/Total Loaned/i)).toBeInTheDocument();
     expect(screen.getByText(/Interest \(Savings\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Interest \(Loans\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Total Group Balance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bank Balance/i)).toBeInTheDocument();
     expect(screen.getByText(/Total Fines/i)).toBeInTheDocument();
     expect(screen.getByText('K10,000')).toBeInTheDocument();
     expect(screen.getByText('K5,000')).toBeInTheDocument();

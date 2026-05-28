@@ -18,6 +18,7 @@ import Onboarding from './pages/Onboarding';
 import Welcome from './pages/Welcome';
 import InviteAccept from './pages/InviteAccept';
 import OperationsPage from './pages/OperationsPage';
+import Contributions from './pages/Contributions';
 import AdminShell from './components/layout/AdminShell';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminGroupsList from './pages/admin/AdminGroupsList';
@@ -169,6 +170,11 @@ function AppRoutes() {
               <OperationsPage />
             </RoleRoute>
           </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/contributions" element={
+        <ProtectedRoute>
+          <Layout><Contributions /></Layout>
         </ProtectedRoute>
       } />
 

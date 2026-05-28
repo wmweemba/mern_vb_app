@@ -6,6 +6,7 @@ import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import GroupProfileDrawer from '../components/settings/GroupProfileDrawer';
 import FinancialRulesDrawer from '../components/settings/FinancialRulesDrawer';
+import ContributionTypesManager from '../components/settings/ContributionTypesManager';
 
 function SectionCard({ title, onEdit, children }) {
   return (
@@ -47,6 +48,7 @@ export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === 'admin';
+  const canManageTypes = ['admin', 'treasurer'].includes(user?.role);
   const [profileOpen, setProfileOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
 
@@ -87,6 +89,16 @@ export default function Settings() {
               <Field label="Profit Sharing Method" value={fmtProfitSharing(settings?.profitSharingMethod)} />
             </div>
           </SectionCard>
+
+          {/* Contribution Types — admin and treasurer only */}
+          {canManageTypes && (
+            <SectionCard title="Contribution Types">
+              <p className="text-sm text-text-secondary mb-4">
+                Configure which contribution types are available and where they are routed — to the main lending account or the social fund pot.
+              </p>
+              <ContributionTypesManager />
+            </SectionCard>
+          )}
 
           {/* Fine Rules */}
           <SectionCard title="Fine Rules">
