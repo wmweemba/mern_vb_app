@@ -114,6 +114,7 @@ exports.createGroup = async (req, res) => {
         savingsInterestRate: 10, minimumSavingsMonth1: 3000, minimumSavingsMonthly: 1000,
         maximumSavingsFirst3Months: 5000, savingsShortfallFine: 500,
         profitSharingMethod: 'proportional', lateFineType: 'fixed',
+        partialPaymentFineAmount: 0,
       }], { session });
 
       await BankBalance.create([{ balance: 0, groupId: group._id }], { session });

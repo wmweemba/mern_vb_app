@@ -14,6 +14,8 @@ const fineSchema = new mongoose.Schema({
   cancelled: { type: Boolean, default: false },
   cancelledAt: { type: Date },
   cancelReason: { type: String },
+  loanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Loan', default: null },
+  installmentMonth: { type: Number, default: null },
   cycleNumber: { type: Number },
   cycleEndDate: { type: Date },
   archived: { type: Boolean, default: false }

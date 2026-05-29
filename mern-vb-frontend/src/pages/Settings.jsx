@@ -101,10 +101,11 @@ export default function Settings() {
           )}
 
           {/* Fine Rules */}
-          <SectionCard title="Fine Rules">
+          <SectionCard title="Fine Rules" onEdit={isAdmin ? () => setFinancialOpen(true) : undefined}>
             <div className="space-y-4">
               <Field label="Late Fine Amount" value={settings?.overdueFineAmount != null ? `K${settings.overdueFineAmount}` : null} />
               <Field label="Fine Type" value={fmtFineType(settings?.lateFineType)} />
+              <Field label="Partial Payment Fine" value={settings?.partialPaymentFineAmount != null ? (settings.partialPaymentFineAmount > 0 ? `K${settings.partialPaymentFineAmount}` : 'None') : null} />
             </div>
           </SectionCard>
         </>

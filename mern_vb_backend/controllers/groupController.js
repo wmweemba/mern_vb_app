@@ -14,6 +14,7 @@ exports.createGroup = async (req, res) => {
     meetingDay, cycleStartDate, cycleLengthMonths,
     interestRate, interestMethod, loanLimitMultiplier,
     lateFineAmount, lateFineType = 'fixed',
+    partialPaymentFineAmount,
   } = req.body;
 
   if (!groupName || !treasurerName) {
@@ -71,6 +72,7 @@ exports.createGroup = async (req, res) => {
         maximumSavingsFirst3Months: 5000,
         savingsShortfallFine: lateFineAmount || 500,
         profitSharingMethod: 'proportional',
+        partialPaymentFineAmount: partialPaymentFineAmount || 0,
       }], { session });
 
       await BankBalance.create([{ balance: 0, groupId: group._id }], { session });

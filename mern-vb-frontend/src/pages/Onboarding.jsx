@@ -43,6 +43,7 @@ export default function Onboarding() {
   // Step 3 fields
   const [lateFineAmount, setLateFineAmount] = useState(DEFAULTS.lateFineAmount);
   const [lateFineType, setLateFineType] = useState(DEFAULTS.lateFineType);
+  const [partialPaymentFineAmount, setPartialPaymentFineAmount] = useState(0);
 
   const handleSubmit = async () => {
     if (!groupName.trim() || !treasurerName.trim()) {
@@ -64,6 +65,7 @@ export default function Onboarding() {
         loanLimitMultiplier,
         lateFineAmount,
         lateFineType,
+        partialPaymentFineAmount,
       });
       await refreshMembership();
       setShowWelcome(true);
@@ -227,6 +229,13 @@ export default function Onboarding() {
                 <option value="percentage">Percentage of overdue amount</option>
               </select>
             </div>
+            <div>
+              <label className={labelClass}>Partial payment fine</label>
+              <input type="number" min="0" value={partialPaymentFineAmount}
+                onChange={e => setPartialPaymentFineAmount(Number(e.target.value))}
+                className={fieldClass} />
+              <p className={helpClass}>Optional. Charge a fine when a member pays only the interest and carries the principal forward. Set to 0 for no fine.</p>
+            </div>
             {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setStep(2)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
@@ -249,6 +258,7 @@ export default function Onboarding() {
               <p><span className="font-medium">Interest:</span> {interestRate}% ({interestMethod} balance)</p>
               <p><span className="font-medium">Loan limit:</span> {loanLimitMultiplier}x savings</p>
               <p><span className="font-medium">Late fine:</span> {lateFineType === 'fixed' ? `K${lateFineAmount}` : `${lateFineAmount}%`}</p>
+              <p><span className="font-medium">Partial payment fine:</span> {partialPaymentFineAmount > 0 ? `K${partialPaymentFineAmount}` : 'None'}</p>
               <p><span className="font-medium">Your role:</span> Admin</p>
               <p><span className="font-medium">Free trial:</span> 15 days</p>
             </div>

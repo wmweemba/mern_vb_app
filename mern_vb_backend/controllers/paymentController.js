@@ -1,5 +1,6 @@
 const { updateBankBalance } = require('./bankBalanceController');
 const { logTransaction } = require('./transactionController');
+const { getSettings } = require('./groupSettingsController');
 const GroupMember = require('../models/GroupMember');
 const Fine = require('../models/Fine');
 const Loan = require('../models/Loans');
@@ -103,6 +104,37 @@ exports.repayment = async (req, res) => {
       referenceId: loan._id,
       groupId: req.groupId
     }, session);
+
+    // Auto-fine: interest covered but principal carried forward
+    const partial = installmentsToUpdate.find(u => !u.willBePaid);
+    if (partial) {
+      const inst = loan.installments[partial.index];
+      if (partial.newPaidAmount >= inst.interest) {
+        const settings = await getSettings(req.groupId);
+        const fineAmount = Number(settings.partialPaymentFineAmount) || 0;
+        if (fineAmount > 0) {
+          const existing = await Fine.findOne({
+            ...req.groupScope,
+            userId,
+            loanId: loan._id,
+            installmentMonth: inst.month,
+            cancelled: { $ne: true },
+          }).session(session);
+          if (!existing) {
+            await Fine.create([{
+              ...req.groupScope,
+              userId,
+              username: member.name,
+              amount: fineAmount,
+              note: `Partial payment — Month ${inst.month} principal not paid`,
+              issuedBy: req.memberId,
+              loanId: loan._id,
+              installmentMonth: inst.month,
+            }], { session });
+          }
+        }
+      }
+    }
 
     await session.commitTransaction();
 

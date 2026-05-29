@@ -1,3 +1,7 @@
+// ⚠️  RETIRED — v3.10.0 (partial payments feature)
+// Partial payments make `paidAmount > 0` with `paid = false` a valid state.
+// Running this script after this version will silently destroy legitimate
+// partial payment records. Do not run.
 const mongoose = require('mongoose');
 require('dotenv').config();
 

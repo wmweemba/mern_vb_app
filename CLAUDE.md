@@ -234,7 +234,7 @@ These have caused bugs before. Don't repeat them.
 
 6. **Fines** — only credit bank balance when **paid**, not when issued. This distinction matters for balance accuracy.
 
-7. **Corrupt installment data** — `paid=false` but `paidAmount > 0` is a corruption state. Validation exists in reversal logic — maintain it.
+7. **Partial payment state** — `paid===false` with `paidAmount>0` is VALID after v3.9.1. This state means an installment has been partially paid (typically interest covered, principal outstanding). It is only a corruption signal if `paidAmount > installment total`. The old `scripts/fixCorruptedLoan.js` has been retired — do not restore or re-run it. See `RETIRED_fixCorruptedLoan.js` for history.
 
 ---
 
@@ -439,5 +439,25 @@ Added 2026-05-28. Key decisions recorded here to prevent regression:
 
 ---
 
-*Last updated: 2026-05-28 — contributions feature backend added*
+## Partial Payments Feature — Architecture Notes
+
+Added 2026-05-29. Key decisions recorded here to prevent regression:
+
+1. **Partial payment state is valid** — `paid===false && paidAmount > 0` is a legitimate installment state after a partial payment. It is NOT corruption. Only treat it as corruption if `paidAmount > installment.total`. `scripts/fixCorruptedLoan.js` has been retired as `RETIRED_fixCorruptedLoan.js` — do not restore or run it.
+
+2. **Auto-fine is opt-in per group** — `GroupSettings.partialPaymentFineAmount` (default `0`) controls the fine amount. Zero means no fine. The amount is always read from settings; never hardcoded. Use `Number(settings.partialPaymentFineAmount) || 0` defensively.
+
+3. **Detection condition** — a fine fires only when the partial installment has `newPaidAmount >= inst.interest` (interest covered, principal carried). Payment below interest does NOT fire a fine.
+
+4. **Duplicate prevention on Fine** — `Fine` model has two new nullable fields: `loanId` (ref: 'Loan') and `installmentMonth`. The auto-fine block does a `Fine.findOne({ loanId, installmentMonth, cancelled: { $ne: true } })` guard before creating. A voided fine does not block a new one. Never use description-string matching for deduplication.
+
+5. **Fine created inside the existing payment session** — `Fine.create([...], { session })` runs inside the same manual transaction as the installment update, bank balance update, and Transaction log. If any step fails, the entire payment rolls back atomically.
+
+6. **No reversal path for partial payments (pre-existing gap)** — `reverseInstallmentPayment` requires `installment.paid === true`. A partial installment (unpaid) cannot be reversed through it. Parked for future sprint. Current lever: void the auto-fine via `voidFine`.
+
+7. **Fine Rules settings drawer** — `partialPaymentFineAmount` is editable via `FinancialRulesDrawer.jsx` (not a separate drawer) and is included in the PUT `/api/group-settings` allowedFields whitelist.
+
+---
+
+*Last updated: 2026-05-29 — partial payments + auto-fine feature added*
 *Next review: April 7 (Week 1 checkpoint)*
