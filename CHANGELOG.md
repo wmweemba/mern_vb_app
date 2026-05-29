@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.0] - 2026-05-29
+
+### Added
+- **Flexible partial loan payments**: members can now make payments that cover only the interest portion of an installment and carry the principal forward. The installment state `paid=false` with `paidAmount>0` is fully supported and preserved across subsequent payments — a top-up payment later in the cycle picks up the same installment and credits the remaining principal correctly.
+- **Optional auto-fine on partial payment** (`GroupSettings.partialPaymentFineAmount`): treasurers can configure a fixed-amount fine (in ZMW) that is automatically issued whenever a member covers the interest but does not clear the principal. Default is `0` (no fine) — zero behavior change for existing groups. Configurable per group in the onboarding wizard (Step 3 "Fine Rules") and in Settings → Financial Rules.
+- **`Fine` model — `loanId` and `installmentMonth` fields**: two new nullable reference fields added to `Fine.js`. Used for field-based duplicate prevention — a group can only hold one non-cancelled auto-fine per loan installment. Voiding the fine re-opens the slot. Existing fine documents remain valid (fields default to `null`); no migration required.
+- **Duplicate-fine guard**: the repayment handler checks for an existing non-cancelled fine with the same `loanId` + `installmentMonth` before creating a new one. If a member makes multiple sub-full payments against the same installment, only one auto-fine is issued.
+- **Atomic session integration**: the auto-fine block runs inside the existing `paymentController.repayment` manual MongoDB transaction, after the installment mutation, bank balance update, and Transaction log but before `commitTransaction`. If fine creation throws, the entire payment rolls back — no orphan fines, no balance drift.
+- **Onboarding wizard — "Partial payment fine" input** (Step 3): `type="number"`, default `0`, with helper text explaining the rule. Included in the POST `/api/groups` body and shown in the Step 4 confirmation summary.
+- **Settings page — "Partial Payment Fine" read field**: displayed in the Fine Rules section, formatted as `K{amount}` or `"None"` when zero. Fine Rules section now has an Edit button wired to the existing Financial Rules drawer.
+- **`FinancialRulesDrawer.jsx` — `partialPaymentFineAmount` input**: editable number field included in the PUT `/api/group-settings` payload. Already passes the server-side `allowedFields` whitelist.
+- **Backend tests** (`tests/paymentController.test.js`): 7 new integration tests using `MongoMemoryReplSet`. Covers: interest-only payment fires fine (setting > 0), interest-only payment fires no fine (setting = 0), full installment payment fires no fine, duplicate-fine prevention (second sub-full payment on same installment → still one fine), session rollback when `Fine.create` throws (payment + balance + transaction all rolled back), payment below interest fires no fine, overpayment spanning two installments produces fine only on the partial month.
+
+### Changed
+- **`GroupSettings` schema**: added `partialPaymentFineAmount: { type: Number, default: 0, min: 0 }`. Non-required with a default, so existing documents are unaffected.
+- **`groupSettingsController.updateGroupSettings`**: `partialPaymentFineAmount` added to the `allowedFields` whitelist so Settings-page edits persist.
+- **`groupController.createGroup` and `adminGroupsController.createGroup`**: both seed `partialPaymentFineAmount: 0` in their `GroupSettings.create` payload.
+
+### Fixed (data safety)
+- **Retired `scripts/fixCorruptedLoan.js`** → renamed to `RETIRED_fixCorruptedLoan.js` with a header warning. The script reset any installment with `paid=false && paidAmount>0` to `paidAmount=0`, which would silently destroy legitimate partial payment records after this release. The script must not be run against any database using v3.10.0+.
+- **CLAUDE.md Known History #7 updated**: `paid=false && paidAmount>0` is now documented as a valid state. Corruption is defined only as `paidAmount > installment.total`.
+
+---
+
 ## [3.9.1] - 2026-05-28
 
 ### Added
