@@ -8,7 +8,7 @@
 **App name:** Chama360 (formerly Village Banking App, repo still named `mern_vb_app`)
 **What it does:** Village banking group management — savings, loans, fines, reports, cycle management
 **Who uses it:** Group treasurers, loan officers, admins, members in Zambia
-**Current version:** 2.1.0
+**Current version:** 3.10.0
 **Sprint context:** 30-day commercial launch sprint, April 1–30 2026. Target: 2 paying groups at ZMW 150–250/month.
 
 ---
@@ -234,7 +234,7 @@ These have caused bugs before. Don't repeat them.
 
 6. **Fines** — only credit bank balance when **paid**, not when issued. This distinction matters for balance accuracy.
 
-7. **Partial payment state** — `paid===false` with `paidAmount>0` is VALID after v3.9.1. This state means an installment has been partially paid (typically interest covered, principal outstanding). It is only a corruption signal if `paidAmount > installment total`. The old `scripts/fixCorruptedLoan.js` has been retired — do not restore or re-run it. See `RETIRED_fixCorruptedLoan.js` for history.
+7. **Partial payment state** — `paid===false` with `paidAmount>0` is VALID after v3.10.0. This state means an installment has been partially paid (typically interest covered, principal outstanding). It is only a corruption signal if `paidAmount > installment total`. The old `scripts/fixCorruptedLoan.js` has been retired — do not restore or re-run it. See `RETIRED_fixCorruptedLoan.js` for history.
 
 ---
 
