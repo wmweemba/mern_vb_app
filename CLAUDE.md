@@ -13,6 +13,31 @@
 
 ---
 
+## Second Brain Context
+
+William's cross-venture context lives in a separate repo:
+`/Users/williammweemba/Dev_Projects/wsm-second-brain` — read-only from here.
+
+At the start of a new session, or when a task needs context beyond this
+file, read:
+- `WILLIAM.md` — priorities, constraints, time budget, what NOT to suggest
+- `systems/NS-001-manual-payment-flow.md` — if touching billing/subscription logic
+- `systems/NS-002-security-audit.md` — before any deploy or when asked to
+  run a security pass
+- `systems/NS-005-in-app-support-system.md` — if touching the support
+  ticket system (Chama360 is its source implementation)
+
+Do not read the whole second-brain repo by default — it's a large
+multi-venture knowledge base and most of it (other ventures, relationships,
+admin) is irrelevant to Chama360 work. Pull specific files only when the
+task calls for them.
+
+If a session surfaces something that looks like it belongs in the second
+brain (a new gotcha, a completed milestone, a system worth extracting),
+flag it to William explicitly rather than writing it there yourself.
+
+---
+
 ## Repository Structure
 
 ```
