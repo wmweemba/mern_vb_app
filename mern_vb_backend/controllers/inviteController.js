@@ -7,7 +7,7 @@ const Group = require('../models/Group');
 const PendingInvite = require('../models/PendingInvite');
 
 const INVITE_SECRET = process.env.INVITE_JWT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://villagebanking.netlify.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://chama360.nxhub.online';
 
 exports.createInvite = async (req, res) => {
   const { name, phone, role } = req.body;
@@ -132,7 +132,7 @@ exports.inviteByEmail = async (req, res) => {
     const group = await Group.findById(req.groupId);
     const groupName = group?.name || 'your group';
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://villagebanking.netlify.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://chama360.nxhub.online';
     const signUpUrl = `${frontendUrl}/sign-up`;
     const roleLabel = { member: 'Member', treasurer: 'Treasurer', loan_officer: 'Loan Officer' }[inviteRole] || inviteRole;
 

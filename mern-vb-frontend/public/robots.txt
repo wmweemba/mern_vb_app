@@ -1,0 +1,77 @@
+# robots.txt — Chama360
+# Last updated: 2026-07-05
+#
+# Chama360 is an authenticated SaaS product. Nearly all routes require
+# sign-in and have no indexable content. Only the sign-in/sign-up entry
+# points and root are public.
+
+# General crawlers
+User-agent: *
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+Disallow: /dashboard
+Disallow: /loans
+Disallow: /savings
+Disallow: /thresholds
+Disallow: /reports
+Disallow: /users
+Disallow: /members
+Disallow: /settings
+Disallow: /upgrade
+Disallow: /operations
+Disallow: /contributions
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /welcome
+Disallow: /invite
+Disallow: /api
+
+# OpenAI (ChatGPT)
+User-agent: GPTBot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Anthropic (Claude)
+User-agent: ClaudeBot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Google AI (Gemini, Search Generative Experience)
+User-agent: GoogleOther
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Amazon (Alexa, AWS)
+User-agent: Amazonbot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Apple (Siri, Spotlight)
+User-agent: Applebot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+# Common SEO crawlers
+User-agent: Googlebot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+User-agent: Bingbot
+Allow: /
+Allow: /sign-in
+Allow: /sign-up
+
+Sitemap: https://chama360.nxhub.online/sitemap.xml

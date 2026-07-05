@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.3] - 2026-07-05
+
+### Added
+- **SEO + AI crawler visibility**: added `robots.txt`, `sitemap.xml`, and `llms.txt` to `mern-vb-frontend/public/`. Scoped to the app's actual public surface — `/`, `/sign-in`, `/sign-up` — since Chama360 is an authenticated SaaS product with no public marketing page (`/` redirects to `/dashboard`; everything else requires sign-in). `robots.txt` explicitly disallows all app/API routes while allowing named AI crawlers (GPTBot, ClaudeBot, PerplexityBot, GoogleOther, Amazonbot, Applebot) and standard search engine bots on the public pages.
+- **Meta tags, Open Graph, Twitter Card, and Schema.org JSON-LD** (`SoftwareApplication`) added to `mern-vb-frontend/index.html`.
+- **og:image asset**: `mern-vb-frontend/public/assets/images/og-cover.webp` (1200×630, ~24KB) — brand-gradient card with the app mark, wordmark, and feature pills, matching the existing icon/favicon gradient (`#D6622A` → `#B04216`). Rendered from an HTML template via headless Chrome and encoded to WebP.
+- **Google Search Console verification**: added `google-site-verification` meta tag to `index.html` for the `https://chama360.nxhub.online/` property. Verified as a separate URL-prefix property (not a domain-wide property) since `chama360.nxhub.online` and `bazabooks.nxhub.online` are distinct products sharing the `nxhub.online` domain and should not share Search Console data.
+
+### Fixed
+- **Stale Netlify domain references**: the app moved from Netlify to Coolify (`https://chama360.nxhub.online`) some time ago, but `CLAUDE.md`'s "Live URL"/CORS notes and `mern_vb_backend/controllers/inviteController.js`'s `FRONTEND_URL` fallback default still pointed at the retired `villagebanking.netlify.app`. If `FRONTEND_URL` were ever unset in production, invite emails would have linked to a dead domain. Both corrected to `https://chama360.nxhub.online`.
+
+---
+
 ## [3.10.2] - 2026-06-27
 
 ### Changed

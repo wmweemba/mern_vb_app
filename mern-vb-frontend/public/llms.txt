@@ -1,0 +1,44 @@
+# Chama360
+
+> Village banking group management software for savings, loans, fines, and cycle management, built for chama/village banking groups in Zambia.
+
+Chama360 is a web-based SaaS application that helps village banking group treasurers, loan officers, and members track group finances digitally instead of using paper ledgers or spreadsheets. It replaces manual bookkeeping with an auditable, role-based system for recording savings, disbursing and repaying loans, issuing fines, and closing out savings cycles.
+
+## Features
+
+- Savings: member deposits tracked per savings cycle
+- Loans: disbursement, repayment schedules, reducing-balance or flat-rate interest calculation
+- Fines: issue, track, and mark fines as paid; optional automatic fines on partial loan payments
+- Bank balance: single source of truth updated atomically with every transaction, with an audit script to verify integrity
+- Contributions: configurable contribution types (e.g. admin fees, social fund) routed to the main lending pool or a separate non-lendable social fund
+- Reports: PDF and Excel export of group financials per cycle
+- Cycle management: open and close savings cycles, profit sharing
+- Member management: invite members by email, role-based access control (admin, treasurer, loan officer, member)
+- Group onboarding: self-serve setup wizard with configurable per-group settings (interest method, fine amounts, loan limits, cycle length)
+- Multi-group support: each group's data, settings, and members are isolated
+- Trial and billing: trial period enforcement, upgrade flow via mobile money or bank transfer
+- Installable as a Progressive Web App (PWA) with offline support for static assets
+
+## Who We Serve
+
+Village banking groups (chamas/VSLAs) in Zambia — informal or semi-formal savings and lending circles typically run by a group treasurer, with members contributing savings and borrowing from the pooled fund. Built by and for a real operating group, so the calculation logic (reducing-balance interest, fine rules, partial payment handling) reflects genuine village banking practice rather than a generic loan calculator.
+
+## Roles
+
+- Admin: full access, including user management and cycle resets
+- Treasurer: bank balance, payments, reports, fines
+- Loan officer: loans, savings, member operations, repayments
+- Member: read-only access to their own personal data
+
+## Access
+
+Chama360 is an authenticated application — group data is private to each group's members. There is no public browsing of group financials. Sign-up and sign-in are the public entry points; all financial data lives behind login.
+
+## Contact
+
+- Website: https://chama360.nxhub.online
+- Country: Zambia
+
+## Pricing
+
+Subscription-based, billed per group via mobile money or bank transfer. See the in-app upgrade flow for current pricing.

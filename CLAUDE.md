@@ -85,9 +85,10 @@ mern_vb_app/                    ← monorepo root
 - **PWA:** vite-plugin-pwa + Workbox service worker
 
 ### Deployment
-- **Frontend:** Netlify (deploy `dist/` folder)
-- **Backend:** Render (Node.js server)
-- **Live URL:** https://villagebanking.netlify.app/
+- **Frontend:** Coolify (Vite static build served via Caddy)
+- **Backend:** Coolify (Node.js server, nixpacks build)
+- **Live URL:** https://chama360.nxhub.online/
+- **API URL:** https://api.chama360.nxhub.online/
 
 ### Development
 ```bash
@@ -314,7 +315,7 @@ VITE_API_URL=https://your-backend-on-render.com/api
 ```
 
 ### CORS
-Backend must allow the Netlify frontend domain. Check `server.js` cors config when deploying changes.
+Backend must allow the `chama360.nxhub.online` frontend domain. Check `server.js` cors config when deploying changes.
 
 ---
 
