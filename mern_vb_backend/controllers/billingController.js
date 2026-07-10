@@ -2,6 +2,9 @@ const { Resend } = require('resend');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const { getAuth } = require('@clerk/express');
+const PLANS = require('../config/plans');
+
+exports.listPlans = (req, res) => res.json(PLANS);
 
 exports.requestUpgrade = async (req, res) => {
   try {

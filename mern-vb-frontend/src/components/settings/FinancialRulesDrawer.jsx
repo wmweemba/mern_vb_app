@@ -9,7 +9,6 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
   const [interestMethod, setInterestMethod] = useState('reducing');
   const [loanLimitMultiplier, setLoanLimitMultiplier] = useState('');
   const [profitSharingMethod, setProfitSharingMethod] = useState('proportional');
-  const [partialPaymentFineAmount, setPartialPaymentFineAmount] = useState('0');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -19,7 +18,6 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
       setInterestMethod(settings.interestMethod || 'reducing');
       setLoanLimitMultiplier(String(settings.loanLimitMultiplier ?? ''));
       setProfitSharingMethod(settings.profitSharingMethod || 'proportional');
-      setPartialPaymentFineAmount(String(settings.partialPaymentFineAmount ?? '0'));
       setError(null);
     }
   }, [settings, open]);
@@ -44,7 +42,6 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
         interestMethod,
         loanLimitMultiplier: multiplier,
         profitSharingMethod,
-        partialPaymentFineAmount: Number(partialPaymentFineAmount) || 0,
       };
       const res = await axios.put(`${API_BASE_URL}/group-settings`, payload);
       toast.success('Financial rules updated');
@@ -129,18 +126,6 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
               <option value="proportional">Proportional (by savings)</option>
               <option value="equal">Equal split</option>
             </select>
-          </div>
-          <div>
-            <p className={labelClass}>Partial Payment Fine (K)</p>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              value={partialPaymentFineAmount}
-              onChange={(e) => setPartialPaymentFineAmount(e.target.value)}
-              className={inputClass}
-            />
-            <p className="text-xs text-text-muted mt-1">Fine issued when a member covers interest but carries the principal forward. Set to 0 for no fine.</p>
           </div>
         </div>
       </form>

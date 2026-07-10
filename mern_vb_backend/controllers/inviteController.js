@@ -5,6 +5,7 @@ const InviteToken = require('../models/InviteToken');
 const GroupMember = require('../models/GroupMember');
 const Group = require('../models/Group');
 const PendingInvite = require('../models/PendingInvite');
+const { getMemberLimitStatus } = require('../utils/planLimits');
 
 const INVITE_SECRET = process.env.INVITE_JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://chama360.nxhub.online';
@@ -73,6 +74,16 @@ exports.acceptInvite = async (req, res) => {
   });
   if (existing) return res.status(409).json({ error: 'Already a member of this group' });
 
+  const group = await Group.findById(payload.groupId);
+  if (!group) return res.status(404).json({ error: 'Group not found' });
+  const { plan, atLimit } = await getMemberLimitStatus(group);
+  if (atLimit) {
+    return res.status(403).json({
+      error: 'member_limit_reached',
+      message: `Your ${plan.name} plan allows up to ${plan.memberLimit} members. Remove a member or upgrade to add more.`,
+    });
+  }
+
   const member = await GroupMember.create({
     clerkUserId,
     groupId: payload.groupId,
@@ -131,6 +142,16 @@ exports.inviteByEmail = async (req, res) => {
     // Look up group name for the email
     const group = await Group.findById(req.groupId);
     const groupName = group?.name || 'your group';
+
+    if (group) {
+      const { plan, atLimit } = await getMemberLimitStatus(group);
+      if (atLimit) {
+        return res.status(403).json({
+          error: 'member_limit_reached',
+          message: `Your ${plan.name} plan allows up to ${plan.memberLimit} members. Remove a member or upgrade to add more.`,
+        });
+      }
+    }
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://chama360.nxhub.online';
     const signUpUrl = `${frontendUrl}/sign-up`;

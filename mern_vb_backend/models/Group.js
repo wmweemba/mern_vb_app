@@ -7,6 +7,7 @@ const groupSchema = new mongoose.Schema({
   trialExpiresAt: { type: Date, required: true },
   isPaid: { type: Boolean, default: false },
   paidUntil: { type: Date, default: null },
+  plan: { type: String, enum: ['starter', 'standard'], default: null },
   deletedAt: { type: Date, default: null },
   suspendedAt: { type: Date, default: null },
   suspendedReason: { type: String, default: null },

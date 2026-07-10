@@ -6,6 +6,7 @@ import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import GroupProfileDrawer from '../components/settings/GroupProfileDrawer';
 import FinancialRulesDrawer from '../components/settings/FinancialRulesDrawer';
+import FineRulesDrawer from '../components/settings/FineRulesDrawer';
 import ContributionTypesManager from '../components/settings/ContributionTypesManager';
 
 function SectionCard({ title, onEdit, children }) {
@@ -44,6 +45,7 @@ const fmtFineType = (v) => v === 'fixed' ? 'Fixed amount' : v === 'percentage' ?
 
 export default function Settings() {
   const { trialActive, user } = useAuth();
+  const isPaid = user?.isPaid;
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ export default function Settings() {
   const canManageTypes = ['admin', 'treasurer'].includes(user?.role);
   const [profileOpen, setProfileOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
+  const [fineRulesOpen, setFineRulesOpen] = useState(false);
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/group-settings`)
@@ -101,7 +104,7 @@ export default function Settings() {
           )}
 
           {/* Fine Rules */}
-          <SectionCard title="Fine Rules" onEdit={isAdmin ? () => setFinancialOpen(true) : undefined}>
+          <SectionCard title="Fine Rules" onEdit={isAdmin ? () => setFineRulesOpen(true) : undefined}>
             <div className="space-y-4">
               <Field label="Late Fine Amount" value={settings?.overdueFineAmount != null ? `K${settings.overdueFineAmount}` : null} />
               <Field label="Fine Type" value={fmtFineType(settings?.lateFineType)} />
@@ -133,7 +136,22 @@ export default function Settings() {
         <div className="border-b border-border-default pb-3 mb-5">
           <h2 className="text-xl font-bold text-text-primary">Billing</h2>
         </div>
-        {trialActive ? (
+        {isPaid && trialActive ? (
+          <div className="bg-status-paid-bg border border-status-paid-text/20 rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-status-paid-text">
+                  {user?.plan ? `${user.plan} Plan` : 'Paid Plan'} — Active
+                </p>
+                {user?.memberLimit != null && (
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {user.memberCount} / {user.memberLimit} members
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : trialActive ? (
           <div className="bg-trial-bg border border-trial-border rounded-md p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -192,6 +210,12 @@ export default function Settings() {
       <FinancialRulesDrawer
         open={financialOpen}
         onClose={() => setFinancialOpen(false)}
+        onSaved={(updated) => setSettings(updated)}
+        settings={settings}
+      />
+      <FineRulesDrawer
+        open={fineRulesOpen}
+        onClose={() => setFineRulesOpen(false)}
         onSaved={(updated) => setSettings(updated)}
         settings={settings}
       />

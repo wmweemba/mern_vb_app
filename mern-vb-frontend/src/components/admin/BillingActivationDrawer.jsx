@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../../lib/utils';
 
 export default function BillingActivationDrawer({ open, onClose, groupId, group, onSuccess }) {
   const [plans, setPlans] = useState({});
-  const [plan, setPlan] = useState('Starter');
+  const [plan, setPlan] = useState('starter');
   const [durationMonths, setDurationMonths] = useState(1);
   const [customPaidUntil, setCustomPaidUntil] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,7 +64,7 @@ export default function BillingActivationDrawer({ open, onClose, groupId, group,
               className="w-full border border-border-default rounded-lg px-3 py-2.5 text-base bg-surface-page text-text-primary"
             >
               {Object.keys(plans).map(p => (
-                <option key={p} value={p}>{p} — ZMW {plans[p]?.price}/mo</option>
+                <option key={p} value={p}>{plans[p]?.name || p} — ZMW {plans[p]?.price}/mo</option>
               ))}
             </select>
           </div>

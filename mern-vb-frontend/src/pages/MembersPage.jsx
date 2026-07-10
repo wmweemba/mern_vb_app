@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { UserPlus, Pencil } from 'lucide-react';
@@ -175,11 +176,13 @@ function EditMemberDrawer({ member, open, onClose, onSaved }) {
 function InviteDrawer({ open, onClose, onInvited }) {
   const [form, setForm] = useState({ name: '', email: '', role: 'member' });
   const [error, setError] = useState('');
+  const [limitReached, setLimitReached] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function handleChange(e) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
     setError('');
+    setLimitReached(false);
   }
 
   async function handleSubmit(e) {
@@ -190,6 +193,7 @@ function InviteDrawer({ open, onClose, onInvited }) {
     }
     setLoading(true);
     setError('');
+    setLimitReached(false);
     try {
       const res = await axios.post(`${API_BASE_URL}/invites/email`, form);
       if (res.data.warning) {
@@ -203,7 +207,12 @@ function InviteDrawer({ open, onClose, onInvited }) {
       onClose();
       onInvited();
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to send invite. Please try again.');
+      if (err?.response?.data?.error === 'member_limit_reached') {
+        setLimitReached(true);
+        setError(err.response.data.message);
+      } else {
+        setError(err?.response?.data?.error || 'Failed to send invite. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -267,6 +276,12 @@ function InviteDrawer({ open, onClose, onInvited }) {
         {error && (
           <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">
             {error}
+            {limitReached && (
+              <>
+                {' '}
+                <Link to="/upgrade" className="underline font-medium">Upgrade your plan</Link>
+              </>
+            )}
           </p>
         )}
       </form>

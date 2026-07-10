@@ -1,10 +1,6 @@
 const Group = require('../models/Group');
 const { logAdminAction } = require('../utils/auditLog');
-
-const PLANS = {
-  Starter: { price: 150, currency: 'ZMW' },
-  Standard: { price: 250, currency: 'ZMW' },
-};
+const PLANS = require('../config/plans');
 
 // GET /api/admin/billing/plans
 exports.listPlans = (req, res) => res.json(PLANS);
@@ -35,6 +31,7 @@ exports.activate = async (req, res) => {
 
   group.isPaid = true;
   group.paidUntil = newPaidUntil;
+  group.plan = plan;
   group.trialExpiresAt = new Date('2099-12-31');
   await group.save();
 

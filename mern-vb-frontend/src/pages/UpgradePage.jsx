@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -7,32 +7,28 @@ import { useUser } from '@clerk/clerk-react';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
 
-const PLANS = [
-  {
+const PLAN_META = {
+  starter: {
     id: 'starter',
-    name: 'Starter',
-    price: 150,
     recommended: false,
-    features: [
-      'Up to 15 members',
+    features: (memberLimit) => [
+      `Up to ${memberLimit} members`,
       'Savings tracking',
       'Loan management',
       'Financial reports',
       'PDF & Excel exports',
     ],
   },
-  {
+  standard: {
     id: 'standard',
-    name: 'Standard',
-    price: 250,
     recommended: true,
-    features: [
-      'Up to 40 members',
+    features: (memberLimit) => [
+      `Up to ${memberLimit} members`,
       'Everything in Starter',
       'Priority support',
     ],
   },
-];
+};
 
 function ConfirmationScreen({ plan, groupName }) {
   return (
@@ -202,8 +198,27 @@ export default function UpgradePage() {
   const { user: member } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [plans, setPlans] = useState([]);
 
   const groupName = member?.groupName || 'My Group';
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/billing/plans`)
+      .then(res => {
+        const list = Object.entries(res.data)
+          .filter(([id]) => PLAN_META[id])
+          .map(([id, data]) => ({
+            id,
+            name: data.name,
+            price: data.price,
+            memberLimit: data.memberLimit,
+            recommended: PLAN_META[id].recommended,
+            features: PLAN_META[id].features(data.memberLimit),
+          }));
+        setPlans(list);
+      })
+      .catch(() => {});
+  }, []);
 
   if (confirmed && selectedPlan) {
     return (
@@ -243,7 +258,7 @@ export default function UpgradePage() {
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {PLANS.map(plan => (
+        {plans.map(plan => (
           <div
             key={plan.id}
             className={`relative bg-surface-card rounded-xl p-6 flex flex-col ${

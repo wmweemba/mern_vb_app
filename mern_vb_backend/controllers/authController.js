@@ -2,6 +2,7 @@ const { getAuth } = require('@clerk/express');
 const GroupMember = require('../models/GroupMember');
 const Group = require('../models/Group');
 const SuperAdmin = require('../models/SuperAdmin');
+const { getMemberLimitStatus } = require('../utils/planLimits');
 
 exports.me = async (req, res) => {
   try {
@@ -29,7 +30,9 @@ exports.me = async (req, res) => {
     }
 
     const group = await Group.findById(member.groupId);
-    const trialActive = group?.isPaid || (group?.trialExpiresAt > new Date());
+    const paidActive = group?.isPaid && (!group?.paidUntil || group.paidUntil > new Date());
+    const trialActive = paidActive || (group?.trialExpiresAt > new Date());
+    const limitStatus = group ? await getMemberLimitStatus(group) : null;
 
     res.json({
       _id: member._id,
@@ -42,6 +45,9 @@ exports.me = async (req, res) => {
       trialActive,
       trialExpiresAt: group?.trialExpiresAt,
       isPaid: group?.isPaid || false,
+      plan: limitStatus?.plan.name || null,
+      memberCount: limitStatus?.activeCount ?? null,
+      memberLimit: limitStatus?.plan.memberLimit ?? null,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch membership', details: err.message });

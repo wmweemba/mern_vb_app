@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.11.0] - 2026-07-10
+
+### Added
+- **Plan tier persistence + member-limit enforcement (Starter/Standard)**: `Group.plan` (`starter` | `standard`, default `null`) is now persisted when a super admin activates billing (`adminBillingController.activate`), instead of being logged to the audit trail and discarded. `mern_vb_backend/config/plans.js` is the new single source of truth for both tiers — Starter: ZMW 150/month, 20-member limit; Standard: ZMW 250/month, 40-member limit — replacing two previously disconnected, price-only `PLANS` objects (`adminBillingController.js`, `UpgradePage.jsx`).
+- **Grandfather + soft-cap member limit**: adding a new member is blocked once a group's active member count reaches its plan's `memberLimit`, enforced at both real member-creation entry points (`inviteController.inviteByEmail` and `inviteController.acceptInvite`) via a shared `utils/planLimits.js` helper. Existing members are never touched, deactivated, or removed by a downgrade — only the creation of *new* members is blocked until the group is back under its limit or upgrades. Legacy paid groups with no `plan` assigned fall back to the Starter limit (never unlimited).
+- **`GET /api/billing/plans`**: new authenticated (non-admin) endpoint backed by the shared plan config, so `UpgradePage.jsx` no longer hardcodes prices/member limits and can't drift out of sync with what's actually enforced.
+- **`scripts/backfillGroupPlans.js`**: one-time, idempotent, dry-run-by-default script (same safety convention as `scripts/seedContributionDefaults.js`) that assigns a `plan` to every existing paid group with none set, based on current active member count (≤20 → Starter, else → Standard) — so no existing group is silently capped by a default it never chose.
+- **Settings — Billing card shows plan + member count**: for paid groups, the Billing section now displays `{Plan} Plan — Active` with an `X / limit members` line, sourced from `/auth/me` (extended with `plan`, `memberCount`, `memberLimit`). The member-invite drawer (`MembersPage.jsx`) surfaces a `member_limit_reached` API error inline with an "Upgrade your plan" link, instead of a generic failure message.
+- **`FineRulesDrawer.jsx`**: new dedicated slide-over for editing `overdueFineAmount`, `lateFineType`, and `partialPaymentFineAmount`. Previously, no such component existed — the Fine Rules section's Edit button was wired to the same state as the Financial Rules button, so it incorrectly opened `FinancialRulesDrawer` (titled "Edit Financial Rules") every time. `partialPaymentFineAmount` was moved out of `FinancialRulesDrawer.jsx` into the new drawer to avoid the same field being editable in two places.
+
+### Fixed
+- **Billing status blind spot — `paidUntil` not checked in `/auth/me`**: `authController.js`'s `trialActive` computation previously checked `group.isPaid` only, never `group.paidUntil`. A paid group whose subscription lapsed would still be shown "Trial Active" in the Settings UI even though `checkTrial.js` (the actual write-gate middleware) had already started blocking new records — the two disagreed. Fixed by computing `paidActive` the same way `checkTrial.js` does (`isPaid && (!paidUntil || paidUntil > now)`) before folding it into `trialActive`.
+
+---
+
 ## [3.10.3] - 2026-07-05
 
 ### Added
