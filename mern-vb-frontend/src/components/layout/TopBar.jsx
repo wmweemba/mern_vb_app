@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
-import { Shield, LifeBuoy } from 'lucide-react';
+import { Shield, LifeBuoy, Menu } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import {
   DropdownMenu,
@@ -9,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import MobileNavDrawer from './MobileNavDrawer';
 
 const AVATAR_COLORS = [
   { bg: '#F5E6DC', text: '#C8501A' },
@@ -28,6 +30,7 @@ export default function TopBar() {
   const { user, clerkUser, isSuperAdmin, adminMode, toggleAdminMode } = useAuth();
   const { signOut } = useClerk();
   const navigate = useNavigate();
+  const [showNavDrawer, setShowNavDrawer] = useState(false);
 
   const displayName = user?.name || clerkUser?.fullName || 'User';
   const groupLabel = user?.groupName || 'My Group';
@@ -44,8 +47,18 @@ export default function TopBar() {
   const handleSignOut = () => signOut(() => navigate('/sign-in'));
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 md:left-60 h-16 bg-surface-card border-b border-border-default z-40 flex items-center justify-between px-4 md:px-8">
-      <span className="text-base font-semibold text-text-primary truncate">{groupLabel}</span>
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={() => setShowNavDrawer(true)}
+          className="md:hidden w-9 h-9 flex items-center justify-center rounded-md text-text-primary hover:bg-surface-page transition-colors flex-shrink-0"
+          aria-label="Open menu"
+        >
+          <Menu size={22} />
+        </button>
+        <span className="text-base font-semibold text-text-primary truncate">{groupLabel}</span>
+      </div>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -92,5 +105,7 @@ export default function TopBar() {
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+    <MobileNavDrawer open={showNavDrawer} onClose={() => setShowNavDrawer(false)} />
+    </>
   );
 }

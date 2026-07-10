@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.0] - 2026-07-10
+
+### Added
+- **Mobile navigation drawer**: `Savings`, `Loans`, `Contributions`, `Operations`, and `Upgrade` had zero mobile access path — the bottom nav only covers Dashboard/Members/+/Reports/Settings, and the "+" Action Sheet only offered indirect shortcuts to Savings/Loans. Added a hamburger icon to `TopBar.jsx` (mobile-only) that opens a new `MobileNavDrawer.jsx`, sliding in from the left with the full nav list — mirrors `DesktopSidebar.jsx` exactly via a newly shared `layout/navItems.js` module, including role-based filtering (Operations stays admin/treasurer/loan_officer-only). `UI_SPEC.md` §6.1 had called for a hamburger menu that was never implemented; this fulfils that gap using the app's actual current header design rather than the unbuilt spec mockup.
+- **`hooks/useDrawerLifecycle.js`**: shared ESC-key-close + body-scroll-lock behavior, extracted from `SlideoverDrawer.jsx` and reused by the new `MobileNavDrawer.jsx` so the same overlay lifecycle logic isn't duplicated a third time.
+
+### Fixed
+- **Sidebar/drawer trial card mislabeled paid accounts**: `DesktopSidebar.jsx`'s bottom trial-status card (and the copy carried into the new `MobileNavDrawer.jsx`) checked `trialActive` only, so a paid-and-active group (e.g. Williams Group on the Starter plan) still showed "Trial Active · 15 days remaining · Upgrade" — the same blind spot already fixed on the Settings page's Billing card in 3.11.0, but never applied to these two nav surfaces. Extracted a shared `layout/PlanStatusCard.jsx` component (paid → `{Plan} Plan — Active` + member count, trial → the existing countdown card) used by both `DesktopSidebar.jsx` and `MobileNavDrawer.jsx`, so the three surfaces (Settings, desktop sidebar, mobile drawer) can no longer drift out of sync on this logic again.
+
+---
+
 ## [3.11.0] - 2026-07-10
 
 ### Added

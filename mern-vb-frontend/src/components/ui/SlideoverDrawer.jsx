@@ -1,20 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
+import { useDrawerLifecycle } from '../../hooks/useDrawerLifecycle';
 
 export default function SlideoverDrawer({ open, onClose, title, children, footer }) {
-  // ESC key closes drawer
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
-
-  // Prevent body scroll when open
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  useDrawerLifecycle(open, onClose);
 
   if (!open) return null;
 

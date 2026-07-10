@@ -1,22 +1,11 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, Wallet, DollarSign, FileText, Settings, Zap, Coins } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/auth';
-
-const NAV_ITEMS = [
-  { label: 'Dashboard',     to: '/dashboard',     icon: LayoutGrid },
-  { label: 'Members',       to: '/members',        icon: Users },
-  { label: 'Savings',       to: '/savings',        icon: Wallet },
-  { label: 'Loans',         to: '/loans',          icon: DollarSign },
-  { label: 'Contributions', to: '/contributions',  icon: Coins },
-  { label: 'Reports',       to: '/reports',        icon: FileText },
-  { label: 'Operations',    to: '/operations',     icon: Zap, roles: ['admin', 'treasurer', 'loan_officer'] },
-  { label: 'Settings',      to: '/settings',       icon: Settings },
-];
+import { NAV_ITEMS } from './navItems';
+import PlanStatusCard from './PlanStatusCard';
 
 export default function DesktopSidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { trialActive, isSuperAdmin, user } = useAuth();
+  const { user } = useAuth();
 
   return (
     <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-60 bg-surface-card border-r border-border-default z-50">
@@ -55,19 +44,7 @@ export default function DesktopSidebar() {
         </ul>
       </nav>
 
-      {/* Trial status card */}
-      {trialActive && !isSuperAdmin && (
-        <div className="mx-3 mb-4 p-3 rounded-md bg-trial-bg border border-trial-border">
-          <p className="text-sm font-semibold text-trial-text">Trial Active</p>
-          <p className="text-xs text-text-secondary mt-0.5">15 days remaining</p>
-          <button
-            onClick={() => navigate('/upgrade')}
-            className="mt-2 w-full text-sm font-medium text-text-primary border border-border-default rounded-full py-1.5 hover:bg-surface-page transition-colors"
-          >
-            Upgrade
-          </button>
-        </div>
-      )}
+      <PlanStatusCard />
     </aside>
   );
 }
