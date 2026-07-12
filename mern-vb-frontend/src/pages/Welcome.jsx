@@ -54,12 +54,12 @@ export default function Welcome() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-surface-card rounded-xl border border-border-default shadow-sm p-6 text-left">
               <p className="text-sm font-semibold text-brand-primary uppercase tracking-wide">Starter</p>
-              <p className="mt-2 text-3xl font-extrabold text-text-primary">ZMW 150<span className="text-base font-medium text-text-secondary">/month</span></p>
+              <p className="mt-2 text-3xl font-extrabold text-text-primary">ZMW 200<span className="text-base font-medium text-text-secondary">/month</span></p>
               <p className="mt-3 text-sm text-text-secondary">Up to 20 members. All core features included.</p>
             </div>
             <div className="bg-surface-dark rounded-xl shadow-sm p-6 text-left text-white">
               <p className="text-sm font-semibold text-text-on-dark-muted uppercase tracking-wide">Standard</p>
-              <p className="mt-2 text-3xl font-extrabold">ZMW 250<span className="text-base font-medium text-text-on-dark-muted">/month</span></p>
+              <p className="mt-2 text-3xl font-extrabold">ZMW 300<span className="text-base font-medium text-text-on-dark-muted">/month</span></p>
               <p className="mt-3 text-sm text-white/80">Up to 40 members. All core features included.</p>
             </div>
           </div>

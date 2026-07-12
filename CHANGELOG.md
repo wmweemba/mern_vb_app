@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.1] - 2026-07-12
+
+### Changed
+- **Pricing update — Starter ZMW150→200, Standard ZMW250→300**: `config/plans.js` (the single source of truth) updated to the reconciled prices agreed with the second-brain pricing one-pager (member limits unchanged: Starter 20, Standard 40). `Welcome.jsx`'s public pricing copy updated to match — it hardcodes the price text rather than fetching it, unlike `UpgradePage.jsx` which already reads live from `GET /api/billing/plans` and needed no change.
+- **`platformAdminController.js` MRR estimate now imports from `config/plans.js`** instead of a second hardcoded `starterPrice` constant that had drifted out of sync with the real plan price — the duplicate was the direct cause of this pricing update needing three separate edits instead of one.
+
 ## [3.12.0] - 2026-07-10
 
 ### Added

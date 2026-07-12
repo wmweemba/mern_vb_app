@@ -2,6 +2,7 @@ const { Resend } = require('resend');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const PLANS = require('../config/plans');
 
 // GET /api/admin/overview
 exports.overview = async (req, res) => {
@@ -16,8 +17,7 @@ exports.overview = async (req, res) => {
     GroupMember.countDocuments({ deletedAt: null, active: true }),
   ]);
 
-  const starterPrice = 150;
-  const mrrEstimate = paidGroups * starterPrice;
+  const mrrEstimate = paidGroups * PLANS.starter.price;
 
   res.json({
     totalGroups, paidGroups, trialGroups, expiringThisWeek, totalMembers, mrrEstimate, currency: 'ZMW',
