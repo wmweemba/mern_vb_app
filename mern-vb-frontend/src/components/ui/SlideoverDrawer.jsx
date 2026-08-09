@@ -16,15 +16,25 @@ export default function SlideoverDrawer({ open, onClose, title, children, footer
         aria-hidden="true"
       />
 
-      {/* Desktop: right-side drawer */}
-      <div className="hidden md:flex ml-auto relative flex-col w-[420px] h-full bg-surface-card border-l border-border-default shadow-none animate-in slide-in-from-right duration-200">
-        <DrawerContent title={title} onClose={onClose} footer={footer}>
-          {children}
-        </DrawerContent>
-      </div>
-
-      {/* Mobile: bottom sheet */}
-      <div className="md:hidden absolute bottom-0 left-0 right-0 flex flex-col bg-surface-card rounded-t-xl h-[90vh] animate-in slide-in-from-bottom duration-200">
+      {/*
+        Single rendered drawer — responsive via CSS only (mobile bottom sheet,
+        desktop right-side panel). Previously this mounted two separate DOM
+        copies (one per breakpoint, toggled with hidden/md:hidden), which for
+        any child form component with its own internal state meant two
+        independent React instances with divergent state. Since the submit
+        button lives in `footer` and targets its form via the cross-DOM
+        `form="..."` id attribute, it always bound to the *first* copy in DOM
+        order (the desktop one) regardless of which was visually shown — so
+        on mobile, tapping submit posted the OTHER, still-empty copy, which
+        silently failed native required-field validation. Rendering once
+        removes the duplicate-ID / divergent-state issue entirely.
+      */}
+      <div
+        className="absolute bottom-0 left-0 right-0 w-full md:relative md:bottom-auto md:left-auto md:right-auto md:ml-auto md:w-[420px]
+          flex flex-col bg-surface-card h-[90vh] md:h-full rounded-t-xl md:rounded-none
+          border-t md:border-t-0 md:border-l border-border-default shadow-none
+          animate-in slide-in-from-bottom md:[--tw-enter-translate-y:0px] md:slide-in-from-right duration-200"
+      >
         <DrawerContent title={title} onClose={onClose} footer={footer}>
           {children}
         </DrawerContent>
