@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.2] - 2026-08-09
+
+### Fixed
+- **Support ticket submission failing for members with no email on file**: `supportController.createRequest` resolved identity from `req.member` and passed `email` straight into `new SupportRequest({...})` without checking it was present. `GroupMember.email` is optional (`models/GroupMember.js`) and, critically, **the group-creation flow never sets it** — `groupController.createGroup` only writes `name`/`phone` onto the admin's own `GroupMember` record (`treasurerName`/`phone` from the onboarding wizard; no email field exists in that step at all). Any group admin who signed up and created their own group therefore had a blank `email`, and hitting Submit on a support ticket threw an uncaught Mongoose `ValidationError` (`SupportRequest.email` is `required: true`), surfacing to the user as a generic "Failed to submit support request" 500. Fixed in `supportController.js`: falls back to the user's Clerk-verified primary email when `req.member.email` is blank; if that's also unavailable, returns a clear `400` ("Your account is missing an email address...") instead of a 500.
+
+### Added
+- **Self-service "add my email" profile completion**: since the root cause above means *any* admin who onboarded their own group can be missing an email (not just via support tickets — it also silently blocks Resend notifications), added a proper fix rather than only a better error message. New endpoint `PUT /api/users/me/email` (`routes/users.js`, `userController.updateMyEmail`) lets any authenticated group member set their own email, scoped to their own `GroupMember` record — no admin role required, and deliberately **not** gated by `checkTrial` so a lapsed trial can't trap someone in the same hole. New `ProfileEmailBanner.jsx` component (mounted in `AppShell.jsx` next to `TrialBanner`) shows a persistent, low-friction banner — "Your account has no email on file..." with an inline "Add Email" field — to anyone signed in with no email on record, so the gap surfaces immediately instead of being discovered via a failed action later.
+- Verified end-to-end in a browser walkthrough against the dev database (MongoDB Atlas — see Docs note below): fresh signup → onboarding wizard (confirmed it collects no email) → dashboard → banner appears → Add Email → `PUT /api/users/me/email` 200s → banner clears → email confirmed persisted in Members list → survives a full reload.
+
+### Docs
+- **Corrected stale "Atlas is production" framing**: `CLAUDE.md` and `README.md` both still described MongoDB Atlas as the production cluster. Production was migrated to a self-hosted Mongo on Coolify at some point after those docs were written; Atlas now holds dev/test data only. Both docs updated to state this explicitly, including a note that local `mern_vb_backend/.env` points `MONGODB_URI` at Atlas, so a local `pnpm dev` run cannot reach real production data. (Second-brain `ventures/saas/chama360/_overview.md` updated to match.)
+
+---
+
 ## [3.12.1] - 2026-07-12
 
 ### Changed

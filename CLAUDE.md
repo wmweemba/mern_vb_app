@@ -68,7 +68,7 @@ mern_vb_app/                    ← monorepo root
 
 ### Backend
 - **Runtime:** Node.js, Express 5.1.0
-- **Database:** MongoDB via Mongoose 8.x
+- **Database:** MongoDB via Mongoose 8.x — **production** is self-hosted Mongo on Coolify; MongoDB **Atlas** is dev/test only (roles swapped from the original Atlas-as-production setup — see README.md and CHANGELOG.md, which still describe the old arrangement in older entries). Local `.env` `MONGODB_URI` points at Atlas, so local dev runs cannot reach real production data.
 - **Auth:** JWT (jsonwebtoken) + bcryptjs
 - **Package manager:** pnpm
 

@@ -49,6 +49,22 @@ exports.createRequest = async (req, res) => {
       groupId = req.groupId || null;
       groupMemberId = req.member._id;
 
+      if (!email) {
+        // GroupMember.email is optional, so fall back to the Clerk-verified
+        // email for this user rather than letting the ticket fail Mongoose
+        // validation (SupportRequest.email is required).
+        try {
+          const clerkUser = await clerkClient.users.getUser(clerkUserId);
+          const primaryEmail = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId);
+          email = primaryEmail?.emailAddress || '';
+        } catch {
+          // leave email blank; caught by the check below
+        }
+      }
+      if (!email) {
+        return res.status(400).json({ error: 'Your account is missing an email address. Add one from the banner at the top of the app, then try again.', code: 'MISSING_EMAIL' });
+      }
+
       if (groupId) {
         const group = await Group.findById(groupId).select('name');
         groupName = group ? group.name : null;

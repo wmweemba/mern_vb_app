@@ -48,3 +48,27 @@ exports.updateUser = async (req, res) => {
     res.status(500).json({ error: 'Failed to update member', details: err.message });
   }
 };
+
+// Self-service: any authenticated group member can add/update their own
+// email. Members can end up with a blank email (e.g. added by an admin, or
+// signed up via a flow that didn't collect one) which silently blocks
+// email-dependent features like support tickets — this lets them fix it
+// themselves instead of needing an admin edit.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+exports.updateMyEmail = async (req, res) => {
+  try {
+    if (!req.member) {
+      return res.status(400).json({ error: 'No group membership found.' });
+    }
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email || !EMAIL_RE.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+    req.member.email = email;
+    await req.member.save();
+    res.json({ message: 'Email updated successfully', email });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update email', details: err.message });
+  }
+};

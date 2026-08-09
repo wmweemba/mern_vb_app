@@ -5,6 +5,7 @@ import DesktopSidebar from './DesktopSidebar';
 import TopBar from './TopBar';
 import MobileBottomNav from './MobileBottomNav';
 import TrialBanner from '../TrialBanner';
+import ProfileEmailBanner from '../ProfileEmailBanner';
 import ManageBankBalanceModal from '../ui/ManageBankBalanceModal';
 import ChangePasswordModal from '../ui/ChangePasswordModal';
 import ManagePaymentModal from '../ui/ManagePaymentModal';
@@ -53,6 +54,7 @@ export default function AppShell({ children }) {
       {/* Main content */}
       <main className="md:ml-60 pt-16 pb-28 md:pb-8 px-4 md:px-8">
         <TrialBanner />
+        <ProfileEmailBanner />
         {children}
       </main>
 
