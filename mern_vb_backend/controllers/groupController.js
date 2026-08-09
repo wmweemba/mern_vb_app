@@ -51,6 +51,7 @@ exports.createGroup = async (req, res) => {
         role: 'admin',
         name: treasurerName,
         phone: phone || null,
+        isVerified: true,
       }], { session });
 
       await GroupSettings.create([{

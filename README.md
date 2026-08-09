@@ -66,7 +66,7 @@ mern_vb_app/                    ← monorepo root
 | Reports | jspdf + jspdf-autotable, xlsx |
 | PWA | vite-plugin-pwa + Workbox |
 | Backend runtime | Node.js, Express 5 |
-| Database | MongoDB via Mongoose 8 — **production** on self-hosted Mongo (Coolify); MongoDB **Atlas** is dev/test only |
+| Database | MongoDB via Mongoose 8, hosted on **MongoDB Atlas** — this is production (confirmed 2026-08-09 from the live container's env var); no separate dev/staging DB exists yet. Self-hosted migration to Coolify is planned, not yet scheduled |
 | Auth (backend) | @clerk/express (JWT verification) |
 | Webhooks | Svix (Clerk webhook signature verification) |
 | Email | Resend |

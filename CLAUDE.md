@@ -68,7 +68,7 @@ mern_vb_app/                    ← monorepo root
 
 ### Backend
 - **Runtime:** Node.js, Express 5.1.0
-- **Database:** MongoDB via Mongoose 8.x — **production** is self-hosted Mongo on Coolify; MongoDB **Atlas** is dev/test only (roles swapped from the original Atlas-as-production setup — see README.md and CHANGELOG.md, which still describe the old arrangement in older entries). Local `.env` `MONGODB_URI` points at Atlas, so local dev runs cannot reach real production data.
+- **Database:** MongoDB via Mongoose 8.x, hosted on **MongoDB Atlas** (`mern-vb-cluster`, db `mern_vb_app`) — this is the real, live production database, confirmed 2026-08-09 by reading the `MONGODB_URI` env var directly off the running `api.chama360.nxhub.online` container on Coolify. (A 3.12.2 changelog entry briefly claimed the opposite — that production had moved to a self-hosted Mongo on Coolify — based on a mixup with a different app on the same host; that was wrong and is corrected here.) **Local `.env` `MONGODB_URI` points at this same production database** — there is currently no separate dev/staging DB, so local runs and manual scripts touch real user data. A future migration to a self-hosted Coolify Mongo (matching the other apps on this host) is planned but not yet scheduled.
 - **Auth:** JWT (jsonwebtoken) + bcryptjs
 - **Package manager:** pnpm
 

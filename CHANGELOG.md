@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.3] - 2026-08-09
+
+### Fixed
+- **Self-onboarded admins stuck showing "Pending" forever on the Members page**: `isPending` (`MembersPage.jsx`) is driven by `GroupMember.isVerified`, which is meant to flip `true` automatically — either when a group is created (the creator is inherently verified, they just authenticated via Clerk to create it) or when an invited member accepts their invite (via the Clerk `user.created` webhook, `webhookRoutes.js`). `groupController.createGroup` was setting `clerkUserId` on the admin's own `GroupMember` record but never setting `isVerified: true`, so every self-onboarded group admin showed a permanent "Pending" badge on their own row — cosmetic (it doesn't block any feature) but confusing, and indistinguishable from a real invite-approval gate that doesn't actually exist anywhere in the app. `scripts/backfillVerified.js` had already patched this once before as a one-time data fix, but the root cause in `createGroup` was never fixed, so it kept recurring for every new self-onboarded admin since. Fixed by adding `isVerified: true` to the `GroupMember.create(...)` call in `createGroup`. Also corrected the one existing live case found (Simon Peter / Grocery Savings Group) directly in production.
+
+### Docs
+- **Corrected the 3.12.2 database documentation** — that entry claimed production had moved off MongoDB Atlas to a self-hosted Mongo on Coolify. That was wrong (a mixup with a different app hosted on the same box). Verified 2026-08-09 by reading `MONGODB_URI` directly off the live `api.chama360.nxhub.online` container: **MongoDB Atlas is the real, current production database**, and there is no separate dev/staging database yet — local `.env` and manual scripts point at the same live data. `CLAUDE.md`/`README.md` corrected back. A future migration to a self-hosted Coolify Mongo (matching the other apps on the host) is planned but not yet scheduled.
+
+---
+
 ## [3.12.2] - 2026-08-09
 
 ### Fixed
