@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.5] - 2026-08-10
+
+### Fixed
+- **Super admin mobile hamburger menu showed the regular group nav instead of the admin nav.** `AdminShell.jsx` (the platform-admin layout) reuses the shared `TopBar.jsx`, but `TopBar`'s hamburger button was hardcoded to always open `MobileNavDrawer` — the member-group nav (Dashboard/Members/Savings/Loans/Contributions/Reports/Operations/Settings) — regardless of `adminMode`. It never checked whether the signed-in user was in Platform Admin mode. Desktop was unaffected since `AdminSidebar.jsx` is a separate, correctly-scoped component. On mobile, this meant a super admin in Platform Admin mode had no way to reach `/admin/support`, `/admin/super-admins`, or `/admin/audit` via the hamburger, and `AdminMobileBottomNav`'s 4 icons (Overview/Groups/Super Admins/Audit) don't include Support either — so **Support was completely unreachable on mobile while in admin mode**, only visible on desktop.
+  - Reported by William Mweemba against his own super admin account (screenshots of desktop vs. mobile menus).
+  - **Fix:** new `AdminMobileNavDrawer.jsx`, mirroring `AdminSidebar.jsx`'s nav items (Overview, All Groups, Support, Super Admins, Audit Log) plus an Exit Admin Mode action. `TopBar.jsx` now renders it instead of the regular `MobileNavDrawer` when `adminMode` is true.
+  - Verified with a dummy super admin account created in dev (test Clerk user + a `SuperAdmin` record, both cleaned up after): confirmed the mobile hamburger now shows the correct 5-item admin nav with "Platform Admin" labeling, and that tapping "Support" correctly navigates to `/admin/support` and renders the ticket inbox — previously unreachable on mobile at all. Regular (non-admin) mobile nav unaffected. Build clean.
+
 ## [3.12.4] - 2026-08-09
 
 ### Fixed

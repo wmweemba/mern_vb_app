@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import MobileNavDrawer from './MobileNavDrawer';
+import AdminMobileNavDrawer from './AdminMobileNavDrawer';
 
 const AVATAR_COLORS = [
   { bg: '#F5E6DC', text: '#C8501A' },
@@ -105,7 +106,9 @@ export default function TopBar() {
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
-    <MobileNavDrawer open={showNavDrawer} onClose={() => setShowNavDrawer(false)} />
+    {adminMode
+      ? <AdminMobileNavDrawer open={showNavDrawer} onClose={() => setShowNavDrawer(false)} />
+      : <MobileNavDrawer open={showNavDrawer} onClose={() => setShowNavDrawer(false)} />}
     </>
   );
 }
