@@ -45,6 +45,10 @@ coverage/
 # MongoDB dump files
 dump/
 
+# Local data backups — contain real member financial records. Never commit.
+mern_vb_backend/backups/
+backups/
+
 # Backend specific
 mern_vb_backend/node_modules/
 mern_vb_backend/.env
