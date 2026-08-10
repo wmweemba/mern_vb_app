@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.6] - 2026-08-10
+
+### Fixed
+- **`TopBar` header showed "My Group" while in Platform Admin mode.** `groupLabel` fell back to a hardcoded `'My Group'` whenever `user.groupName` was unset — true for a super admin with no group of their own, which is the normal case in Platform Admin mode. Now shows "Platform Admin" when `adminMode` is true, matching `AdminSidebar`'s own labeling. Verified with a dummy super admin account: header reads "Platform Admin" while in admin mode, and correctly reverts to "My Group" when switching back. Build clean.
+
+### Infra
+- The 3.12.5 frontend deploy failed during the Nixpacks build's Nix package-fetch/garbage-collection phase (before the app's own code was even built) — unrelated to the code change itself. Disk on the Coolify host was at 80% with 6.5GB of reclaimable Docker images/build cache; cleared via `docker system prune -a -f` (down to 61%) before retrying with this release. This was the first frontend deploy since the 2026-08-09 Docker 27→29 upgrade; watching for any recurrence to rule in/out a BuildKit-related regression versus a one-off resource/network blip.
+
 ## [3.12.5] - 2026-08-10
 
 ### Fixed

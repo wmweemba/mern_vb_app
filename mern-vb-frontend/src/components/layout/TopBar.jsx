@@ -34,7 +34,7 @@ export default function TopBar() {
   const [showNavDrawer, setShowNavDrawer] = useState(false);
 
   const displayName = user?.name || clerkUser?.fullName || 'User';
-  const groupLabel = user?.groupName || 'My Group';
+  const groupLabel = adminMode ? 'Platform Admin' : (user?.groupName || 'My Group');
 
   const initials = displayName
     .split(' ')
