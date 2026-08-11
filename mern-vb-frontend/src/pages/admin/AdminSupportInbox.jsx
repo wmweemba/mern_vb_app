@@ -35,36 +35,71 @@ function StatusBadge({ status }) {
   );
 }
 
-function DetailDrawer({ ticket, onClose, onUpdated }) {
-  const [status, setStatus] = useState(ticket.status);
-  const [resolutionNote, setResolutionNote] = useState(ticket.resolutionNote || '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+function DetailDrawer({ ticket: initialTicket, onClose, onUpdated }) {
+  const [ticket, setTicket] = useState(initialTicket);
+  const [status, setStatus] = useState(initialTicket.status);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState(null);
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
+  const [replyBody, setReplyBody] = useState('');
+  const [replySaving, setReplySaving] = useState(false);
+  const [replyError, setReplyError] = useState(null);
+
+  async function handleSaveStatus() {
+    setStatusSaving(true);
+    setStatusError(null);
     try {
-      await axios.patch(`${API_BASE_URL}/admin/support/${ticket._id}`, { status, resolutionNote });
-      toast.success('Ticket updated.');
+      const res = await axios.patch(`${API_BASE_URL}/admin/support/${ticket._id}`, { status });
+      setTicket(res.data);
+      toast.success('Status updated.');
       onUpdated();
-      onClose();
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to update ticket.');
+      setStatusError(err?.response?.data?.error || 'Failed to update status.');
     } finally {
-      setSaving(false);
+      setStatusSaving(false);
     }
   }
 
-  const saveButton = (
-    <button
-      type="button"
-      onClick={handleSave}
-      disabled={saving}
-      className="w-full bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-md py-3 transition-colors disabled:opacity-60"
-    >
-      {saving ? 'Saving…' : 'Save'}
-    </button>
+  async function handleSendReply() {
+    if (replyBody.trim().length < 1) return;
+    setReplySaving(true);
+    setReplyError(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/admin/support/${ticket._id}/messages`, { body: replyBody.trim() });
+      setTicket(res.data);
+      setStatus(res.data.status);
+      setReplyBody('');
+      toast.success('Reply sent.');
+      onUpdated();
+    } catch (err) {
+      setReplyError(err?.response?.data?.error || 'Failed to send reply.');
+    } finally {
+      setReplySaving(false);
+    }
+  }
+
+  const footer = (
+    <div className="flex flex-col gap-2">
+      <textarea
+        value={replyBody}
+        onChange={e => setReplyBody(e.target.value)}
+        rows={2}
+        maxLength={4000}
+        placeholder="Reply to this ticket…"
+        className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-text-muted resize-none"
+      />
+      {replyError && (
+        <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">{replyError}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleSendReply}
+        disabled={replySaving || replyBody.trim().length < 1}
+        className="w-full bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold rounded-md py-3 transition-colors disabled:opacity-60"
+      >
+        {replySaving ? 'Sending…' : 'Send Reply'}
+      </button>
+    </div>
   );
 
   return (
@@ -72,7 +107,7 @@ function DetailDrawer({ ticket, onClose, onUpdated }) {
       open
       onClose={onClose}
       title="Support Request"
-      footer={saveButton}
+      footer={footer}
     >
       <div className="space-y-4 text-sm">
         <div className="bg-surface-page rounded-lg p-4 space-y-2">
@@ -96,6 +131,26 @@ function DetailDrawer({ ticket, onClose, onUpdated }) {
           <p className="text-sm text-text-primary whitespace-pre-wrap bg-surface-page rounded-lg p-3">{ticket.description}</p>
         </div>
 
+        {ticket.messages && ticket.messages.length > 0 && (
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-text-secondary mb-1.5">Thread</p>
+            <div className="space-y-2">
+              {ticket.messages.map((m, i) => (
+                <div key={i} className={`flex ${m.authorType === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-xl p-3 ${
+                    m.authorType === 'admin' ? 'bg-brand-primary text-white' : 'bg-surface-page text-text-primary'
+                  }`}>
+                    <p className={`text-[10px] mb-1 ${m.authorType === 'admin' ? 'text-white/70' : 'text-text-muted'}`}>
+                      {m.authorName} · {dayjs(m.createdAt).format('DD MMM, HH:mm')}
+                    </p>
+                    <p className="text-sm whitespace-pre-wrap">{m.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-surface-page rounded-lg p-4 space-y-2">
           <NotifyRow label="Telegram" date={ticket.notifiedTelegramAt} />
           <NotifyRow label="Email" date={ticket.notifiedEmailAt} />
@@ -104,38 +159,34 @@ function DetailDrawer({ ticket, onClose, onUpdated }) {
           )}
         </div>
 
-        <div className="border-t border-border-default pt-4 space-y-4">
+        <div className="border-t border-border-default pt-4 space-y-3">
           <div>
             <label className="block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1.5">
               Update Status
             </label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-              className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            >
-              {STATUSES.map(s => (
-                <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="flex-1 border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
+              >
+                {STATUSES.map(s => (
+                  <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveStatus}
+                disabled={statusSaving || status === ticket.status}
+                className="border border-border-default rounded-xl px-4 text-sm font-medium text-text-primary hover:bg-surface-page transition-colors disabled:opacity-40"
+              >
+                {statusSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1.5">
-              Resolution Note
-            </label>
-            <textarea
-              value={resolutionNote}
-              onChange={e => setResolutionNote(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Optional note for this ticket…"
-              className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-text-muted resize-none"
-            />
-            <p className="text-right text-xs text-text-muted mt-1">{resolutionNote.length}/2000</p>
-          </div>
-          {error && (
+          {statusError && (
             <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">
-              {error}
+              {statusError}
             </p>
           )}
         </div>

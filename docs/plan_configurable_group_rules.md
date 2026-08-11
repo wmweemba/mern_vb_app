@@ -225,7 +225,38 @@ While in the file: `MemberSelect` caps results at `.slice(0, 5)`. Raise to 8 and
 
 ---
 
-### Phase 0.5 — Support tickets are write-only for customers
+### Phase 0.5 — Support tickets are write-only for customers — ✅ DONE 2026-08-11
+
+Ported the working pattern from NdalamaHub's `server/routes/tickets.js` rather than building
+from scratch — it already had a real `messages[]` thread, scoped list/get/reply endpoints, and
+a counterparty-notification helper, none of which the second brain's NS-005 doc had recorded as
+existing. NS-005 itself has been flagged (via NdalamaHub's session) to link this implementation
+so future ports don't rediscover it from zero.
+
+Delivered: `SupportRequest.messages[]` + `userLastViewedAt`; `scripts/migrateSupportResolutionNotes.js`
+(idempotent — migrated all 9 production tickets with a legacy `resolutionNote` on first run,
+including Simon Peter's, confirmed 0 on re-run); `GET /api/support/requests`,
+`GET /api/support/requests/:id` (marks read), `POST /api/support/requests/:id/messages` (user
+reply, reopens a resolved/closed ticket); `POST /api/admin/support/:id/messages` (admin reply,
+Resend email to the customer, best-effort); `SupportRequestDrawer.jsx` restructured into
+list/form/thread views with an unread dot per ticket; `HelpSupport.jsx` FAB shows an unread
+badge (refetches on mount + tab focus); `AdminSupportInbox.jsx`'s resolution-note textarea
+replaced with a read-only thread + reply compose box, status update kept independent.
+
+Verified live end-to-end as both a member and a super admin (throwaway Clerk accounts created
+via the Backend API and deleted after — see chat log for the technique, since standard
+signup/magic-link flows can't be driven headlessly): ticket created → admin replied → status
+auto-transitioned to `in_progress` → unread dot appeared on the member's FAB → member saw the
+threaded reply and replied back → admin inbox showed both messages correctly bubble-aligned.
+64 backend tests and 10 frontend tests pass unchanged; `pnpm build` succeeds.
+
+**Bug found during verification, out of scope, flagged separately:** switching to Platform
+Admin mode changes the TopBar title correctly but the desktop sidebar keeps rendering the
+regular group nav instead of `AdminSidebar` (mobile hamburger renders correctly — this is the
+desktop-only counterpart of the bugs fixed in `e69ab23`/`79b606f`). A hard page reload was also
+observed to silently reset `adminMode` before Clerk rehydrates. Filed as a follow-up task.
+
+Original scoping notes below, kept for context.
 
 Raised by William 2026-08-10: he replied to Simon's tickets in-app, and Simon has never seen a word of it.
 

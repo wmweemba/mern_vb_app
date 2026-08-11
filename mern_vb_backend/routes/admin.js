@@ -55,5 +55,6 @@ router.delete('/super-admins/:id', superAdmins.revoke);
 // Support inbox
 router.get('/support', supportController.listRequests);
 router.patch('/support/:id', supportController.updateStatus);
+router.post('/support/:id/messages', supportController.addAdminMessage);
 
 module.exports = router;

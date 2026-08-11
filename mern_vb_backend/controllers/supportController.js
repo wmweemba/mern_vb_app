@@ -18,6 +18,61 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
+// A ticket is unread (from the customer's side) when the most recent admin
+// message postdates the last time the customer opened the thread. Derived,
+// never stored, so it can't drift from the messages that feed it.
+function hasUnreadAdminReply(ticket) {
+  if (!ticket.messages || ticket.messages.length === 0) return false;
+  const lastAdminMessage = [...ticket.messages].reverse().find(m => m.authorType === 'admin');
+  if (!lastAdminMessage) return false;
+  if (!ticket.userLastViewedAt) return true;
+  return new Date(lastAdminMessage.createdAt) > new Date(ticket.userLastViewedAt);
+}
+
+// Best-effort Telegram ping to the operator when a customer replies.
+// Never throws — a notification failure must not fail the reply itself.
+async function notifyAdminOfReply(ticket, body) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const text =
+      `💬 <b>New reply on support ticket</b>\n\n` +
+      `<b>From:</b> ${escapeHtml(ticket.name)}\n` +
+      `<b>Group:</b> ${escapeHtml(ticket.groupName || '—')}\n\n` +
+      `${escapeHtml(body)}\n\n` +
+      `<b>Ticket ID:</b> ${ticket._id}`;
+    const r = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
+    });
+    if (!r.ok) throw new Error(`Telegram ${r.status}`);
+  } catch (err) {
+    console.error('Failed to notify admin of support reply:', err.message);
+  }
+}
+
+// Best-effort email to the customer when an admin replies. Closes the loop
+// for users who aren't in the app daily — see NS-005 §2a in the second brain.
+async function notifyUserOfReply(ticket, body) {
+  if (!process.env.RESEND_API_KEY || !ticket.email) return;
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>',
+      to: ticket.email,
+      subject: 'Reply to your Chama360 support request',
+      html:
+        `<p>Hi ${escapeHtml(ticket.name)},</p>` +
+        `<p>Support replied to your ticket:</p>` +
+        `<p>${escapeHtml(body).replace(/\n/g, '<br>')}</p>` +
+        `<p>Open the app → Help &amp; Support → My Requests to reply.</p>`,
+    });
+  } catch (err) {
+    console.error('Failed to email user about support reply:', err.message);
+  }
+}
+
 exports.createRequest = async (req, res) => {
   try {
     const { phone, category, description, pagePath, userAgent } = req.body;
@@ -161,6 +216,109 @@ exports.createRequest = async (req, res) => {
     return res.status(201).json({ success: true, ticketId: ticket._id });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to submit support request', details: err.message });
+  }
+};
+
+// The authenticated user's own tickets. Identity resolved server-side from
+// the session — never from a client-supplied id. Not gated by trial/
+// subscription middleware, per NS-005 §2: an expired user must still be
+// able to reach support.
+exports.listMyRequests = async (req, res) => {
+  try {
+    const { userId: clerkUserId } = getAuth(req);
+    const tickets = await SupportRequest.find({ clerkUserId })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const withUnread = tickets.map(t => ({ ...t, hasUnread: hasUnreadAdminReply(t) }));
+    return res.json({ requests: withUnread });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load your support requests', details: err.message });
+  }
+};
+
+// A single ticket with its full thread, scoped so a user can only fetch
+// their own ticket — the query filters on clerkUserId, not just _id.
+// Viewing marks the thread read for the unread-badge calculation.
+exports.getMyRequest = async (req, res) => {
+  try {
+    const { userId: clerkUserId } = getAuth(req);
+    const { id } = req.params;
+
+    const ticket = await SupportRequest.findOne({ _id: id, clerkUserId });
+    if (!ticket) return res.status(404).json({ error: 'Support request not found.' });
+
+    ticket.userLastViewedAt = new Date();
+    await ticket.save();
+
+    return res.json(ticket);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load support request', details: err.message });
+  }
+};
+
+// A user reply, scoped so a user can only post to their own ticket.
+exports.addUserMessage = async (req, res) => {
+  try {
+    const { userId: clerkUserId } = getAuth(req);
+    const { id } = req.params;
+    const body = req.body?.body ? String(req.body.body).trim() : '';
+
+    if (body.length < 1) return res.status(400).json({ error: 'Message cannot be empty.' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Message must be 4000 characters or fewer.' });
+
+    const ticket = await SupportRequest.findOne({ _id: id, clerkUserId });
+    if (!ticket) return res.status(404).json({ error: 'Support request not found.' });
+
+    ticket.messages.push({ authorType: 'user', authorId: clerkUserId, authorName: ticket.name, body });
+
+    // A reply means the issue isn't settled from the customer's side — reopen it.
+    if (['resolved', 'closed'].includes(ticket.status)) {
+      ticket.status = 'in_progress';
+    }
+    // They just wrote in the thread, so they've necessarily seen everything in it.
+    ticket.userLastViewedAt = new Date();
+
+    await ticket.save();
+    await notifyAdminOfReply(ticket, body);
+
+    return res.status(201).json(ticket);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to send message', details: err.message });
+  }
+};
+
+// Admin reply — appends a message rather than overwriting resolutionNote.
+// Mounted under /api/admin, already behind requireSuperAdmin.
+exports.addAdminMessage = async (req, res) => {
+  try {
+    const { userId: clerkUserId } = getAuth(req);
+    const { id } = req.params;
+    const body = req.body?.body ? String(req.body.body).trim() : '';
+
+    if (body.length < 1) return res.status(400).json({ error: 'Message cannot be empty.' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Message must be 4000 characters or fewer.' });
+
+    const ticket = await SupportRequest.findById(id);
+    if (!ticket) return res.status(404).json({ error: 'Support request not found.' });
+
+    let authorName = 'Support Team';
+    try {
+      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      authorName = clerkUser.fullName || clerkUser.firstName || authorName;
+    } catch {
+      // fall back to the generic label above
+    }
+
+    ticket.messages.push({ authorType: 'admin', authorId: clerkUserId, authorName, body });
+    if (ticket.status === 'open') ticket.status = 'in_progress';
+
+    await ticket.save();
+    await notifyUserOfReply(ticket, body);
+
+    return res.status(201).json(ticket);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to send reply', details: err.message });
   }
 };
 
