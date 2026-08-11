@@ -146,7 +146,7 @@ const FinesModal = ({ open, onClose }) => {
                   {fines.map((fine) => (
                     <tr key={fine._id} className="border-b border-border-default last:border-b-0">
                       {isOfficer && (
-                        <td className="px-3 py-3 font-medium text-text-primary">{fine.userId?.username || '—'}</td>
+                        <td className="px-3 py-3 font-medium text-text-primary">{fine.userId?.name || '—'}</td>
                       )}
                       <td className="px-3 py-3 text-text-primary">K{Number(fine.amount).toLocaleString()}</td>
                       <td className="px-3 py-3 max-w-xs text-text-primary" title={fine.note}>{fine.note || '—'}</td>
@@ -206,7 +206,7 @@ const FinesModal = ({ open, onClose }) => {
         <Dialog open={true} onOpenChange={() => setEditingFine(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Fine — {editingFine.userId?.username}</DialogTitle>
+              <DialogTitle>Edit Fine — {editingFine.userId?.name}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4 mt-2">
               <div>
@@ -248,7 +248,7 @@ const FinesModal = ({ open, onClose }) => {
         <Dialog open={true} onOpenChange={() => { setVoidingFine(null); setCancelReason(''); }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Void Fine — {voidingFine.userId?.username}</DialogTitle>
+              <DialogTitle>Void Fine — {voidingFine.userId?.name}</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-text-primary mb-3">
               Amount: <strong>K{Number(voidingFine.amount).toLocaleString()}</strong>
@@ -287,7 +287,7 @@ const FinesModal = ({ open, onClose }) => {
             </DialogHeader>
             <p className="text-sm text-text-primary mb-2">
               Permanently delete fine of <strong>K{Number(deletingFine.amount).toLocaleString()}</strong> for{' '}
-              <strong>{deletingFine.userId?.username}</strong>?
+              <strong>{deletingFine.userId?.name}</strong>?
             </p>
             {deletingFine.paid && !deletingFine.cancelled && (
               <p className="text-sm font-medium mb-3" style={{ color: '#B85A00' }}>

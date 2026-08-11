@@ -66,7 +66,7 @@ export default function MemberSelect({ value, onChange, placeholder = 'Search me
       const q = query.toLowerCase();
       return (m.name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q);
     })
-    .slice(0, 5);
+    .slice(0, 8);
 
   const handleSelect = (member) => {
     setSelected(member);

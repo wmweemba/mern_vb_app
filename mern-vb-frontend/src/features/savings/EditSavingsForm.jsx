@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../../lib/utils';
 
 const EditSavingsForm = ({ saving, onSuccess, onCancel }) => {
   const [form, setForm] = useState({
-    username: saving.userId?.username || '',
+    username: saving.userId?.name || '',
     month: saving.month,
     amount: saving.amount,
     date: saving.date ? new Date(saving.date).toISOString().split('T')[0] : '',

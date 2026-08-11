@@ -262,6 +262,8 @@ These have caused bugs before. Don't repeat them.
 
 7. **Partial payment state** — `paid===false` with `paidAmount>0` is VALID after v3.10.0. This state means an installment has been partially paid (typically interest covered, principal outstanding). It is only a corruption signal if `paidAmount > installment total`. The old `scripts/fixCorruptedLoan.js` has been retired — do not restore or re-run it. See `RETIRED_fixCorruptedLoan.js` for history.
 
+8. **`GroupMember` has `name`, not `username`** — residue from the `User` → `GroupMember` migration left 15 frontend sites reading `userId?.username`, which rendered blank on loan cards, savings/loans exports, fines dialogs, and the payment modal. Fixed 2026-08-11 (Phase 0 of `docs/plan_configurable_group_rules.md`). If you see a blank member name anywhere, grep for `?.username` first before assuming it's a new bug.
+
 ---
 
 ## What NOT to Build (Sprint Constraints)

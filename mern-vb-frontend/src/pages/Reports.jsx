@@ -36,7 +36,6 @@ const generateTransactionPDF = async (filename) => {
     doc.text('Transactions Report', 105, 15, { align: 'center' });
 
     const tableData = transactions.map(t => ([
-      t.userId?.username || '',
       t.userId?.name || '',
       t.type,
       `K${Number(t.amount).toLocaleString()}`,
@@ -46,7 +45,7 @@ const generateTransactionPDF = async (filename) => {
 
     autoTable(doc, {
       startY: 25,
-      head: [['Username', 'Name', 'Type', 'Amount', 'Note', 'Date']],
+      head: [['Name', 'Type', 'Amount', 'Note', 'Date']],
       body: tableData,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [33, 150, 243] },
@@ -72,7 +71,6 @@ const generateLoansPDF = async (filename) => {
     loans.forEach(loan => {
       loan.installments.forEach(installment => {
         tableData.push([
-          loan.userId?.username || '',
           loan.userId?.name || '',
           `K${Number(loan.amount).toLocaleString()}`,
           loan.durationMonths,
@@ -88,7 +86,7 @@ const generateLoansPDF = async (filename) => {
 
     autoTable(doc, {
       startY: 25,
-      head: [['Username', 'Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total', 'Paid', 'Date']],
+      head: [['Name', 'Loan Amount', 'Duration', 'Month', 'Principal', 'Interest', 'Total', 'Paid', 'Date']],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [33, 150, 243] },
@@ -110,7 +108,6 @@ const generateSavingsPDF = async (filename) => {
     doc.text('Savings Report', 105, 15, { align: 'center' });
 
     const tableData = savings.map(saving => ([
-      saving.userId?.username || '',
       saving.userId?.name || '',
       `K${Number(saving.amount).toLocaleString()}`,
       saving.month,
@@ -121,7 +118,7 @@ const generateSavingsPDF = async (filename) => {
 
     autoTable(doc, {
       startY: 25,
-      head: [['Username', 'Name', 'Amount', 'Month', 'Interest Earned', 'Fine', 'Date']],
+      head: [['Name', 'Amount', 'Month', 'Interest Earned', 'Fine', 'Date']],
       body: tableData,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [33, 150, 243] },

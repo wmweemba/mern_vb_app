@@ -13,10 +13,9 @@ export function exportToExcel(data, filename = 'report.xlsx') {
 // ✅ Specialized PDF Export: Loans
 export function exportLoansToPDF(loansData, filename = 'loans_report.pdf') {
   const doc = new jsPDF();
-  const headers = ['Username', 'Name', 'Amount', 'Duration (months)', 'Status'];
+  const headers = ['Name', 'Amount', 'Duration (months)', 'Status'];
 
   const body = loansData.map(loan => [
-    loan.userId?.username || '',
     loan.userId?.name || '',
     `K${Number(loan.amount || 0).toLocaleString()}`,
     loan.durationMonths || '',
@@ -39,10 +38,9 @@ export function exportLoansToPDF(loansData, filename = 'loans_report.pdf') {
 // ✅ Specialized PDF Export: Savings
 export function exportSavingsToPDF(savingsData, filename = 'savings_report.pdf') {
   const doc = new jsPDF();
-  const headers = ['Username', 'Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'];
+  const headers = ['Name', 'Amount', 'Month', 'Date', 'Fine', 'Interest Earned'];
 
   const body = savingsData.map(s => [
-    s.userId?.username || '',
     s.userId?.name || '',
     `K${Number(s.amount || 0).toLocaleString()}`,
     s.month || '',

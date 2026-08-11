@@ -185,7 +185,20 @@ Three payoffs, in order of value:
 
 ---
 
-### Phase 0 — Walkthrough fixes (ship first, independently)
+### Phase 0 — Walkthrough fixes (ship first, independently) — ✅ DONE 2026-08-11
+
+Both fixes implemented and manually verified in a throwaway dev group (created and
+deleted for the test — no real group data touched):
+- 0.1: all 15 `userId?.username` sites replaced with `?.name` (`Loans.jsx`, `Reports.jsx`,
+  `export.js`, `FinesModal.jsx`, `ManagePaymentModal.jsx`, `EditSavingsForm.jsx`). Where a
+  value was shown twice or as a redundant export column, the duplicate was dropped rather
+  than printed twice.
+- 0.2: `ManagePaymentModal.jsx` now uses `MemberSelect` instead of a raw username input,
+  on all three tabs. `MemberSelect` result cap raised from 5 to 8.
+- Verified live: loan card name display, loan details dialog, savings record, and a full
+  loan-repayment flow through the payment modal's member search — all render/resolve
+  correctly. Frontend test suite (10/10) and `pnpm build` both pass.
+
 
 Both are residue from the `User` → `GroupMember` migration. Neither is a regression from recent commits.
 

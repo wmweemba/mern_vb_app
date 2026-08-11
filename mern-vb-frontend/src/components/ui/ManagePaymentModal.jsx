@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/utils';
+import MemberSelect from './MemberSelect';
 
 const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
   const [type, setType] = useState(initialType);
@@ -137,7 +138,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
                 <option value="">Select a fine to pay</option>
                 {unpaidFines.map(fine => (
                   <option key={fine._id} value={fine._id}>
-                    {fine.userId?.username} ({fine.userId?.name}) — K{Number(fine.amount).toLocaleString()}{fine.note ? ` — ${fine.note}` : ''}
+                    {fine.userId?.name} — K{Number(fine.amount).toLocaleString()}{fine.note ? ` — ${fine.note}` : ''}
                   </option>
                 ))}
               </select>
@@ -146,14 +147,12 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
             <>
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
-                  Username
+                  Member
                 </label>
-                <input
+                <MemberSelect
                   value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="Enter username"
-                  className="w-full border border-border-default rounded-md px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                  required
+                  onChange={setUsername}
+                  placeholder="Search member name..."
                 />
               </div>
               <div>

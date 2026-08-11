@@ -91,7 +91,7 @@ const Loans = () => {
               <AccordionTrigger className="py-4">
                 <div className="flex items-center gap-2 w-full">
                   <FaMoneyBillWave className="text-text-secondary flex-shrink-0" />
-                  <span className="font-semibold text-text-primary">{loan.userId?.username}</span>
+                  <span className="font-semibold text-text-primary">{loan.userId?.name}</span>
                   <span className="ml-auto font-bold text-text-primary">K{Number(loan.amount).toLocaleString()}</span>
                   <StatusBadge fullyPaid={loan.fullyPaid} />
                 </div>
@@ -181,7 +181,7 @@ const Loans = () => {
                         <DialogContent>
                           <DialogHeader><DialogTitle>Loan Details</DialogTitle></DialogHeader>
                           <div className="flex flex-col gap-2 text-sm">
-                            <div><strong>Member:</strong> {loan.userId?.name} ({loan.userId?.username})</div>
+                            <div><strong>Member:</strong> {loan.userId?.name}</div>
                             <div><strong>Amount:</strong> K{Number(loan.amount).toLocaleString()}</div>
                             <div><strong>Duration:</strong> {loan.durationMonths} months</div>
                             <div><strong>Status:</strong> {loan.fullyPaid ? 'Paid' : 'Active'}</div>
@@ -217,7 +217,7 @@ const Loans = () => {
         <Dialog open={true} onOpenChange={() => setReversing({ loan: null, month: null })}>
           <DialogContent>
             <DialogHeader><DialogTitle>Reverse Payment</DialogTitle></DialogHeader>
-            <div className="mb-2 text-sm">Are you sure you want to reverse the payment for <strong>Month {reversing.month}</strong> on loan for <strong>{reversing.loan.userId?.username}</strong>?</div>
+            <div className="mb-2 text-sm">Are you sure you want to reverse the payment for <strong>Month {reversing.month}</strong> on loan for <strong>{reversing.loan.userId?.name}</strong>?</div>
             {reverseError && <div className="text-status-overdue-text text-sm mb-2">{reverseError}</div>}
             <DialogFooter>
               <button
@@ -249,7 +249,7 @@ const Loans = () => {
         <Dialog open={true} onOpenChange={() => { setDeletingLoan(null); setDeleteError(''); }}>
           <DialogContent>
             <DialogHeader><DialogTitle>Delete Loan</DialogTitle></DialogHeader>
-            <div className="mb-2 text-sm">Are you sure you want to <strong>permanently delete</strong> the loan for <strong>{deletingLoan.userId?.username}</strong> (K{Number(deletingLoan.amount).toLocaleString()})?</div>
+            <div className="mb-2 text-sm">Are you sure you want to <strong>permanently delete</strong> the loan for <strong>{deletingLoan.userId?.name}</strong> (K{Number(deletingLoan.amount).toLocaleString()})?</div>
             <div className="text-xs text-text-secondary mb-2">The disbursed amount will be restored to the bank balance. This cannot be undone.</div>
             {deleteError && <div className="text-status-overdue-text text-sm mb-2">{deleteError}</div>}
             <DialogFooter>
