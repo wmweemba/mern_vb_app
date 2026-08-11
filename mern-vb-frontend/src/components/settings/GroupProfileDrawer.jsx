@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import SlideoverDrawer from '../ui/SlideoverDrawer';
+import Select from '../ui/Select';
 import { API_BASE_URL } from '../../lib/utils';
 
 const MEETING_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Not set'];
@@ -84,26 +85,24 @@ export default function GroupProfileDrawer({ open, onClose, onSaved, settings })
           </div>
           <div>
             <p className={labelClass}>Meeting Day</p>
-            <select
+            <Select
               value={meetingDay}
               onChange={(e) => setMeetingDay(e.target.value)}
-              className={inputClass}
             >
               {MEETING_DAYS.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <p className={labelClass}>Cycle Length</p>
-            <select
+            <Select
               value={cycleLengthMonths}
               onChange={(e) => setCycleLengthMonths(e.target.value)}
-              className={inputClass}
             >
               <option value="6">6 months</option>
               <option value="12">12 months</option>
-            </select>
+            </Select>
           </div>
           <div>
             <p className={labelClass}>Currency</p>

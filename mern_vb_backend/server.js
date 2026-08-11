@@ -29,6 +29,7 @@ app.use('/api/loans', require('./routes/loans'));
 app.use('/api/cycle', require('./routes/cycle'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/group-settings', require('./routes/groupSettings'));
+app.use('/api/group-templates', require('./routes/groupTemplates'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/invites', require('./routes/invites'));
 app.use('/api/billing', require('./routes/billingRoutes'));

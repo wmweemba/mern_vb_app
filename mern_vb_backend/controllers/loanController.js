@@ -70,7 +70,7 @@ exports.reverseInstallmentPayment = async (req, res) => {
 const Loan = require('../models/Loans');
 const GroupMember = require('../models/GroupMember');
 const Savings = require('../models/Savings');
-const calculateLoanSchedule = require('../utils/loanCalculator');
+const { resolveLoanAccrualStrategy } = require('../utils/strategies/loanAccrual');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { getSettings } = require('./groupSettingsController');
@@ -179,7 +179,8 @@ exports.updateLoan = async (req, res) => {
           }
         }
       } else if (!repaymentsStarted) {
-        const { schedule } = calculateLoanSchedule(finalAmount, finalDuration, loan.interestRate, loan.interestMethod || 'reducing');
+        const strategy = resolveLoanAccrualStrategy({ interestMethod: loan.interestMethod || 'reducing' });
+        const { schedule } = strategy.onDisburse(finalAmount, finalDuration, loan.interestRate);
         loan.installments = schedule;
       }
     }
@@ -232,7 +233,8 @@ exports.createLoan = async (req, res) => {
       });
     }
 
-    const { schedule } = calculateLoanSchedule(amount, duration, appliedInterestRate, settings.interestMethod);
+    const strategy = resolveLoanAccrualStrategy(settings);
+    const { schedule } = strategy.onDisburse(amount, duration, appliedInterestRate);
 
     const loan = new Loan({
       ...req.groupScope,

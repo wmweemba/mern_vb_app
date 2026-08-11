@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/utils';
+import Select from './Select';
 
 const ReportSelectionModal = ({ open, onClose, onSelect }) => {
   const [cycleType, setCycleType] = useState('current');
@@ -118,10 +119,9 @@ const ReportSelectionModal = ({ open, onClose, onSelect }) => {
                 {cycleType === 'historical' && (
                   <div className="ml-7">
                     {availableCycles.length > 0 ? (
-                      <select
+                      <Select
                         value={selectedCycle}
                         onChange={(e) => setSelectedCycle(e.target.value)}
-                        className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
                       >
                         <option value="">Choose a cycle…</option>
                         {availableCycles.map((cycle) => (
@@ -129,7 +129,7 @@ const ReportSelectionModal = ({ open, onClose, onSelect }) => {
                             Cycle {cycle.cycleNumber} ({formatCycleDate(cycle.createdAt)})
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     ) : (
                       <p className="text-xs text-text-muted italic">
                         No historical cycles available

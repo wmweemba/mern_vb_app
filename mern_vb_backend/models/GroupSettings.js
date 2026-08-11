@@ -96,6 +96,22 @@ const groupSettingsSchema = new mongoose.Schema({
     enum: ['proportional', 'equal'],
   },
 
+  // Configurable group rules (docs/plan_configurable_group_rules.md Phase 1) —
+  // which archetype this group was created from, and the behavioural policy for
+  // each seam. Defaults below match 'village_bank', so any group that predates
+  // templates keeps its exact current behaviour once backfilled.
+  templateKey: { type: String, default: 'village_bank' },
+  policies: {
+    loanAccrual:        { type: String, enum: ['scheduled_reducing', 'scheduled_flat', 'revolving_monthly', 'term_flat'], default: 'scheduled_reducing' },
+    arrears:             { type: String, enum: ['none', 'capitalise'], default: 'none' },
+    loanLimit:           { type: String, enum: ['none', 'fixed_cap', 'savings_multiple'], default: 'savings_multiple' },
+    concurrentLoans:      { type: String, enum: ['unlimited', 'one_at_a_time'], default: 'unlimited' },
+    interestObligation:   { type: String, enum: ['none', 'per_member_quota'], default: 'none' },
+    cycleEnd:             { type: String, enum: ['pooled_external', 'shareout_equal', 'shareout_proportional'], default: 'shareout_proportional' },
+    exit:                 { type: String, enum: ['settle_and_refund', 'forfeit'], default: 'settle_and_refund' },
+  },
+  interestObligationAmount: { type: Number, default: 0, min: 0 },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

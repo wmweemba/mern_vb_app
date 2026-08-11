@@ -1,6 +1,7 @@
 const { updateBankBalance } = require('./bankBalanceController');
 const { logTransaction } = require('./transactionController');
 const { getSettings } = require('./groupSettingsController');
+const { resolveLoanAccrualStrategy } = require('../utils/strategies/loanAccrual');
 const GroupMember = require('../models/GroupMember');
 const Fine = require('../models/Fine');
 const Loan = require('../models/Loans');
@@ -50,30 +51,8 @@ exports.repayment = async (req, res) => {
       return res.status(400).json({ error: 'All loan installments are already paid' });
     }
 
-    let installmentsToUpdate = [];
-    let currentInstallment = nextInstallment;
-    let remainingPayment = paymentAmount;
-
-    let idx = loan.installments.findIndex(inst => inst.month === currentInstallment.month);
-    while (remainingPayment > 0 && idx < loan.installments.length) {
-      const inst = loan.installments[idx];
-      if (!inst.paid) {
-        const currentPaid = inst.paidAmount || 0;
-        const amountNeeded = inst.total - currentPaid;
-        const paymentForThis = Math.min(remainingPayment, amountNeeded);
-
-        installmentsToUpdate.push({
-          index: idx,
-          newPaidAmount: currentPaid + paymentForThis,
-          willBePaid: (currentPaid + paymentForThis) >= inst.total,
-          paymentApplied: paymentForThis
-        });
-
-        remainingPayment -= paymentForThis;
-        if (remainingPayment <= 0) break;
-      }
-      idx++;
-    }
+    const strategy = resolveLoanAccrualStrategy({ interestMethod: loan.interestMethod || 'reducing' });
+    const installmentsToUpdate = strategy.applyPayment(loan, paymentAmount);
 
     if (installmentsToUpdate.length === 0) {
       await session.abortTransaction();

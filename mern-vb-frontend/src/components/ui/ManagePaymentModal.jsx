@@ -3,6 +3,7 @@ import axios from 'axios';
 import { X } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/utils';
 import MemberSelect from './MemberSelect';
+import Select from './Select';
 
 const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
   const [type, setType] = useState(initialType);
@@ -129,10 +130,9 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
               <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
                 Select Fine
               </label>
-              <select
+              <Select
                 value={fineId}
                 onChange={e => setFineId(e.target.value)}
-                className="w-full border border-border-default rounded-md px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
                 required
               >
                 <option value="">Select a fine to pay</option>
@@ -141,7 +141,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
                     {fine.userId?.name} — K{Number(fine.amount).toLocaleString()}{fine.note ? ` — ${fine.note}` : ''}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ) : (
             <>

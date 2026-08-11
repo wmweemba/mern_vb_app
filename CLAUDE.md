@@ -214,6 +214,39 @@ The app is a fully installable PWA:
 
 ## Frontend Architecture Patterns
 
+### UI Spec Compliance — Mandatory
+
+**Any frontend UI work — new components, edited components, new pages — must follow
+`UI_SPEC.md` exactly, unless the user explicitly instructs otherwise for that specific
+change.** Read `UI_SPEC.md` before writing JSX, not after. This is not a style
+preference; treat it the same as a functional requirement.
+
+This was added 2026-08-11 after an audit found every `<select>` in the app (16 files)
+rendering as a bare native dropdown — correct height/border/radius in most cases, but
+missing §6.8's required custom chevron, so every dropdown showed the browser's own OS
+arrows instead. The pattern had been copy-pasted file to file for months because
+nothing forced a check against the spec at write time. Concretely:
+
+- **Before adding or editing any input, select, button, card, badge, drawer, or nav
+  element, check `UI_SPEC.md` §6 (Component Library) for an existing pattern first.**
+  If one exists, use it (or the shared component it maps to) — don't hand-roll a new
+  Tailwind className string that happens to look similar.
+- **Dropdowns:** use `components/ui/Select.jsx` — never a raw `<select>`. It already
+  implements §6.8 (height, border, radius, custom chevron, focus state). See its
+  header comment for `className` (wrapper sizing) vs `selectClassName` (escape hatch).
+- **Colour, spacing, radius, typography:** pull from the tokens in `UI_SPEC.md` §2–4
+  (`--color-*`, `--space-*`, `--radius-*`, `--text-*`), via the Tailwind classes in
+  §11.1, not arbitrary hex values or one-off pixel sizes.
+- **Before marking any frontend task done, re-read the relevant `UI_SPEC.md` section
+  once more against the diff** — the same way the test suite gates a backend change,
+  spec conformance gates a frontend one.
+- If a legacy file is already off-spec in ways beyond what the current task touches
+  (e.g. `pages/Users.jsx` is styled with raw Tailwind defaults throughout), fix what
+  the task's own component type touches (per the sweep above, that meant every select
+  in the file) and flag the rest rather than silently expanding scope to a full
+  rewrite — but don't ship a *new* off-spec element into an already-off-spec file
+  either.
+
 ### State Management
 - **Zustand** for global state (store/)
 - Local component state for UI-only state
@@ -358,6 +391,46 @@ Test files:
 - `mern-vb-frontend/src/__tests__/` — component tests (Testing Library)
 
 Run tests after any change to calculation logic. The loanSavingsController.test.js and reportController.test.js are the most critical.
+
+---
+
+## Dev Test Accounts — Headless Browser Verification
+
+Verifying a UI change in a real browser needs a signed-in session, but Clerk's real
+sign-up/sign-in flows both end in a magic link or an emailed OTP — no good for an
+agent with no inbox. `mern_vb_backend/scripts/createThrowawayTestUser.js` implements
+the documented workaround (full technique + gotchas: second brain
+`systems/NS-020-clerk-headless-test-session.md`):
+
+```bash
+# No group — lands on /welcome → /onboarding (for testing the onboarding wizard)
+node scripts/createThrowawayTestUser.js
+
+# With a group — lands straight on an authenticated page
+node scripts/createThrowawayTestUser.js --group "ZZZ_TEST My Group" --template village_bank
+
+# Cleanup (always do this — see below)
+node scripts/createThrowawayTestUser.js --delete <clerkUserId> [--groupId <id>]
+```
+
+It creates a pre-verified Clerk user via the Backend API (no email ever sent), then
+sign in through the real `/sign-in` form with the printed email/password — a "new
+device" OTP challenge fires, satisfied by the fixed Clerk test code **424242**
+(only works because the email uses the `+clerk_test@` convention; this does NOT work
+around the *signup* flow's magic-link step, only the *sign-in* OTP step).
+
+**Safety:**
+- The script refuses to run unless `CLERK_SECRET_KEY` starts with `sk_test_` — never
+  point this at a live Clerk instance.
+- MongoDB is currently still the shared production Atlas database (see the DB section
+  above) — every `--group` run creates a real `Group`/`GroupMember`/`GroupSettings`/
+  `BankBalance`/`SocialFundBalance`/`ContributionType` set of documents. **Always
+  clean up with `--delete` when done**, and prefix test group names with `ZZZ_TEST`
+  so they're easy to spot if a cleanup is ever missed.
+- `Clerk.setActive({ session })` from the browser console does **not** reliably work
+  for this — a session minted via the Backend API isn't bound to the browser's own
+  Clerk `client`, so `__client_uat` stays `0` and the app never sees it as signed in.
+  Use the real `/sign-in` form + OTP path above instead.
 
 ---
 
@@ -526,5 +599,25 @@ Added 2026-08-11 (Phase 0.5 of `docs/plan_configurable_group_rules.md`). Key dec
 
 ---
 
-*Last updated: 2026-08-11 — support ticket two-way threading added*
+## Configurable Group Rules (Phase 1) — Architecture Notes
+
+Added 2026-08-11 (Phase 1 of `docs/plan_configurable_group_rules.md`: template + policy architecture). **Behaviour-neutral for every existing group** — this phase only wires the seams; no new arithmetic ships until Phase 2 (revolving accrual). Key decisions recorded here to prevent regression:
+
+1. **Templates are copied at group creation, never referenced live.** `GroupTemplate` is a small platform catalogue (`village_bank`, `grocery_chilimba` seeded by `scripts/seedGroupTemplates.js`). `groupController.createGroup` reads a template's `defaults`/`policies` once and writes them onto the new `GroupSettings` document; editing a template afterwards never retroactively changes an existing group. If the catalogue isn't seeded, `createGroup` falls back to a hardcoded constant matching the exact pre-Phase-1 literals, so group creation can never break on a missing template.
+
+2. **`interestMethod` stays authoritative for scheduled loans — `policies.loanAccrual` doesn't override it.** `utils/strategies/loanAccrual/index.js`'s `resolveLoanAccrualStrategy()` only trusts the stored `policies.loanAccrual` value to pick a *family* (scheduled vs. revolving vs. term-flat). For the two scheduled families it re-derives reducing-vs-flat from `GroupSettings.interestMethod` every time, because Phase 1 doesn't expose a policy editor in the UI — an admin editing interest method via the existing Settings drawer must not silently stop taking effect because a stale policy value disagrees.
+
+3. **`loanCalculator.js` is untouched.** `scheduledReducing.js`/`scheduledFlat.js` are thin wrappers around it. The `flat` branch's known double-charge defect (bills 25%-over-8-weeks groups like Grocery Champions twice) is unchanged and intentionally out of scope — it belongs to `term_flat` (parked, Champions only).
+
+4. **`paymentController.repayment`'s allocation loop moved into the strategy, unchanged.** `applyPayment()` in `utils/strategies/loanAccrual/scheduledCommon.js` is an exact extraction of the sequential-installment-allocation algorithm that used to live inline — verified byte-for-byte against `tests/paymentController.test.js`'s 7 cases (partial payments, auto-fines, overpayment spanning installments, session rollback) with no test changes needed.
+
+5. **Template switching is a separate, guarded endpoint.** `PUT /api/group-settings/template` (not the general settings `PUT`) — refuses to switch once the group has any non-archived `Transaction` (mid-cycle switch would silently restate every open loan's arithmetic, per the plan's §3.3 rule). There's no `Cycle` model yet (that's Phase 5), so "has the current cycle started" is approximated as "does this group have any transaction at all" — revisit once Phase 5 ships a real cycle boundary.
+
+6. **Two new backfill/seed scripts, neither run against production yet.** `scripts/seedGroupTemplates.js` (creates the 2-template catalogue) and `scripts/backfillGroupSettingsPolicies.js` (persists `templateKey`/`policies` on existing `GroupSettings` docs, derived from their own `interestMethod`/`profitSharingMethod` — safe because Mongoose already applies the schema's `village_bank`-shaped defaults to any document that predates these fields, so nothing was silently wrong before this ran either). **Not yet executed against the shared Atlas database** — run manually when ready, per the outstanding DB-cutover plan.
+
+7. **Onboarding wizard is now template-length, not fixed-4-step.** `pages/Onboarding.jsx`'s step list is computed from the chosen template (`steps = ['template','details','lending', ...('fines' if features.fines), 'confirm']`) — a `grocery_chilimba` selection skips the Fine Rules step entirely and swaps the Lending Rules fields (no interest method / loan-limit multiplier; adds the interest-quota amount when `policies.interestObligation === 'per_member_quota'`). This is a deliberate, plan-mandated deviation from `UI_SPEC.md` §6.12's literal "4 pills" — the pill *pattern* is unchanged, only the count is now dynamic. **Not verified live in a browser** — `/onboarding` requires a signed-in Clerk session with no existing group, which needs real (or throwaway) Clerk credentials; verified via `pnpm build` + code review only.
+
+---
+
+*Last updated: 2026-08-11 — Phase 1 (configurable group rules: templates + policy architecture) added*
 *Next review: April 7 (Week 1 checkpoint)*

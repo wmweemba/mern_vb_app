@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
+import Select from '../components/ui/Select';
 
 const DEFAULTS = {
   cycleLengthMonths: 6,
@@ -13,37 +14,111 @@ const DEFAULTS = {
   lateFineType: 'fixed',
 };
 
-const STEP_LABELS = { 1: 'Group Details', 2: 'Lending Rules', 3: 'Fine Rules', 4: 'Confirm & Launch' };
+// Fallback catalogue shown if GET /api/group-templates fails or hasn't been seeded —
+// same two archetypes the backend seeds by default, so onboarding still works.
+const FALLBACK_TEMPLATES = [
+  {
+    key: 'village_bank', name: 'Village Bank',
+    description: 'Standard savings group: scheduled loans repaid over fixed installments, profit share-out at cycle end.',
+    policies: { loanAccrual: 'scheduled_reducing', interestObligation: 'none' },
+    features: { fines: true, shareOut: true, savingsInterest: true },
+    defaults: DEFAULTS,
+  },
+  {
+    key: 'grocery_chilimba', name: 'Grocery Savings Group',
+    description: 'Members save monthly and borrow from a revolving pool; funds buy groceries in bulk at cycle end. No fines, no fixed installments.',
+    policies: { loanAccrual: 'revolving_monthly', interestObligation: 'per_member_quota' },
+    features: { fines: false, shareOut: false, savingsInterest: false },
+    defaults: { ...DEFAULTS, interestRate: 10 },
+  },
+];
 
-const fieldClass = "h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors";
 const labelClass = "block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1";
+const fieldClass = "h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors";
 const helpClass = "text-xs text-text-muted mt-1";
 
 export default function Onboarding() {
   const { refreshMembership } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+
+  const [templates, setTemplates] = useState(FALLBACK_TEMPLATES);
+  const [templateKey, setTemplateKey] = useState('');
+  const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Step 1 fields
+  // Group Details
   const [groupName, setGroupName] = useState('');
   const [meetingDay, setMeetingDay] = useState('Saturday');
   const [cycleStartDate, setCycleStartDate] = useState('');
   const [cycleLengthMonths, setCycleLengthMonths] = useState(DEFAULTS.cycleLengthMonths);
 
-  // Step 2 fields
+  // Lending Rules
   const [treasurerName, setTreasurerName] = useState('');
   const [phone, setPhone] = useState('');
   const [interestRate, setInterestRate] = useState(DEFAULTS.interestRate);
   const [interestMethod, setInterestMethod] = useState(DEFAULTS.interestMethod);
   const [loanLimitMultiplier, setLoanLimitMultiplier] = useState(DEFAULTS.loanLimitMultiplier);
+  const [interestObligationAmount, setInterestObligationAmount] = useState(0);
 
-  // Step 3 fields
+  // Fine Rules
   const [lateFineAmount, setLateFineAmount] = useState(DEFAULTS.lateFineAmount);
   const [lateFineType, setLateFineType] = useState(DEFAULTS.lateFineType);
   const [partialPaymentFineAmount, setPartialPaymentFineAmount] = useState(0);
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/group-templates`)
+      .then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) setTemplates(res.data);
+      })
+      .catch(() => { /* keep FALLBACK_TEMPLATES */ });
+  }, []);
+
+  const selectedTemplate = useMemo(
+    () => templates.find(t => t.key === templateKey) || null,
+    [templates, templateKey]
+  );
+
+  const isRevolving = selectedTemplate?.policies?.loanAccrual === 'revolving_monthly';
+  const hasQuota = selectedTemplate?.policies?.interestObligation === 'per_member_quota';
+  const showFineStep = selectedTemplate ? selectedTemplate.features?.fines !== false : true;
+
+  // Steps are template-dependent: Fine Rules is skipped entirely for a template with
+  // no fines (e.g. grocery_chilimba), per docs/plan_configurable_group_rules.md §2.3.
+  const steps = useMemo(() => {
+    const s = ['template', 'details', 'lending'];
+    if (showFineStep) s.push('fines');
+    s.push('confirm');
+    return s;
+  }, [showFineStep]);
+
+  const STEP_LABELS = {
+    template: 'Choose a Template',
+    details: 'Group Details',
+    lending: 'Lending Rules',
+    fines: 'Fine Rules',
+    confirm: 'Confirm & Launch',
+  };
+
+  const step = steps[stepIndex];
+  const goTo = name => setStepIndex(steps.indexOf(name));
+  const goNext = () => setStepIndex(i => Math.min(i + 1, steps.length - 1));
+  const goBack = () => setStepIndex(i => Math.max(i - 1, 0));
+
+  const handleSelectTemplate = key => {
+    setTemplateKey(key);
+    const tpl = templates.find(t => t.key === key);
+    if (tpl?.defaults) {
+      setCycleLengthMonths(tpl.defaults.cycleLengthMonths ?? DEFAULTS.cycleLengthMonths);
+      setInterestRate(tpl.defaults.interestRate ?? DEFAULTS.interestRate);
+      setInterestMethod(tpl.defaults.interestMethod ?? DEFAULTS.interestMethod);
+      setLoanLimitMultiplier(tpl.defaults.loanLimitMultiplier ?? DEFAULTS.loanLimitMultiplier);
+      setInterestObligationAmount(tpl.defaults.interestObligationAmount ?? 0);
+    }
+    setError('');
+    goNext();
+  };
 
   const handleSubmit = async () => {
     if (!groupName.trim() || !treasurerName.trim()) {
@@ -63,9 +138,10 @@ export default function Onboarding() {
         interestRate,
         interestMethod,
         loanLimitMultiplier,
-        lateFineAmount,
+        lateFineAmount: showFineStep ? lateFineAmount : 0,
         lateFineType,
-        partialPaymentFineAmount,
+        partialPaymentFineAmount: showFineStep ? partialPaymentFineAmount : 0,
+        templateKey: templateKey || 'village_bank',
       });
       await refreshMembership();
       setShowWelcome(true);
@@ -105,17 +181,36 @@ export default function Onboarding() {
         {/* Heading */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-text-primary">Setup Your Chama</h1>
-          <p className="text-sm text-text-secondary mt-1">Step {step} of 4: {STEP_LABELS[step]}</p>
+          <p className="text-sm text-text-secondary mt-1">Step {stepIndex + 1} of {steps.length}: {STEP_LABELS[step]}</p>
         </div>
 
         {/* Step indicator pills */}
         <div className="flex justify-center gap-1.5">
-          {[1, 2, 3, 4].map(n => (
-            <div key={n} className={`h-1.5 rounded-full transition-all ${step === n ? 'w-8 bg-brand-primary' : 'w-6 bg-border-default'}`} />
+          {steps.map((s, i) => (
+            <div key={s} className={`h-1.5 rounded-full transition-all ${i === stepIndex ? 'w-8 bg-brand-primary' : 'w-6 bg-border-default'}`} />
           ))}
         </div>
 
-        {step === 1 && (
+        {step === 'template' && (
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">Pick the setup that matches how your group actually runs. You can change this later, before your first cycle has any transactions.</p>
+            <div className="space-y-3">
+              {templates.map(tpl => (
+                <button
+                  key={tpl.key}
+                  onClick={() => handleSelectTemplate(tpl.key)}
+                  className="w-full text-left border border-border-default rounded-md p-4 hover:border-brand-primary hover:bg-brand-light/40 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-text-primary">{tpl.name}</p>
+                  <p className="text-xs text-text-secondary mt-1">{tpl.description}</p>
+                </button>
+              ))}
+            </div>
+            {error && <p className="text-status-overdue-text text-sm">{error}</p>}
+          </div>
+        )}
+
+        {step === 'details' && (
           <div className="space-y-4">
             <div>
               <label className={labelClass}>Group name</label>
@@ -125,11 +220,11 @@ export default function Onboarding() {
             </div>
             <div>
               <label className={labelClass}>Meeting day</label>
-              <select value={meetingDay} onChange={e => setMeetingDay(e.target.value)} className={fieldClass}>
+              <Select value={meetingDay} onChange={e => setMeetingDay(e.target.value)}>
                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d =>
                   <option key={d} value={d}>{d}</option>
                 )}
-              </select>
+              </Select>
             </div>
             <div>
               <label className={labelClass}>Cycle start date</label>
@@ -139,22 +234,25 @@ export default function Onboarding() {
             </div>
             <div>
               <label className={labelClass}>Cycle length</label>
-              <select value={cycleLengthMonths} onChange={e => setCycleLengthMonths(Number(e.target.value))} className={fieldClass}>
+              <Select value={cycleLengthMonths} onChange={e => setCycleLengthMonths(Number(e.target.value))}>
                 <option value={6}>6 months</option>
                 <option value={12}>12 months</option>
-              </select>
+              </Select>
               <p className={helpClass}>How long is one full savings-and-lending cycle?</p>
             </div>
             {error && <p className="text-status-overdue-text text-sm">{error}</p>}
-            <button
-              onClick={() => { if (groupName.trim()) { setError(''); setStep(2); } else setError('Please enter a group name.'); }}
-              className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
-              Next
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => goTo('template')} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
+              <button
+                onClick={() => { if (groupName.trim()) { setError(''); goNext(); } else setError('Please enter a group name.'); }}
+                className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
+                Next
+              </button>
+            </div>
           </div>
         )}
 
-        {step === 2 && (
+        {step === 'lending' && (
           <div className="space-y-4">
             <div>
               <label className={labelClass}>Your display name</label>
@@ -169,39 +267,62 @@ export default function Onboarding() {
                 className={fieldClass} />
             </div>
             <div>
-              <label className={labelClass}>Interest rate (%)</label>
+              <label className={labelClass}>{isRevolving ? 'Monthly interest rate (%)' : 'Interest rate (%)'}</label>
               <input type="number" min="1" max="50" value={interestRate}
                 onChange={e => setInterestRate(Number(e.target.value))}
                 className={fieldClass} />
-              <p className={helpClass}>The interest rate charged on loans. E.g. 10 means 10% interest.</p>
-            </div>
-            <div>
-              <label className={labelClass}>Interest method</label>
-              <select value={interestMethod} onChange={e => setInterestMethod(e.target.value)} className={fieldClass}>
-                <option value="reducing">Reducing balance</option>
-                <option value="flat">Flat rate</option>
-              </select>
               <p className={helpClass}>
-                {interestMethod === 'reducing'
-                  ? 'Interest decreases as the loan is repaid — fairer for borrowers.'
-                  : 'Same interest charge every installment — simpler to explain.'}
+                {isRevolving
+                  ? 'Charged each month on whatever balance a member still owes — there is no fixed schedule.'
+                  : 'The interest rate charged on loans. E.g. 10 means 10% interest.'}
               </p>
             </div>
-            <div>
-              <label className={labelClass}>Loan limit multiplier</label>
-              <input type="number" min="1" max="10" value={loanLimitMultiplier}
-                onChange={e => setLoanLimitMultiplier(Number(e.target.value))}
-                className={fieldClass} />
-              <p className={helpClass}>
-                Members can borrow up to X times their total savings.
-                E.g. 3 means a member with K1,000 saved can borrow up to K3,000.
-              </p>
-            </div>
+
+            {!isRevolving && (
+              <>
+                <div>
+                  <label className={labelClass}>Interest method</label>
+                  <Select value={interestMethod} onChange={e => setInterestMethod(e.target.value)}>
+                    <option value="reducing">Reducing balance</option>
+                    <option value="flat">Flat rate</option>
+                  </Select>
+                  <p className={helpClass}>
+                    {interestMethod === 'reducing'
+                      ? 'Interest decreases as the loan is repaid — fairer for borrowers.'
+                      : 'Same interest charge every installment — simpler to explain.'}
+                  </p>
+                </div>
+                <div>
+                  <label className={labelClass}>Loan limit multiplier</label>
+                  <input type="number" min="1" max="10" value={loanLimitMultiplier}
+                    onChange={e => setLoanLimitMultiplier(Number(e.target.value))}
+                    className={fieldClass} />
+                  <p className={helpClass}>
+                    Members can borrow up to X times their total savings.
+                    E.g. 3 means a member with K1,000 saved can borrow up to K3,000.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {hasQuota && (
+              <div>
+                <label className={labelClass}>Mandatory interest quota (K)</label>
+                <input type="number" min="0" value={interestObligationAmount}
+                  onChange={e => setInterestObligationAmount(Number(e.target.value))}
+                  className={fieldClass} />
+                <p className={helpClass}>
+                  Every member owes this much interest per cycle, whether from their own borrowing
+                  or a direct top-up payment. Set to 0 if the group has no such rule.
+                </p>
+              </div>
+            )}
+
             {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
+              <button onClick={() => goTo('details')} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
               <button
-                onClick={() => { if (treasurerName.trim()) { setError(''); setStep(3); } else setError('Please enter your name.'); }}
+                onClick={() => { if (treasurerName.trim()) { setError(''); goNext(); } else setError('Please enter your name.'); }}
                 className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
                 Next
               </button>
@@ -209,7 +330,7 @@ export default function Onboarding() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 'fines' && (
           <div className="space-y-4">
             <div>
               <label className={labelClass}>Late payment fine</label>
@@ -224,10 +345,10 @@ export default function Onboarding() {
             </div>
             <div>
               <label className={labelClass}>Fine type</label>
-              <select value={lateFineType} onChange={e => setLateFineType(e.target.value)} className={fieldClass}>
+              <Select value={lateFineType} onChange={e => setLateFineType(e.target.value)}>
                 <option value="fixed">Fixed amount (e.g. K500)</option>
                 <option value="percentage">Percentage of overdue amount</option>
-              </select>
+              </Select>
             </div>
             <div>
               <label className={labelClass}>Partial payment fine</label>
@@ -238,8 +359,8 @@ export default function Onboarding() {
             </div>
             {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
-              <button onClick={() => { setError(''); setStep(4); }}
+              <button onClick={() => goTo('lending')} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
+              <button onClick={() => { setError(''); goNext(); }}
                 className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors">
                 Next
               </button>
@@ -247,24 +368,36 @@ export default function Onboarding() {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 'confirm' && (
           <div className="space-y-4">
             <div className="bg-surface-page rounded-lg p-4 space-y-2 text-sm text-text-primary">
+              <p><span className="font-medium">Template:</span> {selectedTemplate?.name || 'Village Bank'}</p>
               <p><span className="font-medium">Group:</span> {groupName}</p>
               <p><span className="font-medium">Meeting day:</span> {meetingDay}</p>
               <p><span className="font-medium">Cycle:</span> {cycleLengthMonths} months{cycleStartDate ? `, starting ${cycleStartDate}` : ''}</p>
               <p><span className="font-medium">Your name:</span> {treasurerName}</p>
               {phone && <p><span className="font-medium">Phone:</span> {phone}</p>}
-              <p><span className="font-medium">Interest:</span> {interestRate}% ({interestMethod} balance)</p>
-              <p><span className="font-medium">Loan limit:</span> {loanLimitMultiplier}x savings</p>
-              <p><span className="font-medium">Late fine:</span> {lateFineType === 'fixed' ? `K${lateFineAmount}` : `${lateFineAmount}%`}</p>
-              <p><span className="font-medium">Partial payment fine:</span> {partialPaymentFineAmount > 0 ? `K${partialPaymentFineAmount}` : 'None'}</p>
+              {isRevolving
+                ? <p><span className="font-medium">Interest:</span> {interestRate}% monthly, on outstanding balance</p>
+                : <>
+                    <p><span className="font-medium">Interest:</span> {interestRate}% ({interestMethod} balance)</p>
+                    <p><span className="font-medium">Loan limit:</span> {loanLimitMultiplier}x savings</p>
+                  </>
+              }
+              {hasQuota && <p><span className="font-medium">Interest quota:</span> {interestObligationAmount > 0 ? `K${interestObligationAmount} per member per cycle` : 'None'}</p>}
+              {showFineStep
+                ? <>
+                    <p><span className="font-medium">Late fine:</span> {lateFineType === 'fixed' ? `K${lateFineAmount}` : `${lateFineAmount}%`}</p>
+                    <p><span className="font-medium">Partial payment fine:</span> {partialPaymentFineAmount > 0 ? `K${partialPaymentFineAmount}` : 'None'}</p>
+                  </>
+                : <p><span className="font-medium">Fines:</span> Not used by this group type</p>
+              }
               <p><span className="font-medium">Your role:</span> Admin</p>
               <p><span className="font-medium">Free trial:</span> 15 days</p>
             </div>
             {error && <p className="text-status-overdue-text text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={() => setStep(3)} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
+              <button onClick={goBack} className="flex-1 border border-border-default rounded-md py-3 text-sm text-text-secondary hover:bg-surface-page transition-colors">Back</button>
               <button onClick={handleSubmit} disabled={loading}
                 className="flex-1 bg-brand-primary hover:bg-brand-hover text-white py-3 rounded-md text-sm font-semibold transition-colors disabled:opacity-50">
                 {loading ? 'Creating...' : 'Create Group'}

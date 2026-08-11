@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
 import MemberSelect from '../../components/ui/MemberSelect';
+import Select from '../../components/ui/Select';
 
 const inputCls = 'h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
 const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
@@ -103,18 +104,17 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
 
       <div>
         <label className={labelCls}>Contribution Type</label>
-        <select
+        <Select
           name="contributionTypeId"
           value={form.contributionTypeId}
           onChange={handleTypeChange}
-          className={inputCls}
           required
         >
           <option value="">Select type...</option>
           {types.map(t => (
             <option key={t._id} value={t._id}>{t.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
