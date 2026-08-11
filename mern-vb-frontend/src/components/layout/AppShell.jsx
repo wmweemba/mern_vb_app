@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/auth';
 import DesktopSidebar from './DesktopSidebar';
@@ -18,8 +18,16 @@ import HelpSupport from '../support/HelpSupport';
 const canAccessOperations = user => ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
 export default function AppShell({ children }) {
-  const { user } = useAuth();
+  const { user, adminMode, applyAdminMode } = useAuth();
   const navigate = useNavigate();
+
+  // AppShell only renders on non-admin routes — if adminMode is still true here
+  // (e.g. a leftover from a stale sessionStorage flag, or a nav link that didn't
+  // exit admin mode before routing away from /admin/*), correct it so the TopBar
+  // and mobile drawer stop disagreeing with the desktop sidebar shown below.
+  useEffect(() => {
+    if (adminMode) applyAdminMode(false);
+  }, [adminMode]);
 
   // Modal state (moved from Navbar)
   const [showBankBalance, setShowBankBalance] = useState(false);
