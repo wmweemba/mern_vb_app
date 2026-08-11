@@ -491,7 +491,24 @@ All five scoping questions answered. **Two answers changed the plan** (§2.6 bor
 
 ### 7.1 Still open
 
-1. **The definition of "Added Interest" does not match the data.** Simon describes it as interest arising because a member rolled a loan over into a bigger one. But the workbook shows Sandra with `Added Interest` of **K1,050 in a single April entry — exactly the full quota — with no loan activity**, and Natasha and Lucy with round amounts against no borrowing. That reads as a **direct cash payment to settle the quota**, which is precisely the Grocery Champions "NIL LOAN" mechanic. These are different features: one is a by-product of borrowing, the other is a payment type a non-borrower needs. **Ask Simon directly: can a member who never borrows simply pay K1,050 in cash to clear their obligation?** If yes, the Interest Top-Up contribution type in Phase 3 is required as specified. If no, Phase 3 needs rethinking for Grace, though Champions still needs it.
+1. ~~**The definition of "Added Interest" does not match the data.**~~ **Resolved 2026-08-11 — and it unifies two features we thought were separate.** Simon confirms a member who never borrows can simply pay the K1,050. His framing is the important part:
+
+   > *"It's treated like a forced loan where the member does not take the cash out of the pot and decides to simply pay the interest only."*
+
+   **The interest quota is forced borrowing.** It is a *notional* loan — the member is deemed to have borrowed their share of the pool, declines the disbursement, and services the interest anyway. Every member therefore contributes an equal share of interest regardless of whether they wanted the money.
+
+   This is the same mechanic `CLAUDE.md` has had parked for nine months as "unique to William's group," seen from the other side. The difference is only whether cash actually leaves the pot:
+
+   | | Principal disbursed? | Interest owed |
+   |---|---|---|
+   | Real loan | Yes | On the balance |
+   | **Notional loan (the quota)** | **No** | **On the deemed share — K1,050** |
+   | William's forced borrowing | Yes, compelled | On the balance |
+
+   **Effect on the plan: none structurally** — the Phase 3 design (a contribution type flagged `countsTowardInterestObligation`) still models this correctly and remains the simplest thing that works, because the quota is settled in cash and reported alongside loan interest either way. Two smaller consequences:
+   - **Vocabulary.** Members understand this as interest on a share they chose not to draw, not as a "top-up contribution." Label it accordingly in the UI — the grocery template's `vocabulary` block is the right home.
+   - **Forced borrowing gets cheaper later.** Once the obligation is modelled, William's variant is the same feature with the disbursement switched on. Worth knowing before that gets scoped as a from-scratch build.
+
 2. **Simon Peter's K12,000 loan (March 2026)** far exceeds any `projected_cycle_contribution` cap. Previous cycle, so it doesn't affect the migration — but confirm whether the cap rule is new, or whether exceptions are permitted and by whom.
 3. **Opening balances as at 31 July 2026** — Simon will walk through these with William once the modifications are in place. **Phase 7 gate; do not import before this.**
 4. **The K33 / K36 imbalance** — to be resolved with Simon in the same session.

@@ -274,10 +274,16 @@ These have caused bugs before. Don't repeat them.
 > See `patterns/cross-product-dev-patterns.md` P-003 in the second brain.
 
 **Forced minimum borrowing rule** — William's group compels members who haven't hit their
-loan threshold to borrow from surplus. Still parked: the *compelled borrowing* mechanic is
-genuinely hard to configure generically and confuses groups in demos.
-**Evidence: 1 group (William's).** Revisit if a second group requires compelled borrowing
-specifically, as opposed to the interest obligation below.
+loan threshold to borrow from surplus. Still parked, but **no longer for the reason
+originally given.** Simon Peter (Grace's group treasurer) confirmed 2026-08-11 that the
+interest quota below *is* forced borrowing — a **notional** loan, where the member is
+deemed to have borrowed their share, declines the cash, and services the interest anyway.
+The only difference is whether principal actually leaves the pot. So the mechanic is not
+group-specific at all; what remains parked is narrower — **actually disbursing the
+compelled principal**, which is the part that confuses groups in demos.
+**Evidence: 1 group needs the disbursement (William's); 3 need the obligation.**
+Once the interest obligation ships (Phase 3), this becomes the same feature with
+disbursement switched on — scope it as an extension, not a from-scratch build.
 
 **Mandatory interest quota — NO LONGER PARKED (2026-08-10). Build this.**
 Previously folded into the rule above and rejected as one-group-specific. That was wrong.
@@ -285,8 +291,8 @@ Previously folded into the rule above and rejected as one-group-specific. That w
 constitution), Grace Kalele's group (K1,050, mechanised in their `Total Interest`
 spreadsheet), and William's own group. Every member owes a fixed amount of interest per
 cycle, satisfiable either by interest paid on their own borrowing or by a direct cash
-payment. It is the same economic idea as forced borrowing expressed as a payable
-liability — and far simpler to build. Specified in
+payment against a notional loan they never drew (see the entry above — these are one
+mechanic, not two). Specified in
 [`docs/plan_configurable_group_rules.md`](docs/plan_configurable_group_rules.md) Phase 3.
 
 Anything genuinely out of scope goes to `docs/PARKING_LOT.md`.
