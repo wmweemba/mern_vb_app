@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import SlideoverDrawer from '../ui/SlideoverDrawer';
+import Select from '../ui/Select';
 import { API_BASE_URL } from '../../lib/utils';
 
 export default function FineRulesDrawer({ open, onClose, onSaved, settings }) {
@@ -77,14 +78,13 @@ export default function FineRulesDrawer({ open, onClose, onSaved, settings }) {
           </div>
           <div>
             <p className={labelClass}>Fine Type</p>
-            <select
+            <Select
               value={lateFineType}
               onChange={(e) => setLateFineType(e.target.value)}
-              className={inputClass}
             >
               <option value="fixed">Fixed amount</option>
               <option value="percentage">Percentage of overdue</option>
-            </select>
+            </Select>
           </div>
           <div>
             <p className={labelClass}>Partial Payment Fine (K)</p>

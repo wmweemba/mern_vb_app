@@ -3,6 +3,7 @@ const { getAuth } = require('@clerk/express');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const GroupSettings = require('../models/GroupSettings');
+const GroupTemplate = require('../models/GroupTemplate');
 const BankBalance = require('../models/BankBalance');
 const SocialFundBalance = require('../models/SocialFundBalance');
 const ContributionType = require('../models/ContributionType');
@@ -15,6 +16,7 @@ exports.createGroup = async (req, res) => {
     interestRate, interestMethod, loanLimitMultiplier,
     lateFineAmount, lateFineType = 'fixed',
     partialPaymentFineAmount,
+    templateKey = 'village_bank',
   } = req.body;
 
   if (!groupName || !treasurerName) {
@@ -28,6 +30,34 @@ exports.createGroup = async (req, res) => {
   if (existingMember) {
     return res.status(409).json({ error: 'You are already in a group' });
   }
+
+  // Fallback if the template catalogue hasn't been seeded (e.g. a fresh test DB) —
+  // matches the literals this function hardcoded before templates existed, so
+  // createGroup never breaks on a missing GroupTemplate document.
+  const FALLBACK_TEMPLATE_DEFAULTS = {
+    cycleLengthMonths: 6, interestRate: 10, interestMethod: 'reducing',
+    defaultLoanDuration: 4, loanLimitMultiplier: 3, latePenaltyRate: 15,
+    overdueFineAmount: 1000, earlyPaymentCharge: 200, partialPaymentFineAmount: 0,
+    savingsInterestRate: 10, minimumSavingsMonth1: 3000, minimumSavingsMonthly: 1000,
+    maximumSavingsFirst3Months: 5000, savingsShortfallFine: 500,
+    profitSharingMethod: 'proportional', interestObligationAmount: 0,
+  };
+  const FALLBACK_TEMPLATE_POLICIES = {
+    loanAccrual: 'scheduled_reducing', arrears: 'none', loanLimit: 'savings_multiple',
+    concurrentLoans: 'unlimited', interestObligation: 'none',
+    cycleEnd: 'shareout_proportional', exit: 'settle_and_refund',
+  };
+
+  const template = await GroupTemplate.findOne({ key: templateKey, active: true });
+  if (!template && templateKey !== 'village_bank') {
+    // Only 'village_bank' has a hardcoded fallback (it matches this function's
+    // pre-template literals). Any other requested template must resolve to a real
+    // GroupTemplate document — silently substituting village_bank numbers under the
+    // requested label would create a group that doesn't match what the admin picked.
+    return res.status(400).json({ error: `Unknown or inactive group template "${templateKey}"` });
+  }
+  const tplDefaults = template ? template.defaults : FALLBACK_TEMPLATE_DEFAULTS;
+  const tplPolicies = template ? template.policies : FALLBACK_TEMPLATE_POLICIES;
 
   const session = await mongoose.startSession();
   try {
@@ -59,21 +89,24 @@ exports.createGroup = async (req, res) => {
         groupName,
         meetingDay: meetingDay || null,
         lateFineType: lateFineType || 'fixed',
-        cycleLengthMonths: cycleLengthMonths || 6,
-        interestRate: interestRate || 10,
-        interestMethod: interestMethod || 'reducing',
-        defaultLoanDuration: 4,
-        loanLimitMultiplier: loanLimitMultiplier || 3,
-        latePenaltyRate: 15,
-        overdueFineAmount: lateFineAmount || 1000,
-        earlyPaymentCharge: 200,
-        savingsInterestRate: 10,
-        minimumSavingsMonth1: 3000,
-        minimumSavingsMonthly: 1000,
-        maximumSavingsFirst3Months: 5000,
-        savingsShortfallFine: lateFineAmount || 500,
-        profitSharingMethod: 'proportional',
-        partialPaymentFineAmount: partialPaymentFineAmount || 0,
+        cycleLengthMonths: cycleLengthMonths || tplDefaults.cycleLengthMonths,
+        interestRate: interestRate || tplDefaults.interestRate,
+        interestMethod: interestMethod || tplDefaults.interestMethod,
+        defaultLoanDuration: tplDefaults.defaultLoanDuration,
+        loanLimitMultiplier: loanLimitMultiplier || tplDefaults.loanLimitMultiplier,
+        latePenaltyRate: tplDefaults.latePenaltyRate,
+        overdueFineAmount: lateFineAmount || tplDefaults.overdueFineAmount,
+        earlyPaymentCharge: tplDefaults.earlyPaymentCharge,
+        savingsInterestRate: tplDefaults.savingsInterestRate,
+        minimumSavingsMonth1: tplDefaults.minimumSavingsMonth1,
+        minimumSavingsMonthly: tplDefaults.minimumSavingsMonthly,
+        maximumSavingsFirst3Months: tplDefaults.maximumSavingsFirst3Months,
+        savingsShortfallFine: lateFineAmount || tplDefaults.savingsShortfallFine,
+        profitSharingMethod: tplDefaults.profitSharingMethod,
+        partialPaymentFineAmount: partialPaymentFineAmount || tplDefaults.partialPaymentFineAmount,
+        interestObligationAmount: tplDefaults.interestObligationAmount,
+        templateKey: template ? template.key : 'village_bank',
+        policies: tplPolicies,
       }], { session });
 
       await BankBalance.create([{ balance: 0, groupId: group._id }], { session });

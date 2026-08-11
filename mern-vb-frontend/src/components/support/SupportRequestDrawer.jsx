@@ -6,6 +6,7 @@ import { useUser } from '@clerk/clerk-react';
 import { useLocation } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, Plus } from 'lucide-react';
 import SlideoverDrawer from '../ui/SlideoverDrawer';
+import Select from '../ui/Select';
 import { useAuth } from '../../store/auth';
 import { API_BASE_URL } from '../../lib/utils';
 
@@ -242,10 +243,9 @@ export default function SupportRequestDrawer({ open, onClose, onTicketsChanged }
           <label className="block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1.5">
             Category
           </label>
-          <select
+          <Select
             value={category}
             onChange={e => { setCategory(e.target.value); setError(null); }}
-            className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
           >
             <option value="">Select a category…</option>
             <option value="error">Error / Bug</option>
@@ -253,7 +253,7 @@ export default function SupportRequestDrawer({ open, onClose, onTicketsChanged }
             <option value="feature_request">Feature Request</option>
             <option value="billing">Billing</option>
             <option value="other">Other</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1.5">

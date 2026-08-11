@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
+import Select from '../ui/Select';
 import { API_BASE_URL } from '../../lib/utils';
 
 export default function BillingActivationDrawer({ open, onClose, groupId, group, onSuccess }) {
@@ -58,15 +59,14 @@ export default function BillingActivationDrawer({ open, onClose, groupId, group,
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Plan</label>
-            <select
+            <Select
               value={plan}
               onChange={e => setPlan(e.target.value)}
-              className="w-full border border-border-default rounded-lg px-3 py-2.5 text-base bg-surface-page text-text-primary"
             >
               {Object.keys(plans).map(p => (
                 <option key={p} value={p}>{plans[p]?.name || p} — ZMW {plans[p]?.price}/mo</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Duration (months)</label>

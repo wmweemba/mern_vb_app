@@ -18,4 +18,7 @@ router.get('/', verifyToken, resolveGroup, checkTrial, groupSettingsController.g
 // Only admin can update settings
 router.put('/', verifyToken, resolveGroup, checkTrial, allowRoles('admin'), groupSettingsController.updateGroupSettings);
 
+// Template/policy switch — separate, guarded endpoint (see controller comment)
+router.put('/template', verifyToken, resolveGroup, checkTrial, allowRoles('admin'), groupSettingsController.updateGroupTemplate);
+
 module.exports = router;

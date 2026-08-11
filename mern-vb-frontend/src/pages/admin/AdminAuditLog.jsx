@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../../lib/utils';
+import Select from '../../components/ui/Select';
 
 export default function AdminAuditLog() {
   const [logs, setLogs] = useState([]);
@@ -46,22 +47,22 @@ export default function AdminAuditLog() {
 
       {/* Filters */}
       <div className="bg-surface-card rounded-lg p-4 mb-4 flex flex-col md:flex-row gap-3">
-        <select
+        <Select
+          className="flex-1"
           value={filterGroup}
           onChange={e => { setFilterGroup(e.target.value); setPage(1); }}
-          className="flex-1 border border-border-default rounded-lg px-3 py-2.5 text-base bg-surface-page text-text-primary"
         >
           <option value="">All Groups</option>
           {groups.map(g => <option key={g._id} value={g._id}>{g.name}</option>)}
-        </select>
-        <select
+        </Select>
+        <Select
+          className="flex-1"
           value={filterActor}
           onChange={e => { setFilterActor(e.target.value); setPage(1); }}
-          className="flex-1 border border-border-default rounded-lg px-3 py-2.5 text-base bg-surface-page text-text-primary"
         >
           <option value="">All Actors</option>
           {admins.map(a => <option key={a._id} value={a.clerkUserId}>{a.email}</option>)}
-        </select>
+        </Select>
         {(filterGroup || filterActor) && (
           <button onClick={clearFilters} className="border border-border-default rounded-full px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-page">
             Clear

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { UserPlus, Pencil } from 'lucide-react';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
+import Select from '../components/ui/Select';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
 
@@ -262,16 +263,15 @@ function InviteDrawer({ open, onClose, onInvited }) {
           <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
             Role
           </label>
-          <select
+          <Select
             name="role"
             value={form.role}
             onChange={handleChange}
-            className="w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
           >
             <option value="member">Member</option>
             <option value="treasurer">Treasurer</option>
             <option value="loan_officer">Loan Officer</option>
-          </select>
+          </Select>
         </div>
         {error && (
           <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
 import MemberSelect from '../../components/ui/MemberSelect';
+import Select from '../../components/ui/Select';
 
 const inputCls = 'h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
 const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
@@ -68,16 +69,15 @@ const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form'
 
       <div>
         <label className={labelCls}>Category</label>
-        <select
+        <Select
           name="category"
           value={form.category}
           onChange={handleChange}
-          className={inputCls}
         >
           {CATEGORIES.map(c => (
             <option key={c.value} value={c.value}>{c.label}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>

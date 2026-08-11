@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
+import Select from '../components/ui/Select';
 
 const initialForm = { username: '', password: '', role: 'member', name: '', email: '', phone: '' };
 
@@ -111,12 +112,12 @@ const Users = () => {
           <input name="email" value={form.email} onChange={handleChange} placeholder="Email" className="border rounded px-3 py-2 flex-1" />
           <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone" className="border rounded px-3 py-2 flex-1" />
         </div>
-        <select name="role" value={form.role} onChange={handleChange} className="border rounded px-3 py-2 w-40">
+        <Select name="role" value={form.role} onChange={handleChange} className="w-40">
           <option value="admin">Admin</option>
           <option value="treasurer">Treasurer</option>
           <option value="loan_officer">Loan Officer</option>
           <option value="member">Member</option>
-        </select>
+        </Select>
         <div className="flex gap-2 mt-2">
           <button type="submit" className="bg-blue-600 text-white rounded py-2 w-40" disabled={loading}>{loading ? (editId ? 'Saving...' : 'Adding...') : (editId ? 'Save Changes' : 'Add User')}</button>
           {editId && <button type="button" className="bg-gray-300 text-gray-800 rounded py-2 w-32" onClick={handleCancelEdit}>Cancel</button>}

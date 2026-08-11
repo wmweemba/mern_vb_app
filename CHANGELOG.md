@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.13.1] - 2026-08-11
+
+### Fixed
+- **Every dropdown in the app (16 files) rendered with the browser's native arrows instead of `UI_SPEC.md` §6.8's custom chevron.** Found while poking around the new Grocery Savings onboarding UI — the "Contribution Type" select in Record Contribution and the type filter on the Contributions page both showed the OS-native double-arrow icon. A sweep found the same missing-chevron gap in all 16 files with a `<select>` in the codebase (pre-existing, not introduced by Phase 1 — git blame traces the oldest instance back months), plus a few with additional deviations: `Contributions.jsx`'s filter was 36px tall against the spec's 48px, and `Users.jsx`/`AdminGroupDetail.jsx`/`BillingActivationDrawer.jsx`/`AdminAuditLog.jsx` used non-spec radius/font-size/no-tokens-at-all styling.
+  - **Fix:** new canonical `components/ui/Select.jsx` — implements §6.8 exactly (48px height, spec border/radius, custom `ChevronDown` overlay, border-color focus state with no ring/shadow). All 16 files now use it; zero raw `<select>` elements remain in `src/`.
+  - **Process fix, not just a code fix:** added a "UI Spec Compliance — Mandatory" section to `CLAUDE.md` under Frontend Architecture Patterns — any frontend work must check `UI_SPEC.md` for an existing component pattern before hand-rolling new className strings, unless explicitly told otherwise. `UI_SPEC.md` §6.8 updated to point at the new component as its canonical implementation.
+
+## [3.13.0] - 2026-08-11
+
+### Added
+- **Configurable Group Rules, Phase 1: template + policy architecture.** Groundwork for the grocery-chilimba retrofit (`docs/plan_configurable_group_rules.md`), behaviour-neutral for every existing group.
+  - New `GroupTemplate` model — a small platform catalogue (`village_bank`, `grocery_chilimba`), seeded by `scripts/seedGroupTemplates.js`. Copied into a group's own `GroupSettings` at creation, never referenced live.
+  - `GroupSettings` gained `templateKey` + a `policies` subdocument (7 behavioural seams: loan accrual, arrears, loan limit, concurrent loans, interest obligation, cycle end, exit), all defaulting to the `village_bank` shape so existing groups are bit-identical. `scripts/backfillGroupSettingsPolicies.js` persists real per-group values (not yet run against production).
+  - New `utils/strategies/loanAccrual/` registry (`scheduledReducing`, `scheduledFlat`) wrapping `loanCalculator.js` unchanged — `loanController.js` and `paymentController.js` now resolve the strategy from settings instead of calling `calculateLoanSchedule` directly. `interestMethod` stays authoritative for scheduled groups so an existing Settings-drawer edit still takes effect.
+  - `PUT /api/group-settings/template` — separate, guarded endpoint for switching a group's template; refuses mid-cycle switches (any non-archived `Transaction` present) to avoid silently restating open loans. `GET /api/group-templates` serves the catalogue to the onboarding wizard.
+  - `pages/Onboarding.jsx` — new first step (template selection); Lending Rules and Fine Rules now render conditionally on the chosen template's policies/features (a `grocery_chilimba` selection skips Fine Rules entirely and swaps in an interest-quota field). Not verified live in a browser (requires a real Clerk session) — verified via `pnpm build` and code review.
+  - Gate: all 64 backend tests pass unchanged; `paymentController.test.js`'s 7 cases specifically verify the extracted payment-allocation logic is byte-identical to the pre-Phase-1 inline version.
+  - Architecture notes: `CLAUDE.md` § "Configurable Group Rules (Phase 1)".
+
 ## [3.12.7] - 2026-08-11
 
 ### Fixed

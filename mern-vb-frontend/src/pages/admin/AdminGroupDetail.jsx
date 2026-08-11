@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ChevronLeft } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/utils';
 import BillingActivationDrawer from '../../components/admin/BillingActivationDrawer';
+import Select from '../../components/ui/Select';
 import TypedConfirmationModal from '../../components/ui/TypedConfirmationModal';
 
 const STATUS_LABELS = {
@@ -190,9 +191,9 @@ function MembersTab({ groupId, onRefresh }) {
               ))}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1">Role</label>
-                <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))} className="w-full border border-border-default rounded-lg px-3 py-2.5 text-base bg-surface-page text-text-primary">
+                <Select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}>
                   {['admin','treasurer','loan_officer','member'].map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                </Select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={editForm.active} onChange={e => setEditForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />

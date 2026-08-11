@@ -4,6 +4,7 @@ import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
+import Select from '../components/ui/Select';
 import AddContributionForm from '../features/contributions/AddContributionForm';
 import RecordSocialFundExpenseForm from '../features/contributions/RecordSocialFundExpenseForm';
 import { Coins, Wallet, TrendingUp, TrendingDown, Users } from 'lucide-react';
@@ -192,16 +193,16 @@ export default function Contributions() {
           {/* Type filter */}
           {allTypes.length > 0 && (
             <div className="mb-4">
-              <select
+              <Select
+                className="w-64"
                 value={typeFilter}
                 onChange={e => setTypeFilter(e.target.value)}
-                className="h-9 border border-border-default rounded-md px-3 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none"
               >
                 <option value="">All types</option>
                 {allTypes.map(t => (
                   <option key={t._id} value={t._id}>{t.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 

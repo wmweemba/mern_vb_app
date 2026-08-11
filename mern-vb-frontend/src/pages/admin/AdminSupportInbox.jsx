@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import { API_BASE_URL } from '../../lib/utils';
 import SlideoverDrawer from '../../components/ui/SlideoverDrawer';
+import Select from '../../components/ui/Select';
 
 const CATEGORY_LABELS = {
   error: 'Error / Bug',
@@ -165,15 +166,15 @@ function DetailDrawer({ ticket: initialTicket, onClose, onUpdated }) {
               Update Status
             </label>
             <div className="flex gap-2">
-              <select
+              <Select
+                className="flex-1"
                 value={status}
                 onChange={e => setStatus(e.target.value)}
-                className="flex-1 border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 {STATUSES.map(s => (
                   <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>
                 ))}
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={handleSaveStatus}

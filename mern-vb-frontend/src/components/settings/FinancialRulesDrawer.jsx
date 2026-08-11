@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import SlideoverDrawer from '../ui/SlideoverDrawer';
+import Select from '../ui/Select';
 import { API_BASE_URL } from '../../lib/utils';
 
 export default function FinancialRulesDrawer({ open, onClose, onSaved, settings }) {
@@ -94,14 +95,13 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
           </div>
           <div>
             <p className={labelClass}>Interest Method</p>
-            <select
+            <Select
               value={interestMethod}
               onChange={(e) => setInterestMethod(e.target.value)}
-              className={inputClass}
             >
               <option value="flat">Flat Rate</option>
               <option value="reducing">Reducing Balance</option>
-            </select>
+            </Select>
           </div>
           <div>
             <p className={labelClass}>Loan Limit Multiplier</p>
@@ -118,14 +118,13 @@ export default function FinancialRulesDrawer({ open, onClose, onSaved, settings 
           </div>
           <div>
             <p className={labelClass}>Profit Sharing Method</p>
-            <select
+            <Select
               value={profitSharingMethod}
               onChange={(e) => setProfitSharingMethod(e.target.value)}
-              className={inputClass}
             >
               <option value="proportional">Proportional (by savings)</option>
               <option value="equal">Equal split</option>
-            </select>
+            </Select>
           </div>
         </div>
       </form>

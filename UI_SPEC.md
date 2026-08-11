@@ -437,6 +437,11 @@ Select / Dropdown:
   Arrow indicator: custom chevron in --color-text-secondary
 ```
 
+**Implementation:** `mern-vb-frontend/src/components/ui/Select.jsx` is the canonical
+component for every dropdown in the app — it already implements the spec above
+(height, border, radius, focus state, custom chevron). Never use a raw `<select>`;
+always import this component.
+
 ### 6.9 Empty State
 
 ```
