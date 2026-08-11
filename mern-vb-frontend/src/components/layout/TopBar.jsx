@@ -89,7 +89,7 @@ export default function TopBar() {
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem onClick={() => navigate('/settings')}>
+          <DropdownMenuItem onClick={() => { if (adminMode) toggleAdminMode(); navigate('/settings'); }}>
             Account Settings
           </DropdownMenuItem>
           <DropdownMenuItem

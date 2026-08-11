@@ -85,11 +85,12 @@ export const AuthProvider = ({ children }) => {
     });
   }, [isSignedIn, isLoaded]);
 
-  const toggleAdminMode = () => {
-    const next = !adminMode;
+  const applyAdminMode = next => {
     setAdminMode(next);
     sessionStorage.setItem('adminMode', String(next));
   };
+
+  const toggleAdminMode = () => applyAdminMode(!adminMode);
 
   const refreshMembership = () => {
     return getToken().then(token => {
@@ -121,6 +122,7 @@ export const AuthProvider = ({ children }) => {
     isSuperAdmin,
     adminMode,
     toggleAdminMode,
+    applyAdminMode,
     logout: () => {},
   };
 

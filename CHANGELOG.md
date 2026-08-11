@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.7] - 2026-08-11
+
+### Fixed
+- **Desktop sidebar could disagree with `TopBar`/mobile drawer about admin mode.** `TopBar.jsx`'s "Account Settings" menu item called `navigate('/settings')` unconditionally, even while `adminMode` was true — `/settings` is only routed through the regular `Layout`/`AppShell` (never `AdminShell`), so a super admin clicking it from Platform Admin mode landed on the regular group's `DesktopSidebar` while `TopBar` kept showing "Platform Admin" and the mobile hamburger kept showing the admin nav (both of those are driven by the shared `adminMode` context value, not by which Shell actually mounted). Same underlying class of bug as 3.12.5/3.12.6 — a layout piece not staying in sync with `adminMode` — just surfacing on the desktop sidebar instead of the mobile drawer or header label this time.
+  - **Fix:** "Account Settings" now exits admin mode before navigating there. More importantly, `AppShell` and `AdminShell` are now self-correcting: `AppShell` forces `adminMode` false whenever it mounts (it only ever renders on non-admin routes), and `AdminShell` forces `adminMode` true whenever it mounts (it only ever renders on `/admin/*`). This closes the whole class of leak, not just the one call site — including browser back/forward into a stale route, a stale `sessionStorage` flag from a prior session, or a future nav link that forgets to toggle admin mode explicitly.
+  - Added `applyAdminMode(bool)` to `store/auth.jsx` (alongside the existing `toggleAdminMode`) so shells can force a specific value instead of only flipping it.
+  - Regression test added: `src/__tests__/AdminModeSwitch.test.js`, exercising the real `App.jsx` routes with a mocked super-admin auth context. Also added `@/` alias resolution to `jest.config.js` and switched `babel.config.cjs` to the automatic JSX runtime — neither was needed until this test exercised the full route tree, which none of the existing tests did.
+  - Separately investigated a suspected reload race in `store/auth.jsx` (typing an `/admin/*` URL and reloading might wipe `adminMode` before Clerk confirms the session): the effect already guards on `if (!isLoaded) return;` before checking `isSignedIn`, so the naive version of that race isn't present. Not fully ruled out — Clerk's `isLoaded`/`isSignedIn` handoff timing on hydration can't be verified without a live session — but the new `AdminShell` self-correction effect would paper over it anyway (it forces `adminMode` back to `true` once `AdminShell` actually mounts on an `/admin/*` route).
+
 ## [3.12.6] - 2026-08-10
 
 ### Fixed
