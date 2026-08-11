@@ -1,7 +1,7 @@
 # Plan — Configurable Group Rules (Grocery Chilimba Retrofit)
 
 **Status:** Approved for implementation
-**Written:** 2026-08-10 (Opus planning session)
+**Written:** 2026-08-10 (Opus planning session) · **Revised:** 2026-08-11 — Phases 0 and 0.5 shipped; Simon's answers folded in (§7), two of which changed the plan (§2.6 borrowing limit, Phase 2 payment allocation)
 **Baseline:** v3.12.6, commit `e69ab23`
 **Driver:** Grace Kalele's "Grocery Savings Group" — currently **trialing**, committed to subscribing at the end of the trial once the app is confirmed to match their group's rules. The trial exists precisely to establish that fit, so the work in this plan is what converts them. They will be Chama360's first paying customer. Migrating June–Nov 2026 cycle data.
 
@@ -30,10 +30,11 @@ Confirmed by William 2026-08-10 and corroborated by the workbook:
 
 - Interest is **10% per month on the outstanding balance**.
 - There is **no term, no installment count, no schedule**.
-- A member may pay **interest only**, or **interest plus any amount of principal** they choose.
-- Anything unpaid **capitalises** — it becomes next month's loan balance and attracts 10% again.
-- Members may **top up** an existing loan; the workbook's `New Loan Requested` + `New Loan total` columns merge old balance and new borrowing into one running figure (Mwiza, Feb: 3,500 + 1,400 → 4,900).
-- **No borrowing limit.** Members borrow whatever the pool can fund (Simon Peter, March: K12,000).
+- The member **directs how each payment is allocated** — interest only, principal only, or a stated split. Confirmed by Simon 2026-08-11: *"it is allocated as per the user/member's instruction."* Allocation is an **input at payment time, not a fixed rule.**
+- Anything unpaid **capitalises** — it becomes next month's loan balance and attracts 10% again. Confirmed by Simon as real, observed behaviour, not just a constitutional fallback.
+- Members may **top up** an existing loan; the workbook's `New Loan Requested` + `New Loan total` columns merge old balance and new borrowing into one running figure (Mwiza, Feb: 3,500 + 1,400 → 4,900). Simon: *"it gets added to what is outstanding… and becomes a new bigger loan."*
+- **There is a borrowing limit, and it is computable** — see §2.6. An earlier note in this plan said "no borrowing limit"; that was wrong and is corrected below.
+- Loans may run to cycle end, but must be **settled 3 days before the cycle end date** so the buying team has all funds available in time.
 
 This is incompatible with the current `Loan` model, which generates a fixed `installments[]` array at creation. Both existing `interestMethod` values (`reducing`, `flat`) are wrong for this group — not approximately wrong, structurally wrong.
 
@@ -66,6 +67,27 @@ This decouples the share-out calculator from Grace's critical path. It remains g
 
 Grace's monthly contribution moved **K600 → K700** between cycles, and the roster changed (Ospy and Precious out; Emmanuel, Mateba, Tommy, Athena, Prudence, Ruth in). Configuration is a property of a *cycle*, not of a group for all time.
 
+### 2.6 The borrowing limit — corrected 2026-08-11, and it is computable
+
+An earlier answer during scoping was "no limit — members borrow whatever the pool can fund," and §2.1 originally recorded that. **Simon corrected it**, and his rule is precise:
+
+> The maximum a member may borrow is **everything they are projected to contribute by the end of the cycle** — membership fee + interest obligation + (monthly contribution × months in cycle).
+
+For Grace's June–Nov 2026 cycle:
+
+```
+K250 (membership fee) + K1,050 (interest obligation) + (K700 × 6) = K5,500
+```
+
+**The workbook confirms this exactly.** Across both migration months, the largest loans taken are Saasa K5,500 (June), Grace K5,500, Tommy K5,500 (July) — and **not one member exceeds K5,500**. Patricia's K5,113 sits just under it. A cap that three separate members hit to the ngwee and nobody breaches is not a coincidence.
+
+Consequences for the plan:
+
+- The `loanLimit` seam gains a strategy — **`projected_cycle_contribution`**, not `none`. Grace's group moves off `none` in the coverage table.
+- The limit is **derived, not stored**: it is a function of three parameters this plan already tracks (fee, quota, contribution × cycle length). Change any of them for a cycle and the cap follows automatically. No new field.
+- It is a **cycle-level** figure, reinforcing §2.4 — when contribution rises K700 → K800, the cap rises with it.
+- Simon Peter's K12,000 in March 2026 sits in the **previous** cycle and far exceeds any such cap. Either the rule post-dates that cycle or it was an exception. **Worth one question**, but it does not affect the migration, which is June–Nov only.
+
 ### 2.5 Data-quality observation (sales asset, not a defect)
 
 Grace's own sheets do not reconcile: `Total Balance` reads **−33** (June) and **−36** (July), and `May Contributions!F19` contains a corrupted string. Worth showing Simon — it is the argument for the product, sitting in his own file. It also means opening balances must be **agreed with Simon before import**, not derived unilaterally.
@@ -92,7 +114,7 @@ Not "10% vs 25%" but "interest accrues on a schedule vs. on a revolving balance"
 policies: {
   loanAccrual:        'scheduled_reducing' | 'scheduled_flat' | 'revolving_monthly' | 'term_flat',
   arrears:            'none' | 'capitalise',
-  loanLimit:          'none' | 'fixed_cap' | 'savings_multiple',
+  loanLimit:          'none' | 'fixed_cap' | 'savings_multiple' | 'projected_cycle_contribution',
   concurrentLoans:    'unlimited' | 'one_at_a_time',
   interestObligation: 'none' | 'per_member_quota',
   cycleEnd:           'pooled_external' | 'shareout_equal' | 'shareout_proportional',
@@ -106,7 +128,7 @@ Coverage check:
 |---|---|---|---|
 | `loanAccrual` | `scheduled_reducing` | `revolving_monthly` ← **new** | `term_flat` ← new (later) |
 | `arrears` | `none` | `capitalise` ← **new** | `none` |
-| `loanLimit` | `savings_multiple` | `none` ← **new** | `fixed_cap` (later) |
+| `loanLimit` | `savings_multiple` | `projected_cycle_contribution` ← **new** (§2.6) | `fixed_cap` (later) |
 | `concurrentLoans` | `unlimited` | `unlimited` | `one_at_a_time` (later) |
 | `interestObligation` | `per_member_quota` | `per_member_quota` ← **new** | `per_member_quota` |
 | `cycleEnd` | `shareout_proportional` (unbuilt) | `pooled_external` ← **new** | `pooled_external` |
@@ -319,7 +341,10 @@ entries: [{                            // revolving ledger
 
 - `onDisburse` — new loan, or **top up** an existing open one (increase `principalBalance`, append a `disbursement` entry). This is the `New Loan total` column.
 - `accrue` — `interestOutstanding += principalBalance × rate`. **Creates no `Transaction` and does not touch `BankBalance`** — accrual is not a cash movement. This is the single most important correctness rule in the phase.
-- `applyPayment` — interest first, then principal, per the group's stated rule. Overpayment beyond total outstanding is rejected, not absorbed (this also closes audit finding #2 for the revolving path).
+- `applyPayment` — **allocation is member-directed, supplied at payment time.** Corrected 2026-08-11: an earlier draft of this plan specified a fixed interest-first waterfall. Simon's rule is that the member instructs how their money is split — interest only, principal only, or a stated amount to each — and whatever remains outstanding simply carries. The strategy therefore takes an explicit `{ toInterest, toPrincipal }` allocation rather than deriving one.
+  - The **payment form needs two amount fields**, not one, plus a default (interest first) for the common case and a validation that the parts sum to the amount received.
+  - Interest-first must stay available as the default because it is what most payments do — but it cannot be the only behaviour, or the app will silently misrecord any member who directs otherwise, and the balances will diverge from Simon's sheet within a month.
+  - Overpayment beyond total outstanding is rejected, not absorbed (this also closes audit finding #2 for the revolving path).
 - `outstanding` — `principalBalance + interestOutstanding`, the only balance source.
 
 **Capitalisation** (`policies.arrears === 'capitalise'`): at the next accrual, any `interestOutstanding` is folded into `principalBalance` and logged as a `capitalisation` entry before the new interest is charged. Gated on the policy so it can never fire for a scheduled group.
@@ -358,7 +383,9 @@ Grace's members pay a **K250** membership fee in instalments across months (Chit
 
 No new model, no new controller. Together with Phase 3, both features are small extensions to a schema that already exists — this is why the contributions architecture was worth building.
 
-**Open question for Simon:** confirm K250. It is the observed ceiling in both cycles, not a stated rule.
+**Confirmed by Simon 2026-08-11:** K250 per member per cycle, payable in instalments across the cycle, **and expected to change cycle to cycle as the group's needs grow**. So it must be a per-cycle parameter, not a group constant — the same conclusion as the contribution amount (§2.4) and the interest quota.
+
+**Deadline:** the fee must be cleared by the shared `cycleSettlementDeadlineDays` cut-off (3 days before cycle end), the same rule that applies to loans. One parameter, two consumers. Surface an outstanding-fee list against that date so the treasurer can chase before it bites.
 
 ---
 
@@ -401,7 +428,9 @@ Off-peak window. Simon's and Grace's groups are live; announce it.
 
 **Prerequisite: reconciliation, agreed with Simon in writing before any import.** Her sheets carry a −33 / −36 imbalance and a corrupted cell; opening balances must be confirmed by the group, not inferred by us. Produce a reconciliation sheet showing our computed opening balance per member against theirs and resolve every difference first.
 
-1. **Re-template her existing trial group** to `grocery_chilimba`. It was created on village-bank defaults during the trial — this must happen before data lands, or the records restate afterwards.
+**Clean start, confirmed by Simon 2026-08-11:** import **June–November only**. The Dec–May cycle is not migrated. Trial data already entered is the same figures as the shared spreadsheets, so it can be cleared and re-imported rather than reconciled — no information is lost by wiping it.
+
+1. **Re-template her existing trial group** to `grocery_chilimba`, and clear the trial data. It was created on village-bank defaults — this must happen before real data lands, or the records restate afterwards.
 2. Reconcile and confirm opening balances.
 3. Import 26 members from the `Membership` sheet (July workbook).
 4. Import June and July: monthly contributions (K700), loan disbursements and top-ups, interest charged, repayments, membership fee instalments, and `Added Interest` payments as Interest Top-Up contributions.
@@ -418,7 +447,9 @@ Script goes in `scripts/`, is idempotent, runs inside a session, and writes a pr
 **Grace's workbook is the regression fixture.** This is the strongest verification asset in the project — real arithmetic, produced by an independent group over eight months.
 
 - `tests/strategies/revolvingMonthly.test.js` — golden-file cases drawn from the workbook. Mwiza is the best single case: Feb 3,500 + 1,400 top-up → 4,900; March and April accrue 490 each with the balance unmoved (interest paid in cash); July accrues 440 on an opening 4,400 and a 400 principal repayment drops it to 4,000. That one member exercises disbursement, top-up, accrual, interest-only payment and principal payment.
-- Capitalisation needs a synthetic case — the workbook shows the group paying interest monthly, so the fallback path is documented in the constitution but not exercised in the data. Flag to Simon: has capitalisation ever actually happened?
+- **Capitalisation is confirmed real** (Simon, 2026-08-11) — not a constitutional fallback. It needs first-class golden tests, not the synthetic case an earlier draft of this plan assumed. Build a case where interest goes unpaid, capitalises into principal, and the following month's 10% is charged on the larger figure.
+- **Member-directed allocation** needs its own cases: interest-only, principal-only, and a split — asserting the balance after each, since a fixed waterfall would pass an interest-first test while being wrong for the other two.
+- **The `projected_cycle_contribution` cap** is directly assertable from the workbook: K250 + K1,050 + (K700 × 6) = K5,500, and no member exceeds it across June and July. Assert the cap computes to 5,500 and that a K5,501 request is rejected.
 - Phase 1 must leave all 64 existing backend tests passing **unchanged**. Any test that needs editing in Phase 1 signals an accidental behaviour change.
 - Per `CLAUDE.md`, run `scripts/auditBankBalance.js` after every phase that touches money. Discrepancy > ZMW 1 stops work.
 
@@ -438,13 +469,32 @@ Script goes in `scripts/`, is idempotent, runs inside a session, and writes a pr
 
 ---
 
-## 7. Open questions for Simon
+## 7. Answers from Simon — received 2026-08-11
 
-1. Membership fee — confirm **K250** per member per cycle.
-2. Has interest ever actually gone unpaid and capitalised, or does the group always pay monthly?
-3. Interest quota — is it strictly K1,050 for the June–Nov cycle, and does it reset each cycle?
-4. When a member takes a second loan while one is open, is it always a top-up of the same running balance, or can they hold two separate loans?
-5. Confirmed opening balances as at 31 July 2026, per member.
+All five scoping questions answered. **Two answers changed the plan** (§2.6 borrowing limit, §Phase 2 payment allocation); the rest confirmed it.
+
+| # | Question | Answer | Effect |
+|---|---|---|---|
+| 1 | Top-up or separate loan? | Added to what's outstanding; becomes one bigger loan | Confirms plan |
+| 2 | Has interest ever capitalised? | **Yes** — unpaid interest becomes part of the new balance and runs at 10% | Capitalisation is real → first-class tests, not synthetic |
+| 3 | Payment allocation order? | **Member-directed** — interest only, principal only, or a stated split | **Changed the plan** — allocation is an input, not a rule |
+| 4 | Borrowing limit? | **Fee + quota + (contribution × months)** = K5,500 this cycle | **Changed the plan** — new `projected_cycle_contribution` strategy (§2.6) |
+| 5 | Loan deadline? | Cycle end, less a **3-day** allowance so the buying team has funds in time | New settlement-deadline parameter |
+| 6 | Quota K1,050? | Confirmed, **and configurable per cycle** | Reinforces per-cycle snapshot (Phase 5) |
+| 7 | Overshooting the quota? | No refund, no extra groceries — surplus stays in the pot or rolls over | Quota is a **minimum**; no credit-back logic needed |
+| 9 | Membership fee K250? | Confirmed, payable in instalments, **changes cycle to cycle and likely to rise** | Reinforces per-cycle config |
+| 10 | Fee deadline? | Same 3-day-before-cycle-end rule as loans | One shared deadline parameter covers both |
+| 13 | Import Dec–May history? | **No — June–Nov only, clean start** | Simplifies Phase 7 |
+| 14 | Trial data entered so far? | Same figures as the shared spreadsheets | Trial data can be cleared and re-imported without loss |
+
+**Derived parameter, not a new field:** the borrowing cap and both deadlines fall out of values the plan already tracks. Add `cycleSettlementDeadlineDays` (default 3) and nothing else.
+
+### 7.1 Still open
+
+1. **The definition of "Added Interest" does not match the data.** Simon describes it as interest arising because a member rolled a loan over into a bigger one. But the workbook shows Sandra with `Added Interest` of **K1,050 in a single April entry — exactly the full quota — with no loan activity**, and Natasha and Lucy with round amounts against no borrowing. That reads as a **direct cash payment to settle the quota**, which is precisely the Grocery Champions "NIL LOAN" mechanic. These are different features: one is a by-product of borrowing, the other is a payment type a non-borrower needs. **Ask Simon directly: can a member who never borrows simply pay K1,050 in cash to clear their obligation?** If yes, the Interest Top-Up contribution type in Phase 3 is required as specified. If no, Phase 3 needs rethinking for Grace, though Champions still needs it.
+2. **Simon Peter's K12,000 loan (March 2026)** far exceeds any `projected_cycle_contribution` cap. Previous cycle, so it doesn't affect the migration — but confirm whether the cap rule is new, or whether exceptions are permitted and by whom.
+3. **Opening balances as at 31 July 2026** — Simon will walk through these with William once the modifications are in place. **Phase 7 gate; do not import before this.**
+4. **The K33 / K36 imbalance** — to be resolved with Simon in the same session.
 
 ---
 
