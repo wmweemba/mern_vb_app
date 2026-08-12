@@ -5,9 +5,17 @@ const ContributionType = require('../models/ContributionType');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { updateSocialFundBalance } = require('./socialFundController');
+const { resolveEntryDate } = require('../utils/cycleHelpers');
 
 exports.recordContribution = async (req, res) => {
-  const { username, userId, contributionTypeId, amount, note, affectsMainBalance } = req.body;
+  const { username, userId, contributionTypeId, amount, note, affectsMainBalance, date } = req.body;
+
+  // Backdating (a caller-supplied `date`) is restricted to admin/treasurer and
+  // must fall within the currently open cycle — see
+  // docs/plan_configurable_group_rules.md Phase 5.
+  if (date && !['admin', 'treasurer'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only admin or treasurer may backdate a contribution' });
+  }
 
   const session = await mongoose.startSession();
   try {
@@ -15,6 +23,8 @@ exports.recordContribution = async (req, res) => {
     await session.withTransaction(async () => {
       const amt = Number(amount);
       if (!amt || amt <= 0) throw Object.assign(new Error('Invalid amount'), { status: 400 });
+
+      const contributionDate = await resolveEntryDate(req.groupId, date, session);
 
       // Resolve contributing member (accept either name or direct _id)
       let member;
@@ -42,6 +52,7 @@ exports.recordContribution = async (req, res) => {
         countsTowardInterestObligation: type.countsTowardInterestObligation,
         note: note || null,
         recordedBy: req.memberId,
+        date: contributionDate,
       }], { session });
 
       const tx = await logTransaction({
@@ -51,6 +62,7 @@ exports.recordContribution = async (req, res) => {
         referenceId: contribution._id,
         note: note || `${type.name} contribution`,
         groupId: req.groupId,
+        createdAt: contributionDate,
       }, session);
 
       if (effectiveAffectsMain) {

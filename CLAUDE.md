@@ -675,5 +675,27 @@ Added 2026-08-12 (Phase 4 of `docs/plan_configurable_group_rules.md`: membership
 
 ---
 
-*Last updated: 2026-08-12 — Phase 4 (configurable group rules: membership fee as a liability) added*
+## Configurable Group Rules (Phase 5) — Architecture Notes
+
+Added 2026-08-12 (Phase 5 of `docs/plan_configurable_group_rules.md`: Cycle model + per-cycle configuration snapshot). Key decisions recorded here to prevent regression:
+
+1. **`models/Cycle.js` is additive — nothing that reads `archived`/`cycleNumber` on Loan/Saving/Fine/Transaction/Contribution/SocialFundExpense had to change.** Those fields, and the `archived: { $ne: true }` convention Phase 3's notes already documented as "cycle boundary approximated as not-archived," are unchanged and still authoritative for every existing query. `Cycle` adds real `startDate`/`endDate`/`settingsSnapshot` on top, for the two things that convention structurally cannot give: a bound to validate a backdated entry against, and a frozen copy of the rules that were in force. Existing groups have no `Cycle` document until their first reset under this code (or a manual backfill) — `resolveEntryDate` and `getCurrentCycleNumber` both fall back to pre-Phase-5 behaviour when one doesn't exist yet, so this ships with zero behaviour change for any group that hasn't touched Begin New Cycle since deploying it.
+
+2. **`archiveCurrentCycleData` now filters on `archived: { $ne: true }` — this was audit finding #3, and it was live.** Before this fix, every `beginNewCycle` call re-stamped *every* loan/saving/fine/transaction row in the group — including ones already archived from a prior cycle — with the new cycle's `cycleNumber`/`cycleEndDate`. A group on its third reset would have had cycle 1's historical records silently relabelled as cycle 3. `resetForNewCycle`'s `deleteMany` calls remain effectively a no-op after archiving (nothing matches `archived: { $ne: true }` once the archive step has run) — the actual "reset" has always been the archived-flag tagging, not real deletion; this is intentional and unchanged, not a bug introduced here.
+
+3. **Contribution and SocialFundExpense are now archived/reset by `beginNewCycle` — this was audit finding #4.** Previously neither collection was touched by a cycle reset at all, so contribution and social-fund-expense records from a closed cycle kept showing up in every `archived: { $ne: true }` query (Interest Obligation report, contribution liability report, dashboard) indefinitely. `SocialFundBalance` is now zeroed alongside `BankBalance` in the same reset, for the same reason.
+
+4. **`beginNewCycle` is now wrapped in a MongoDB session/transaction — it wasn't before.** This is a genuinely new behaviour, not just a bugfix: previously a failure partway through (e.g. the cycle-reset Transaction log throwing) left the group in a partially-archived, partially-reset state with no rollback, silently swallowed by a `catch` that deliberately didn't re-throw. That catch is now gone; a failure anywhere in the reset rolls back everything, per the project's existing "failed operations must automatically rollback" rule for money-moving code. `generateBackupReports` (read-only) still runs ahead of the transaction, unchanged.
+
+5. **Cycle 1 is opened at group creation, from the same `cycleStartDate` the onboarding wizard already collected and the backend already accepted but silently discarded.** `groupController.createGroup` now reads `req.body.cycleStartDate` (falls back to "now" if blank) and calls `cycleLengthMonths` from the just-created `GroupSettings` doc to compute `endDate`. No frontend change was needed — the wizard was already sending this field.
+
+6. **Backdating (`date`/`createdAt`) is opt-in per request, not a new required field.** `loanController.createLoan`, `savingsController.createSaving`, and `contributionController.recordContribution` all accept an optional date field; omitting it behaves exactly as before ("now"). Supplying one is gated to `admin`/`treasurer` regardless of which role the route itself allows (loans/savings routes also permit `loan_officer` to create records at all — that's unchanged; only the backdating override is narrower), and is validated against the group's open `Cycle` bounds via `utils/cycleHelpers.resolveEntryDate`. A group with no `Cycle` document yet is **not** restricted (same fallback as above) — this matches `savings.date`'s pre-existing, previously-unrestricted behaviour rather than tightening it retroactively.
+
+7. **The backdated date is threaded through to the `Transaction` log, not just the source record.** `logTransaction` now accepts an optional `createdAt`; every call site in the three controllers above passes the resolved entry date through. Without this, a backdated loan would show correctly on the Loan document but still appear in Recent Activity / exports dated "today" — the two would disagree.
+
+8. **`GroupSettings.cycleStartDate` doesn't exist as a stored field — cycle boundaries live only on `Cycle`.** Don't add a duplicate date field to `GroupSettings` for this; the settings document is intentionally single-cycle-snapshot-free, and `Cycle.settingsSnapshot` is where a frozen copy of settings belongs once a cycle closes.
+
+---
+
+*Last updated: 2026-08-12 — Phase 5 (Cycle model + per-cycle configuration snapshot) added*
 *Next review: April 7 (Week 1 checkpoint)*

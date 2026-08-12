@@ -74,6 +74,7 @@ const { resolveLoanAccrualStrategy, resolveLoanAccrualKey } = require('../utils/
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { getSettings } = require('./groupSettingsController');
+const { resolveEntryDate } = require('../utils/cycleHelpers');
 const { Parser } = require('json2csv');
 const PdfPrinter = require('pdfmake');
 const fonts = {
@@ -215,8 +216,15 @@ exports.updateLoan = async (req, res) => {
 };
 
 exports.createLoan = async (req, res) => {
-  const { username, amount, duration: customDuration, interestRate: customRate } = req.body;
+  const { username, amount, duration: customDuration, interestRate: customRate, createdAt } = req.body;
   if (!username || !amount) return res.status(400).json({ error: 'Missing fields' });
+
+  // Backdating (a caller-supplied `createdAt`) is restricted to admin/treasurer
+  // and must fall within the currently open cycle — see
+  // docs/plan_configurable_group_rules.md Phase 5.
+  if (createdAt && !['admin', 'treasurer'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only admin or treasurer may backdate a loan' });
+  }
 
   try {
     // Look up member by name within the group
@@ -224,6 +232,7 @@ exports.createLoan = async (req, res) => {
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const userId = member._id;
 
+    const loanCreatedAt = await resolveEntryDate(req.groupId, createdAt);
     const settings = await getSettings(req.groupId);
 
     const duration = customDuration ? Number(customDuration) : settings.defaultLoanDuration;
@@ -260,10 +269,10 @@ exports.createLoan = async (req, res) => {
       const isTopUp = !!loan;
 
       if (isTopUp) {
-        strategy.onDisburse(loan, amount, { recordedBy: req.memberId });
+        strategy.onDisburse(loan, amount, { recordedBy: req.memberId, date: loanCreatedAt });
         loan.interestRate = appliedInterestRate; // rate can move cycle to cycle; the loan tracks the current one
       } else {
-        const fields = strategy.onDisburse(null, amount, { recordedBy: req.memberId });
+        const fields = strategy.onDisburse(null, amount, { recordedBy: req.memberId, date: loanCreatedAt });
         loan = new Loan({
           ...req.groupScope,
           userId,
@@ -272,6 +281,7 @@ exports.createLoan = async (req, res) => {
           interestRate: appliedInterestRate,
           interestMethod: settings.interestMethod,
           installments: [],
+          createdAt: loanCreatedAt,
           ...fields,
         });
       }
@@ -285,7 +295,8 @@ exports.createLoan = async (req, res) => {
         note: isTopUp
           ? `Loan top-up of K${amount} — new balance K${strategy.outstanding(loan)}.`
           : `Revolving loan of K${amount} disbursed.`,
-        groupId: req.groupId
+        groupId: req.groupId,
+        createdAt: loanCreatedAt,
       });
       await updateBankBalance(-amount, req.groupId);
       return res.status(201).json(loan);
@@ -301,7 +312,8 @@ exports.createLoan = async (req, res) => {
       durationMonths: duration,
       interestRate: appliedInterestRate,
       interestMethod: settings.interestMethod,
-      installments: schedule
+      installments: schedule,
+      createdAt: loanCreatedAt,
     });
 
     await loan.save();
@@ -311,12 +323,13 @@ exports.createLoan = async (req, res) => {
       amount,
       referenceId: loan._id,
       note: `Loan of K${amount} created for ${duration} month(s).`,
-      groupId: req.groupId
+      groupId: req.groupId,
+      createdAt: loanCreatedAt,
     });
     await updateBankBalance(-amount, req.groupId);
     res.status(201).json(loan);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create loan', details: err.message });
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to create loan', details: err.message });
   }
 };
 

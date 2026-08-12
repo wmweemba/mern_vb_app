@@ -389,7 +389,37 @@ No new model, no new controller. Together with Phase 3, both features are small 
 
 ---
 
-### Phase 5 — Cycle model and configuration snapshot
+### Phase 5 — Cycle model and configuration snapshot — ✅ DONE 2026-08-12
+
+Delivered: `models/Cycle.js` (`{ groupId, cycleNumber, startDate, endDate, status,
+settingsSnapshot, closedAt }`, unique partial index enforcing at most one open cycle
+per group); `utils/cycleHelpers.js` (`buildSettingsSnapshot`, `computeCycleEndDate`,
+`openCycle`, `getOpenCycle`, `resolveEntryDate`); `groupController.createGroup` opens
+Cycle 1 from the onboarding wizard's `cycleStartDate` (previously accepted by the
+backend but silently discarded); `cycleController.beginNewCycle` rewritten inside a
+MongoDB transaction, closing the current `Cycle` and opening the next with a fresh
+`settingsSnapshot`. Fixed audit finding #3 (`archiveCurrentCycleData` re-stamping
+already-archived records from prior cycles on every reset — scoped to
+`archived: { $ne: true }`) and audit finding #4 (Contribution and SocialFundExpense
+were never archived/reset by a cycle reset; `SocialFundBalance` now zeroed alongside
+`BankBalance`). Loan/savings/contribution creation now accept an optional backdate,
+gated to admin/treasurer and validated against the open cycle's bounds — audit
+finding #6. New `GET /api/cycle/current` returns the open cycle for the Phase 7
+migration script. All existing groups without a `Cycle` document (pre-Phase-5) fall
+back to unrestricted dates and the legacy transaction-note cycle count — zero
+behaviour change until their first reset under this code. `tests/cycleHelpers.test.js`
+added (8 cases); full backend suite (104/104) passes. See `CLAUDE.md`'s Phase 5
+architecture notes for the complete rationale.
+
+**Verification note:** `scripts/auditBankBalance.js` shows a pre-existing ~K6,950
+discrepancy in the shared Atlas DB, traced to William's own Village Bank group, which
+has been used for demo/test transactions that were never real money — not a
+regression from this phase (no money-moving arithmetic was touched) and not
+significant, since per the Phase 6 cutover plan, Atlas becomes the dev/staging DB and
+only Grace's group's final, Simon-confirmed position gets migrated into the new
+Coolify production DB.
+
+Original scoping notes below, kept for context.
 
 Two known defects make the migration unsafe without this:
 
