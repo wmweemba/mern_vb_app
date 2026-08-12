@@ -483,10 +483,21 @@ All tests must pass. If any fail — fix before proceeding.
 Touched any of these? → `loanCalculator.js`, `paymentController.js`,
 `bankBalanceController.js`, `loanController.js`, `GroupSettings`:
 ```bash
-cd mern_vb_backend && node scripts/auditBankBalance.js
+cd mern_vb_backend && node scripts/auditBankBalance.js --all
 ```
-Confirm the script output matches the app-reported balance.
-Discrepancy > ZMW 1 = stop and investigate before marking done.
+The script is **multi-tenant** (2026-08-12 rewrite — it used to have zero `groupId`
+scoping and compared one group's balance against every group's transactions pooled
+together, producing a meaningless number). `--all` audits every non-deleted group and
+prints a per-group summary table; `--group <id>` audits one group; no args just lists
+groups and exits. Exits non-zero if any audited group's discrepancy exceeds ZMW 1, so
+it can gate a release.
+
+Confirm every group's script output matches its app-reported balance.
+Discrepancy > ZMW 1 on a group you touched = stop and investigate before marking done.
+(William's Group carries a known, pre-existing ~K18,177 discrepancy from repeated
+dev/demo test sessions — not live financial data, not caused by any current change.
+Tracked for a cycle-reset cleanup alongside the eventual Coolify DB cutover, not an
+open bug to chase now.)
 
 ### Step 3 — Console.log sweep
 ```bash
