@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--dir", "mern-vb-frontend", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "chama360-backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "mern_vb_backend", "run", "dev"],
+      "port": 5000
     }
   ]
 }

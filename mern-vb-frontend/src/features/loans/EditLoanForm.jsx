@@ -13,7 +13,8 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const paymentsStarted = loan.installments.some(inst => inst.paid);
+  const isRevolving = loan.accrualMode === 'revolving';
+  const paymentsStarted = !isRevolving && loan.installments.some(inst => inst.paid);
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -25,7 +26,8 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.put(`${API_BASE_URL}/loans/${loan._id}`, form);
+      const payload = isRevolving ? { notes: form.notes } : form;
+      await axios.put(`${API_BASE_URL}/loans/${loan._id}`, payload);
       setSuccess(true);
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -34,6 +36,34 @@ const EditLoanForm = ({ loan, onSuccess, onCancel }) => {
       setLoading(false);
     }
   };
+
+  if (isRevolving) {
+    return (
+      <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">
+        <h2 className="text-lg font-bold mb-2">Edit Loan</h2>
+        <div className="bg-yellow-50 border border-yellow-200 rounded px-3 py-2 text-sm text-yellow-800">
+          This is a revolving loan — amount and duration have no fixed value to edit (top up via Add Loan instead). Only notes can be changed here.
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="notes" className="text-sm font-medium text-gray-700">Notes (optional)</label>
+          <textarea
+            id="notes"
+            name="notes"
+            value={form.notes}
+            onChange={handleChange}
+            placeholder="Add any additional notes..."
+            className="border rounded px-3 py-2 min-h-[80px]"
+          />
+        </div>
+        <div className="flex gap-2 mt-2">
+          <button type="submit" className="bg-blue-600 text-white rounded py-2 px-4" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</button>
+          <button type="button" className="bg-gray-300 text-gray-700 rounded py-2 px-4" onClick={onCancel}>Cancel</button>
+        </div>
+        {success && <div className="text-green-600 text-sm mt-1">Loan updated successfully!</div>}
+        {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
+      </form>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded shadow p-4 w-full max-w-md mx-auto flex flex-col gap-3">

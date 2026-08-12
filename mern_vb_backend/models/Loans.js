@@ -25,7 +25,28 @@ const loanSchema = new mongoose.Schema({
   fullyPaid: { type: Boolean, default: false },
   cycleNumber: { type: Number },
   cycleEndDate: { type: Date },
-  archived: { type: Boolean, default: false }
+  archived: { type: Boolean, default: false },
+
+  // Revolving accrual (docs/plan_configurable_group_rules.md Phase 2). All optional —
+  // scheduled loans (the default) never populate these; installments[] stays their
+  // single source of truth.
+  accrualMode: { type: String, enum: ['scheduled', 'revolving'], default: 'scheduled' },
+  principalBalance: { type: Number },
+  interestOutstanding: { type: Number, default: 0 },
+  entries: [{
+    date: { type: Date, default: Date.now },
+    periodLabel: String, // e.g. '2026-07' — set on accrual/capitalisation entries only
+    type: {
+      type: String,
+      enum: ['disbursement', 'accrual', 'capitalisation', 'interest_payment', 'principal_payment'],
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    principalAfter: Number,
+    interestAfter: Number,
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember' },
+  }],
 });
 
 module.exports = mongoose.model('Loan', loanSchema);

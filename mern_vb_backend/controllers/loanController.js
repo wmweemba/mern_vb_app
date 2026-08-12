@@ -70,7 +70,7 @@ exports.reverseInstallmentPayment = async (req, res) => {
 const Loan = require('../models/Loans');
 const GroupMember = require('../models/GroupMember');
 const Savings = require('../models/Savings');
-const { resolveLoanAccrualStrategy } = require('../utils/strategies/loanAccrual');
+const { resolveLoanAccrualStrategy, resolveLoanAccrualKey } = require('../utils/strategies/loanAccrual');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { getSettings } = require('./groupSettingsController');
@@ -97,6 +97,15 @@ exports.updateLoan = async (req, res) => {
     const loan = await Loan.findOne({ _id: loanId, ...req.groupScope });
     if (!loan) {
       return res.status(404).json({ error: 'Loan not found' });
+    }
+
+    // Revolving loans have no installment schedule to restate — amount/duration edits
+    // are meaningless here; a member's balance changes only via a top-up disbursement
+    // (createLoan) or a payment. Only notes are editable.
+    if (loan.accrualMode === 'revolving') {
+      if (updates.notes !== undefined) loan.notes = updates.notes;
+      await loan.save();
+      return res.json({ message: 'Loan updated successfully', loan });
     }
 
     const repaymentsStarted = loan.installments.some(inst => inst.paid);
@@ -220,17 +229,66 @@ exports.createLoan = async (req, res) => {
     const duration = customDuration ? Number(customDuration) : settings.defaultLoanDuration;
     const appliedInterestRate = customRate !== undefined ? Number(customRate) : settings.interestRate;
 
-    // Enforce loan limit: amount cannot exceed savings × multiplier
-    const totalSavings = await Savings.aggregate([
-      { $match: { userId, groupId: req.groupId, archived: { $ne: true } } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
-    const memberSavings = totalSavings[0]?.total || 0;
-    const maxLoan = memberSavings * settings.loanLimitMultiplier;
-    if (amount > maxLoan) {
-      return res.status(400).json({
-        error: `Loan amount K${amount} exceeds limit of K${maxLoan} (${settings.loanLimitMultiplier}× savings of K${memberSavings})`
+    // Enforce loan limit: amount cannot exceed savings × multiplier. Not every policy
+    // uses this rule — grocery_chilimba's loanLimit is 'none' in Phase 2 (the
+    // projected_cycle_contribution cap is a separate, later strategy — see
+    // docs/plan_configurable_group_rules.md §2.6).
+    if (settings.policies?.loanLimit !== 'none') {
+      const totalSavings = await Savings.aggregate([
+        { $match: { userId, groupId: req.groupId, archived: { $ne: true } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]);
+      const memberSavings = totalSavings[0]?.total || 0;
+      const maxLoan = memberSavings * settings.loanLimitMultiplier;
+      if (amount > maxLoan) {
+        return res.status(400).json({
+          error: `Loan amount K${amount} exceeds limit of K${maxLoan} (${settings.loanLimitMultiplier}× savings of K${memberSavings})`
+        });
+      }
+    }
+
+    const accrualKey = resolveLoanAccrualKey(settings);
+
+    if (accrualKey === 'revolving_monthly') {
+      const strategy = resolveLoanAccrualStrategy(settings);
+
+      // Top up an existing open revolving loan rather than opening a second one for
+      // the same member — mirrors the workbook's "New Loan total" column.
+      let loan = await Loan.findOne({
+        userId, ...req.groupScope, accrualMode: 'revolving', fullyPaid: false, archived: { $ne: true }
       });
+      const isTopUp = !!loan;
+
+      if (isTopUp) {
+        strategy.onDisburse(loan, amount, { recordedBy: req.memberId });
+        loan.interestRate = appliedInterestRate; // rate can move cycle to cycle; the loan tracks the current one
+      } else {
+        const fields = strategy.onDisburse(null, amount, { recordedBy: req.memberId });
+        loan = new Loan({
+          ...req.groupScope,
+          userId,
+          amount,
+          durationMonths: duration,
+          interestRate: appliedInterestRate,
+          interestMethod: settings.interestMethod,
+          installments: [],
+          ...fields,
+        });
+      }
+
+      await loan.save();
+      await logTransaction({
+        userId,
+        type: 'loan',
+        amount,
+        referenceId: loan._id,
+        note: isTopUp
+          ? `Loan top-up of K${amount} — new balance K${strategy.outstanding(loan)}.`
+          : `Revolving loan of K${amount} disbursed.`,
+        groupId: req.groupId
+      });
+      await updateBankBalance(-amount, req.groupId);
+      return res.status(201).json(loan);
     }
 
     const strategy = resolveLoanAccrualStrategy(settings);
@@ -273,7 +331,13 @@ exports.deleteLoan = async (req, res) => {
         throw Object.assign(new Error('Loan not found'), { status: 404 });
       }
 
-      const hasPayments = loan.installments.some(inst => inst.paid || (inst.paidAmount && inst.paidAmount > 0));
+      // Revolving loans have no installments[] to check — a top-up, payment, accrual
+      // or capitalisation all show up as entries beyond the single opening
+      // disbursement. Deleting is only safe for a loan that's still exactly as
+      // disbursed, same rule as the scheduled path.
+      const hasPayments = loan.accrualMode === 'revolving'
+        ? loan.entries.some(e => e.type !== 'disbursement') || loan.entries.filter(e => e.type === 'disbursement').length > 1
+        : loan.installments.some(inst => inst.paid || (inst.paidAmount && inst.paidAmount > 0));
       if (hasPayments || loan.fullyPaid) {
         throw Object.assign(
           new Error('Cannot delete a loan that has existing payments. Please reverse all payments first.'),
@@ -281,20 +345,25 @@ exports.deleteLoan = async (req, res) => {
         );
       }
 
-      await updateBankBalance(loan.amount, req.groupId, session);
+      // For a still-untouched revolving loan principalBalance equals the original
+      // disbursement, but restoring from principalBalance (rather than loan.amount)
+      // keeps this correct if that assumption is ever loosened.
+      const restoreAmount = loan.accrualMode === 'revolving' ? loan.principalBalance : loan.amount;
+
+      await updateBankBalance(restoreAmount, req.groupId, session);
 
       await logTransaction({
         userId: loan.userId,
         type: 'loan',
-        amount: -loan.amount,
+        amount: -restoreAmount,
         referenceId: loan._id,
-        note: `Loan of K${loan.amount} deleted - disbursement reversed.`,
+        note: `Loan of K${restoreAmount} deleted - disbursement reversed.`,
         groupId: req.groupId
       }, session);
 
       await Loan.findByIdAndDelete(loanId).session(session);
 
-      res.json({ message: `Loan deleted successfully. K${loan.amount} restored to bank balance.` });
+      res.json({ message: `Loan deleted successfully. K${restoreAmount} restored to bank balance.` });
     });
   } catch (err) {
     const status = err.status || 500;
@@ -462,5 +531,124 @@ exports.getAllLoans = async (req, res) => {
     res.json(loans);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch all loans' });
+  }
+};
+
+// --- Month-end interest run (revolving loans only) ---
+// docs/plan_configurable_group_rules.md Phase 2. A treasurer-triggered batch action:
+// accrue one period's interest on every open revolving loan in the group, inside a
+// single session, idempotent per periodLabel (re-running the same month is a no-op
+// for loans already accrued).
+
+function round2(n) {
+  return +Number(n).toFixed(2);
+}
+
+function currentPeriodLabel() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function hasAccruedForPeriod(loan, periodLabel) {
+  return loan.entries.some(e => e.type === 'accrual' && e.periodLabel === periodLabel);
+}
+
+// GET — lists what a run would charge, without writing anything. Powers the
+// confirmation screen (UI_SPEC.md §6.18) before the treasurer commits.
+exports.previewMonthEndInterest = async (req, res) => {
+  try {
+    const settings = await getSettings(req.groupId);
+    const periodLabel = req.query.periodLabel || currentPeriodLabel();
+    const rate = settings.interestRate;
+    const capitalise = settings.policies?.arrears === 'capitalise';
+
+    const loans = await Loan.find({
+      ...req.groupScope, accrualMode: 'revolving', fullyPaid: false, archived: { $ne: true }
+    }).populate('userId', 'name');
+
+    let totalInterest = 0;
+    const rows = loans.map(loan => {
+      const alreadyAccrued = hasAccruedForPeriod(loan, periodLabel);
+      if (alreadyAccrued) {
+        return { loanId: loan._id, member: loan.userId?.name, alreadyAccrued: true };
+      }
+      const principalBalance = loan.principalBalance || 0;
+      const interestOutstanding = loan.interestOutstanding || 0;
+      const willCapitalise = capitalise && interestOutstanding > 0;
+      const principalAfterCapitalisation = willCapitalise ? round2(principalBalance + interestOutstanding) : principalBalance;
+      const interestCharge = round2(principalAfterCapitalisation * (rate / 100));
+      totalInterest += interestCharge;
+      return {
+        loanId: loan._id,
+        member: loan.userId?.name,
+        alreadyAccrued: false,
+        currentPrincipal: principalBalance,
+        currentInterestOutstanding: interestOutstanding,
+        willCapitalise,
+        capitalisedAmount: willCapitalise ? interestOutstanding : 0,
+        interestCharge,
+      };
+    });
+
+    res.json({
+      periodLabel,
+      rate,
+      capitalise,
+      count: rows.filter(r => !r.alreadyAccrued).length,
+      totalInterest: round2(totalInterest),
+      loans: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to preview month-end interest', details: err.message });
+  }
+};
+
+// POST — commits the run. Treasurer/admin only, matching other balance-moving actions.
+exports.runMonthEndInterest = async (req, res) => {
+  const allowedRoles = ['admin', 'treasurer'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+  }
+
+  const periodLabel = req.body.periodLabel || currentPeriodLabel();
+  const session = await mongoose.startSession();
+
+  try {
+    let summary;
+    await session.withTransaction(async () => {
+      const settings = await getSettings(req.groupId);
+      const strategy = resolveLoanAccrualStrategy(settings);
+      const rate = settings.interestRate;
+      const capitalise = settings.policies?.arrears === 'capitalise';
+
+      const loans = await Loan.find({
+        ...req.groupScope, accrualMode: 'revolving', fullyPaid: false, archived: { $ne: true }
+      }).session(session);
+
+      let accruedCount = 0;
+      let skippedCount = 0;
+      let totalInterest = 0;
+
+      for (const loan of loans) {
+        if (hasAccruedForPeriod(loan, periodLabel)) {
+          skippedCount++;
+          continue;
+        }
+        const { interestCharge } = strategy.accrue(loan, {
+          periodLabel, rate, capitalise, recordedBy: req.memberId
+        });
+        totalInterest += interestCharge;
+        accruedCount++;
+        await loan.save({ session });
+      }
+
+      summary = { periodLabel, rate, accruedCount, skippedCount, totalInterest: round2(totalInterest) };
+    });
+
+    res.json({ message: 'Month-end interest run complete', ...summary });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to run month-end interest', details: err.message });
+  } finally {
+    await session.endSession();
   }
 };
