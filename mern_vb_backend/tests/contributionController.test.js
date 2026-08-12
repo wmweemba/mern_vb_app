@@ -384,4 +384,57 @@ describe('Group seeding', () => {
     expect(sf).not.toBeNull();
     expect(sf.balance).toBe(0);
   });
+
+  test('11. a grocery_chilimba group additionally seeds "Interest Top-Up" (policies.interestObligation === per_member_quota)', async () => {
+    const GroupTemplate = require('../models/GroupTemplate');
+    await GroupTemplate.findOneAndUpdate(
+      { key: 'grocery_chilimba' },
+      {
+        key: 'grocery_chilimba',
+        name: 'Grocery Savings Group',
+        active: true,
+        policies: {
+          loanAccrual: 'revolving_monthly', arrears: 'capitalise', loanLimit: 'none',
+          concurrentLoans: 'unlimited', interestObligation: 'per_member_quota',
+          cycleEnd: 'pooled_external', exit: 'settle_and_refund',
+        },
+        defaults: {
+          cycleLengthMonths: 6, interestRate: 10, interestMethod: 'flat',
+          defaultLoanDuration: 1, loanLimitMultiplier: 10, latePenaltyRate: 15,
+          overdueFineAmount: 0, earlyPaymentCharge: 0, partialPaymentFineAmount: 0,
+          savingsInterestRate: 0, minimumSavingsMonth1: 0, minimumSavingsMonthly: 0,
+          maximumSavingsFirst3Months: 0, savingsShortfallFine: 0,
+          profitSharingMethod: 'equal', interestObligationAmount: 0,
+        },
+      },
+      { upsert: true }
+    );
+
+    const groupApp = express();
+    groupApp.use(express.json());
+    const { verifyToken } = require('../middleware/auth');
+    const groupController = require('../controllers/groupController');
+    groupApp.post('/api/groups', verifyToken, groupController.createGroup);
+
+    const res = await request(groupApp)
+      .post('/api/groups')
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({
+        groupName: 'Grocery Seed Test Group',
+        treasurerName: 'Grocery Treasurer',
+        templateKey: 'grocery_chilimba',
+      });
+
+    expect(res.statusCode).toBe(201);
+    const gid = res.body.group.id;
+
+    const types = await ContributionType().find({ groupId: gid }).sort({ name: 1 });
+    expect(types.map(t => t.name)).toEqual(
+      expect.arrayContaining(['Admin Fee', 'Interest Top-Up', 'Social Fund'])
+    );
+    const topUp = types.find(t => t.name === 'Interest Top-Up');
+    expect(topUp.affectsMainBalance).toBe(true);
+    expect(topUp.countsTowardInterestObligation).toBe(true);
+    expect(topUp.isDefault).toBe(true);
+  });
 });

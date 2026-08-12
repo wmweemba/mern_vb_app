@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { exportToExcel } from '../lib/export';
@@ -255,6 +255,16 @@ const Reports = () => {
   const [reportSelectionOpen, setReportSelectionOpen] = useState(false);
   const [pendingReportConfig, setPendingReportConfig] = useState(null);
   const [showFinesModal, setShowFinesModal] = useState(false);
+  const [interestObligation, setInterestObligation] = useState(null);
+
+  const isOfficer = ['admin', 'loan_officer', 'treasurer'].includes(user?.role);
+
+  useEffect(() => {
+    if (!isOfficer) return;
+    axios.get(`${API_BASE_URL}/reports/interest-obligation`)
+      .then(res => setInterestObligation(res.data))
+      .catch(() => setInterestObligation(null));
+  }, [isOfficer]);
 
   const handleViewReport = async (config) => {
     setPendingReportConfig(config);
@@ -353,8 +363,6 @@ const Reports = () => {
     }
   };
 
-  const isOfficer = ['admin', 'loan_officer', 'treasurer'].includes(user?.role);
-
   return (
     <div className="p-4 w-full max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-center">Reports</h1>
@@ -376,6 +384,38 @@ const Reports = () => {
           </button>
         </div>
       </div>
+
+      {/* Interest Obligation — only rendered when the group has a quota configured */}
+      {isOfficer && interestObligation && interestObligation.target > 0 && (
+        <div className="mb-8 border border-border-default rounded-lg p-4 bg-surface-card">
+          <div className="font-semibold mb-1 text-center text-text-primary">Interest Obligation</div>
+          <p className="text-sm text-center text-text-secondary mb-3">
+            Target: K{Number(interestObligation.target).toLocaleString()} per member this cycle.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-widest text-text-secondary border-b border-border-default">
+                  <th className="py-2 pr-2">Member</th>
+                  <th className="py-2 pr-2 text-right">Credited</th>
+                  <th className="py-2 text-right">Shortfall</th>
+                </tr>
+              </thead>
+              <tbody>
+                {interestObligation.rows.map(row => (
+                  <tr key={row.memberId} className="border-b border-border-default last:border-b-0">
+                    <td className="py-2 pr-2 text-text-primary">{row.name}</td>
+                    <td className="py-2 pr-2 text-right text-text-primary">K{Number(row.credited).toLocaleString()}</td>
+                    <td className={`py-2 text-right font-semibold ${row.shortfall > 0 ? 'text-status-overdue-text' : 'text-status-paid-text'}`}>
+                      K{Number(row.shortfall).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {exportConfigs.map(config => (
         <div key={config.label} className="mb-8">

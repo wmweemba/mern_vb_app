@@ -22,7 +22,7 @@ export default function ContributionTypesManager() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', affectsMainBalance: true });
+  const [addForm, setAddForm] = useState({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false });
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -44,7 +44,7 @@ export default function ContributionTypesManager() {
     setAddLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/contribution-types`, addForm);
-      setAddForm({ name: '', affectsMainBalance: true });
+      setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false });
       setShowAdd(false);
       fetchTypes();
     } catch (err) {
@@ -125,6 +125,11 @@ export default function ContributionTypesManager() {
               </div>
 
               <RoutingBadge affectsMainBalance={type.affectsMainBalance} />
+              {type.countsTowardInterestObligation && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-status-paid-bg text-status-paid-text flex-shrink-0">
+                  Counts to Quota
+                </span>
+              )}
 
               {/* Edit name button — hidden for default types */}
               {!type.isDefault && editingId !== type._id && (
@@ -204,12 +209,23 @@ export default function ContributionTypesManager() {
             </div>
           </div>
 
+          {/* Interest obligation toggle */}
+          <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={addForm.countsTowardInterestObligation}
+              onChange={e => setAddForm({ ...addForm, countsTowardInterestObligation: e.target.checked })}
+              className="h-4 w-4 rounded border-border-default text-brand-primary focus:ring-brand-primary"
+            />
+            Counts toward each member's interest obligation quota
+          </label>
+
           {addError && <p className="text-xs text-status-overdue-text">{addError}</p>}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', affectsMainBalance: true }); }}
+              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false }); }}
               className="flex-1 border border-border-default text-text-primary rounded-md py-2 text-sm hover:bg-surface-card transition-colors"
             >
               Cancel

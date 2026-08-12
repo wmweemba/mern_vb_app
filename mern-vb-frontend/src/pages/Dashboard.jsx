@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import NewCycleBanner from '../components/NewCycleBanner';
 import BeginNewCycleModal from '../components/ui/BeginNewCycleModal';
 import DashboardStatsCard from '../components/ui/DashboardStatsCard';
+import InterestObligationCard from '../components/ui/InterestObligationCard';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
@@ -62,7 +63,10 @@ const Dashboard = () => {
       ) : error ? (
         <div className="text-status-overdue-text text-sm">{error}</div>
       ) : (
-        <DashboardStatsCard stats={stats} />
+        <>
+          <InterestObligationCard />
+          <DashboardStatsCard stats={stats} />
+        </>
       )}
     </div>
   );

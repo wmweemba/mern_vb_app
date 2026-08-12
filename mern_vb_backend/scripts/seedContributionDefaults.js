@@ -9,6 +9,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Group = require('../models/Group');
+const GroupSettings = require('../models/GroupSettings');
 const SocialFundBalance = require('../models/SocialFundBalance');
 const ContributionType = require('../models/ContributionType');
 
@@ -16,6 +17,14 @@ const DEFAULT_TYPES = [
   { name: 'Admin Fee',   affectsMainBalance: true,  isDefault: true, active: true },
   { name: 'Social Fund', affectsMainBalance: false, isDefault: true, active: true },
 ];
+
+// Phase 3 (docs/plan_configurable_group_rules.md) — only seeded for groups whose
+// interest obligation policy is actually active; adding it unconditionally would give
+// every village_bank group a meaningless type.
+const INTEREST_TOPUP_TYPE = {
+  name: 'Interest Top-Up', affectsMainBalance: true,
+  countsTowardInterestObligation: true, isDefault: true, active: true,
+};
 
 async function seed() {
   await mongoose.connect(process.env.MONGODB_URI);
@@ -39,7 +48,12 @@ async function seed() {
     }
 
     // ContributionTypes — insert only if the name doesn't already exist for this group
-    for (const def of DEFAULT_TYPES) {
+    const typesToSeed = [...DEFAULT_TYPES];
+    const settings = await GroupSettings.findOne({ groupId: gid });
+    if (settings?.policies?.interestObligation === 'per_member_quota') {
+      typesToSeed.push(INTEREST_TOPUP_TYPE);
+    }
+    for (const def of typesToSeed) {
       const exists = await ContributionType.findOne({ groupId: gid, name: def.name })
         .collation({ locale: 'en', strength: 2 });
       if (!exists) {

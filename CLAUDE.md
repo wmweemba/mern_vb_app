@@ -641,5 +641,25 @@ Added 2026-08-12 (Phase 2 of `docs/plan_configurable_group_rules.md`: revolving 
 
 ---
 
-*Last updated: 2026-08-12 — Phase 2 (configurable group rules: revolving monthly loan accrual) added*
+## Configurable Group Rules (Phase 3) — Architecture Notes
+
+Added 2026-08-12 (Phase 3 of `docs/plan_configurable_group_rules.md`: interest quota tracking). Key decisions recorded here to prevent regression:
+
+1. **Derive the report, store only the target.** `GroupSettings.interestObligationAmount` is the only stored number (added in Phase 1). Everything in the Interest Obligation report — credited from loans, credited from contributions, shortfall — is computed fresh from `Loan` and `Contribution` records on every request in `controllers/interestObligationController.js`. A stored running total would drift from the transactions that feed it the first time a payment is reversed or a fine is voided; a derived figure structurally cannot.
+
+2. **Credited-from-loans works for both accrual families, not just revolving.** `interestPaidOnLoan(loan)` branches on `accrualMode`: revolving loans sum their `entries[]` of `type: 'interest_payment'` (the ledger already tracks this exactly); scheduled loans credit a paid installment's full `interest`, or — for a partial (`paid: false, paidAmount > 0`) — `min(paidAmount, interest)`, mirroring the interest-first allocation convention `utils/strategies/loanAccrual/scheduledCommon.js` already uses elsewhere. No group currently has both a scheduled accrual and an active quota, but the function is written to be correct if one ever does, rather than silently under-reporting.
+
+3. **Shortfall is a floor, never a credit-back.** `shortfall = max(0, target − credited)`. A member who over-delivers (paid more interest or top-up than their quota) shows `0`, not a negative number — confirmed by Simon Peter: surplus stays in the pot or rolls over, it is never refunded or converted into extra groceries. Don't "fix" a negative-looking shortfall by subtracting it elsewhere; `0` is correct.
+
+4. **`countsTowardInterestObligation` is denormalized onto `Contribution` at record time**, not resolved live via `contributionTypeId`. Same defensive instinct as `typeName`/`affectsMainBalance` (§ Contributions Feature notes above) — if a treasurer later flips a type's quota flag, every already-recorded contribution must keep reporting under the rule that was true when it was recorded, or historical Interest Obligation reports would silently restate themselves.
+
+5. **The "Interest Top-Up" contribution type is seeded conditionally, not unconditionally.** `groupController.createGroup` only creates it when the resolved template's `policies.interestObligation === 'per_member_quota'` (currently `grocery_chilimba`) — adding it to every `village_bank` group would give admins a meaningless type with no corresponding quota to service. `scripts/seedContributionDefaults.js` mirrors this conditional for backfilling existing groups (checks each group's own `GroupSettings.policies.interestObligation`, not the template).
+
+6. **No `Cycle` model yet, so "credited this cycle" means "not archived."** The plan's Phase 5 (a real `Cycle` model with explicit start/end dates) hasn't shipped. Until it does, the Interest Obligation report follows the same convention every other cycle-scoped aggregate in this codebase already uses (e.g. the loan-limit savings check in `loanController.createLoan`): `archived: { $ne: true }`. A "Begin New Cycle" reset is what resets a member's credited total to zero, not a date boundary.
+
+7. **Route middleware gotcha, caught before merge:** `middleware/auth.js`'s `requireRole` takes a single role or an **array** of roles — it is not variadic. `requireRole('admin', 'treasurer', 'loan_officer')` silently only enforces `'admin'` (extra arguments are dropped); the correct call is `requireRole(['admin', 'treasurer', 'loan_officer'])`. Grep for `requireRole(` before adding a new multi-role route rather than copying a `allowRoles(...roles)` call from `loanController`/`paymentController`-style routers, which use a different, genuinely variadic local helper.
+
+---
+
+*Last updated: 2026-08-12 — Phase 3 (configurable group rules: interest quota tracking) added*
 *Next review: April 7 (Week 1 checkpoint)*
