@@ -10,6 +10,11 @@ const contributionTypeSchema = new Schema({
   // e.g. the "Interest Top-Up" type: a member who declined a notional loan pays this
   // instead of loan interest. Report-only flag — does not affect balance routing.
   countsTowardInterestObligation: { type: Boolean, default: false },
+  // Phase 4 (docs/plan_configurable_group_rules.md) — when > 0, this type is a
+  // per-member liability with a running balance (e.g. a K250 membership fee payable
+  // in instalments). 0 (default) means "no target" — an ordinary contribution type,
+  // same behaviour as before this field existed.
+  targetAmountPerMember: { type: Number, default: 0, min: 0 },
   active:             { type: Boolean, default: true },
   isDefault:          { type: Boolean, default: false },
   createdBy:          { type: Schema.Types.ObjectId, ref: 'GroupMember', default: null },
