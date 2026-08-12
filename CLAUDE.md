@@ -619,5 +619,27 @@ Added 2026-08-11 (Phase 1 of `docs/plan_configurable_group_rules.md`: template +
 
 ---
 
-*Last updated: 2026-08-11 — Phase 1 (configurable group rules: templates + policy architecture) added*
+## Configurable Group Rules (Phase 2) — Architecture Notes
+
+Added 2026-08-12 (Phase 2 of `docs/plan_configurable_group_rules.md`: revolving monthly loan accrual, scoped to Grace Kalele's group). Key decisions recorded here to prevent regression:
+
+1. **Revolving loans never touch `installments[]`.** `Loan.accrualMode` (`'scheduled' | 'revolving'`) is the switch every controller checks first. A revolving loan's single source of truth is `principalBalance + interestOutstanding`, restated by an append-only `entries[]` ledger. Any code that reads `loan.installments` for a revolving loan will just see an empty array — that's intentional, not a bug to "fix" by populating it.
+
+2. **Accrual is not a cash movement.** `revolvingMonthly.accrue()` creates no `Transaction` and never calls `updateBankBalance` — it only restates `principalBalance`/`interestOutstanding` on the loan document. Only `onDisburse` (money leaving the pot) and `applyPayment` (money entering it) touch the bank balance and log a `Transaction`. Adding a `Transaction`/balance call to `accrue()` would double-count — the group's total lending pool doesn't shrink or grow just because interest was calculated.
+
+3. **Payment allocation is member-directed, not a fixed waterfall — confirmed by Simon Peter, not assumed.** `paymentController.repayment` accepts an optional `allocation: { toInterest, toPrincipal }` for revolving loans; omitted, it defaults to interest-first. A fixed interest-first rule with no override would silently misrecord any member who directs payment differently (principal-only, or a stated split), and the group's balances would diverge from their own tracking within a month. `revolvingMonthly.applyPayment` rejects (400, not silently clamped) both an allocation that doesn't sum to the payment amount and a payment that exceeds the loan's total outstanding balance.
+
+4. **Capitalisation is gated on `policies.arrears === 'capitalise'` and never fires for a scheduled loan.** When it does fire (`revolvingMonthly.accrue`), unpaid `interestOutstanding` folds into `principalBalance` *before* that period's new interest is computed — so a capitalising group is charged interest on the larger, post-capitalisation balance in the same period the capitalisation happens. This is real, observed behaviour in Grace's group, not a synthetic edge case; it has first-class golden tests (`tests/strategies/revolvingMonthly.test.js`).
+
+5. **"Run Month-End Interest" is a treasurer-triggered batch action, idempotent per `periodLabel`.** `POST /api/loans/accrue-month-end` accrues every open revolving loan in the group inside one session; a loan that already has an `entries[]` row of `type: 'accrual'` for that `periodLabel` is skipped, so re-running the same month is always safe. There is no scheduled/cron version of this — a human runs it once a month, with `GET /api/loans/accrue-month-end/preview` powering the confirmation screen first (UI_SPEC.md §6.18: this moves every member's balance at once, so it is never a single-tap action).
+
+6. **A member's active revolving loan is topped up, not duplicated.** `loanController.createLoan`, when the group's resolved accrual family is `revolving_monthly`, looks for the member's existing open (`fullyPaid: false`) revolving loan first and calls `onDisburse(loan, amount, ctx)` on it instead of creating a second `Loan` document. This mirrors the workbook's "New Loan total" column (old balance + new borrowing merge into one running figure) and keeps `entries[]` as the complete history for a member's one ongoing loan.
+
+7. **`savings_multiple` loan-limit checking is skipped when `policies.loanLimit === 'none'`**, not just left in place and coincidentally passing. Grace's group has no savings-based cap — checking it anyway would either block valid loans or require faking a multiplier. The `projected_cycle_contribution` cap from the plan's §2.6 (fee + interest quota + contribution × months) is a **separate, later strategy** — not built in Phase 2, and `loanLimit` stays `'none'` for `grocery_chilimba` until it lands.
+
+8. **`deleteLoan` and `updateLoan` both need a revolving-aware branch, or they silently do the wrong thing with real money.** Before this phase, `deleteLoan`'s "has this loan had any payments" check only looked at `installments[]` — for a revolving loan that's always empty, so the check would have let a treasurer delete a loan with real payment/top-up history and refund only the *original* disbursed `amount`, not the current `principalBalance` (which may have grown via top-ups). Fixed by checking `entries[]` for anything beyond the single opening disbursement, and refunding `principalBalance` instead of `amount` for revolving loans. `updateLoan` on a revolving loan now only allows editing `notes` — amount/duration edits are meaningless without a fixed schedule, and a balance change belongs in `createLoan` (top-up) or a payment, never a direct field edit.
+
+---
+
+*Last updated: 2026-08-12 — Phase 2 (configurable group rules: revolving monthly loan accrual) added*
 *Next review: April 7 (Week 1 checkpoint)*

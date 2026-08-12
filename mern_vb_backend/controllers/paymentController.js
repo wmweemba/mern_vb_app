@@ -1,14 +1,14 @@
 const { updateBankBalance } = require('./bankBalanceController');
 const { logTransaction } = require('./transactionController');
 const { getSettings } = require('./groupSettingsController');
-const { resolveLoanAccrualStrategy } = require('../utils/strategies/loanAccrual');
+const { resolveLoanAccrualStrategyForLoan } = require('../utils/strategies/loanAccrual');
 const GroupMember = require('../models/GroupMember');
 const Fine = require('../models/Fine');
 const Loan = require('../models/Loans');
 const mongoose = require('mongoose');
 
 exports.repayment = async (req, res) => {
-  const { username, amount, note, loanId } = req.body;
+  const { username, amount, note, loanId, allocation } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -45,13 +45,47 @@ exports.repayment = async (req, res) => {
       return res.status(404).json({ error: `No active loan found for member '${username}'` });
     }
 
+    if (loan.accrualMode === 'revolving') {
+      const strategy = resolveLoanAccrualStrategyForLoan(loan);
+      let result;
+      try {
+        result = strategy.applyPayment(loan, paymentAmount, allocation || {}, { recordedBy: req.memberId });
+      } catch (err) {
+        await session.abortTransaction();
+        return res.status(err.status || 400).json({ error: err.message });
+      }
+
+      if (result.fullyPaid) loan.fullyPaid = true;
+
+      await loan.save({ session });
+      await updateBankBalance(paymentAmount, req.groupId, session);
+      await logTransaction({
+        userId,
+        type: 'loan_payment',
+        amount: paymentAmount,
+        note: note || `Payment — interest K${result.toInterest}, principal K${result.toPrincipal}`,
+        referenceId: loan._id,
+        groupId: req.groupId
+      }, session);
+
+      await session.commitTransaction();
+
+      return res.json({
+        message: 'Loan payment recorded successfully',
+        paymentAmount,
+        allocation: { toInterest: result.toInterest, toPrincipal: result.toPrincipal },
+        loanFullyPaid: result.fullyPaid,
+        loan
+      });
+    }
+
     const nextInstallment = loan.installments.find(inst => !inst.paid);
     if (!nextInstallment) {
       await session.abortTransaction();
       return res.status(400).json({ error: 'All loan installments are already paid' });
     }
 
-    const strategy = resolveLoanAccrualStrategy({ interestMethod: loan.interestMethod || 'reducing' });
+    const strategy = resolveLoanAccrualStrategyForLoan(loan);
     const installmentsToUpdate = strategy.applyPayment(loan, paymentAmount);
 
     if (installmentsToUpdate.length === 0) {

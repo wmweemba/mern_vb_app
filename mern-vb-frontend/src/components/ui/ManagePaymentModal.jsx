@@ -15,6 +15,8 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [activeLoan, setActiveLoan] = useState(null);
+  const [toInterest, setToInterest] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -31,6 +33,27 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
         .catch(() => setUnpaidFines([]));
     }
   }, [open, type]);
+
+  // Revolving loans need a member-directed interest/principal split at payment time
+  // (docs/plan_configurable_group_rules.md Phase 2) — scheduled loans don't, so this
+  // only matters once we know which kind of loan the member's active loan is.
+  useEffect(() => {
+    setActiveLoan(null);
+    setToInterest('');
+    if (open && type === 'repayment' && username) {
+      axios.get(`${API_BASE_URL}/loans/user/by-username`, { params: { username } })
+        .then(res => {
+          const loans = Array.isArray(res.data) ? res.data : [];
+          const openLoans = loans.filter(l => !l.fullyPaid)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setActiveLoan(openLoans[0] || null);
+        })
+        .catch(() => setActiveLoan(null));
+    }
+  }, [open, type, username]);
+
+  const isRevolving = activeLoan?.accrualMode === 'revolving';
+  const outstanding = isRevolving ? (activeLoan.principalBalance || 0) + (activeLoan.interestOutstanding || 0) : null;
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -51,9 +74,19 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
         const endpoint = type === 'repayment'
           ? `${API_BASE_URL}/payments/repayment`
           : `${API_BASE_URL}/payments/payout`;
-        response = await axios.post(endpoint, { username, amount: Number(amount), note });
+        const payload = { username, amount: Number(amount), note };
+        if (type === 'repayment' && isRevolving && toInterest !== '') {
+          const interestPart = Number(toInterest);
+          payload.allocation = { toInterest: interestPart, toPrincipal: Number(amount) - interestPart };
+        }
+        response = await axios.post(endpoint, payload);
 
-        if (type === 'repayment' && response.data.installmentsPaid) {
+        if (type === 'repayment' && response.data.allocation) {
+          const { toInterest: paidInterest, toPrincipal: paidPrincipal } = response.data.allocation;
+          let msg = `Loan payment recorded! Interest: K${paidInterest}, Principal: K${paidPrincipal}`;
+          if (response.data.loanFullyPaid) msg += ' — Loan fully paid!';
+          setSuccess(msg);
+        } else if (type === 'repayment' && response.data.installmentsPaid) {
           const installmentDetails = response.data.installmentsPaid
             .map(inst => `Month ${inst.month}: K${inst.amount}`)
             .join(', ');
@@ -68,6 +101,8 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
         setUsername('');
         setAmount('');
         setNote('');
+        setToInterest('');
+        setActiveLoan(null);
       }
     } catch (err) {
       let errorMessage = 'Failed to record payment';
@@ -168,6 +203,24 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
                   required
                 />
               </div>
+              {type === 'repayment' && isRevolving && (
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
+                    Allocate to interest (ZMW)
+                  </label>
+                  <input
+                    type="number"
+                    value={toInterest}
+                    onChange={e => setToInterest(e.target.value)}
+                    placeholder={`Default: interest first, up to K${activeLoan.interestOutstanding || 0}`}
+                    className="w-full border border-border-default rounded-md px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  />
+                  <p className="text-xs text-text-secondary mt-1">
+                    Revolving loan — outstanding K{outstanding.toLocaleString()} (interest K{(activeLoan.interestOutstanding || 0).toLocaleString()}, principal K{(activeLoan.principalBalance || 0).toLocaleString()}).
+                    {' '}Leave blank to apply the payment to interest first, then principal. The rest of the amount goes to principal.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5">
                   Note (optional)

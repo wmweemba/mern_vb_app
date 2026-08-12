@@ -17,6 +17,9 @@ router.post('/', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loa
 router.get('/user/:id', verifyToken, resolveGroup, checkTrial, loanController.getLoansByUser);
 router.get('/export', verifyToken, resolveGroup, checkTrial, loanController.exportLoansReport);
 router.get('/export/pdf', verifyToken, resolveGroup, checkTrial, loanController.exportLoansReportPDF);
+// Month-end interest run (revolving loans) — static routes, must stay above /:loanId.
+router.get('/accrue-month-end/preview', verifyToken, resolveGroup, checkTrial, loanController.previewMonthEndInterest);
+router.post('/accrue-month-end', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer'), loanController.runMonthEndInterest);
 router.get('/', verifyToken, resolveGroup, checkTrial, loanController.getAllLoans);
 router.put('/repay', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.repayInstallment);
 router.put('/:loanId', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.updateLoan);
