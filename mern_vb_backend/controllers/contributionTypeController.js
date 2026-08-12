@@ -1,7 +1,7 @@
 const ContributionType = require('../models/ContributionType');
 
 exports.createType = async (req, res) => {
-  const { name, affectsMainBalance, countsTowardInterestObligation } = req.body;
+  const { name, affectsMainBalance, countsTowardInterestObligation, targetAmountPerMember } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -11,6 +11,7 @@ exports.createType = async (req, res) => {
       name: name.trim(),
       affectsMainBalance: typeof affectsMainBalance === 'boolean' ? affectsMainBalance : true,
       countsTowardInterestObligation: typeof countsTowardInterestObligation === 'boolean' ? countsTowardInterestObligation : false,
+      targetAmountPerMember: Number(targetAmountPerMember) || 0,
       createdBy: req.memberId,
     });
     res.status(201).json(type);
@@ -34,7 +35,7 @@ exports.listTypes = async (req, res) => {
 };
 
 exports.updateType = async (req, res) => {
-  const { name, active, countsTowardInterestObligation } = req.body;
+  const { name, active, countsTowardInterestObligation, targetAmountPerMember } = req.body;
   try {
     const type = await ContributionType.findOne({ _id: req.params.id, ...req.groupScope });
     if (!type) return res.status(404).json({ error: 'Contribution type not found' });
@@ -48,6 +49,13 @@ exports.updateType = async (req, res) => {
     }
     if (typeof countsTowardInterestObligation === 'boolean') {
       type.countsTowardInterestObligation = countsTowardInterestObligation;
+    }
+    if (targetAmountPerMember !== undefined) {
+      const target = Number(targetAmountPerMember);
+      if (isNaN(target) || target < 0) {
+        return res.status(400).json({ error: 'targetAmountPerMember must be a non-negative number' });
+      }
+      type.targetAmountPerMember = target;
     }
 
     await type.save();

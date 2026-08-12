@@ -22,12 +22,15 @@ export default function ContributionTypesManager() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false });
+  const [addForm, setAddForm] = useState({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' });
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editError, setEditError] = useState('');
+  const [editingTargetId, setEditingTargetId] = useState(null);
+  const [editTargetValue, setEditTargetValue] = useState('');
+  const [targetError, setTargetError] = useState('');
 
   const fetchTypes = () => {
     axios.get(`${API_BASE_URL}/contribution-types`)
@@ -44,7 +47,7 @@ export default function ContributionTypesManager() {
     setAddLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/contribution-types`, addForm);
-      setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false });
+      setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' });
       setShowAdd(false);
       fetchTypes();
     } catch (err) {
@@ -82,6 +85,28 @@ export default function ContributionTypesManager() {
     setEditingId(type._id);
     setEditName(type.name);
     setEditError('');
+  };
+
+  const startEditTarget = (type) => {
+    setEditingTargetId(type._id);
+    setEditTargetValue(type.targetAmountPerMember > 0 ? String(type.targetAmountPerMember) : '');
+    setTargetError('');
+  };
+
+  const handleSaveTarget = async (type) => {
+    setTargetError('');
+    const value = editTargetValue === '' ? 0 : Number(editTargetValue);
+    if (isNaN(value) || value < 0) {
+      setTargetError('Enter a non-negative number');
+      return;
+    }
+    try {
+      await axios.patch(`${API_BASE_URL}/contribution-types/${type._id}`, { targetAmountPerMember: value });
+      setEditingTargetId(null);
+      fetchTypes();
+    } catch (err) {
+      setTargetError(err.response?.data?.error || 'Failed to update target');
+    }
   };
 
   if (loading) return <p className="text-sm text-text-secondary">Loading contribution types...</p>;
@@ -129,6 +154,41 @@ export default function ContributionTypesManager() {
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-status-paid-bg text-status-paid-text flex-shrink-0">
                   Counts to Quota
                 </span>
+              )}
+
+              {/* Per-member liability target (Phase 4) */}
+              {editingTargetId === type._id ? (
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <input
+                    type="number"
+                    min="0"
+                    className={inputCls + ' h-8 w-24'}
+                    value={editTargetValue}
+                    onChange={e => setEditTargetValue(e.target.value)}
+                    placeholder="0"
+                    autoFocus
+                  />
+                  <button type="button" onClick={() => handleSaveTarget(type)} className="text-status-paid-text flex-shrink-0"><Check size={15} /></button>
+                  <button type="button" onClick={() => setEditingTargetId(null)} className="text-text-secondary flex-shrink-0"><X size={15} /></button>
+                  {targetError && <p className="text-xs text-status-overdue-text">{targetError}</p>}
+                </div>
+              ) : type.targetAmountPerMember > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => startEditTarget(type)}
+                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-brand-light text-brand-primary flex-shrink-0"
+                  title="Edit target"
+                >
+                  Target K{type.targetAmountPerMember.toLocaleString()}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startEditTarget(type)}
+                  className="text-xs text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
+                >
+                  + Set target
+                </button>
               )}
 
               {/* Edit name button — hidden for default types */}
@@ -220,12 +280,25 @@ export default function ContributionTypesManager() {
             Counts toward each member's interest obligation quota
           </label>
 
+          {/* Per-member liability target */}
+          <div>
+            <label className={labelCls}>Target per member (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputCls}
+              value={addForm.targetAmountPerMember}
+              onChange={e => setAddForm({ ...addForm, targetAmountPerMember: e.target.value })}
+              placeholder="e.g. 250 — leave blank for an ordinary contribution"
+            />
+          </div>
+
           {addError && <p className="text-xs text-status-overdue-text">{addError}</p>}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false }); }}
+              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' }); }}
               className="flex-1 border border-border-default text-text-primary rounded-md py-2 text-sm hover:bg-surface-card transition-colors"
             >
               Cancel

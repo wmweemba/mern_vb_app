@@ -661,5 +661,19 @@ Added 2026-08-12 (Phase 3 of `docs/plan_configurable_group_rules.md`: interest q
 
 ---
 
-*Last updated: 2026-08-12 — Phase 3 (configurable group rules: interest quota tracking) added*
+## Configurable Group Rules (Phase 4) — Architecture Notes
+
+Added 2026-08-12 (Phase 4 of `docs/plan_configurable_group_rules.md`: membership fee as a liability). Key decisions recorded here to prevent regression:
+
+1. **No new model — any `ContributionType` can become a liability.** `targetAmountPerMember > 0` is the only signal. This was a deliberate minimalism call in the plan itself ("no new model, no new controller"): a treasurer can put a target on the existing default "Admin Fee" type rather than needing a dedicated "Membership Fee" type seeded for them. Don't add an auto-seeded liability type later without checking whether the group actually wants a *second* fee, separate from Admin Fee — the plan's Grace Kalele case uses exactly one.
+
+2. **Same derive-don't-store discipline as Phase 3.** `controllers/contributionLiabilityController.js` stores nothing beyond the target on `ContributionType`; paid/outstanding are computed fresh from `Contribution` records on every request. `outstanding = max(0, target − paid)` floors at zero — an overpaying member shows `0`, not a negative "credit," consistent with how Phase 3's shortfall handles over-delivery.
+
+3. **`cycleSettlementDeadlineDays` is stored but inert.** Added to `GroupSettings` because the plan explicitly names it as shared by loans and liability fees, but there is nothing to enforce it against yet — confirmed by checking `NewCycleBanner.jsx`, which is a fully static "Cycle 12 ends soon" stub with no real date logic behind it. Don't build "is this fee overdue" UI against this field until Phase 5's `Cycle` model gives it a real cycle-end date to subtract from; a fabricated date would be worse than no deadline indicator at all.
+
+4. **The Settings UI target editor is a separate inline control from the existing rename flow**, not a merge of the two. `ContributionTypesManager.jsx`'s pencil-icon rename (`editingId`/`editName`) and the new target badge (`editingTargetId`/`editTargetValue`) are independent pieces of state — a type can be mid-rename and have its target edited by a different control without the two clobbering each other. If extending this component further (e.g. Phase 5 per-cycle target overrides), keep new inline editors on their own state rather than folding into `editingId`.
+
+---
+
+*Last updated: 2026-08-12 — Phase 4 (configurable group rules: membership fee as a liability) added*
 *Next review: April 7 (Week 1 checkpoint)*

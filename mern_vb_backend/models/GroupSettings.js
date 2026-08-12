@@ -111,6 +111,11 @@ const groupSettingsSchema = new mongoose.Schema({
     exit:                 { type: String, enum: ['settle_and_refund', 'forfeit'], default: 'settle_and_refund' },
   },
   interestObligationAmount: { type: Number, default: 0, min: 0 },
+  // Shared by loans and per-member liability contribution types (Phase 4/5) — the
+  // number of days before cycle end that a balance must be cleared by. Stored now per
+  // the plan's §7 answer #5/#10; not yet enforced anywhere, since there's no real
+  // cycle end date until Phase 5's Cycle model ships. Default matches Grace's group.
+  cycleSettlementDeadlineDays: { type: Number, default: 3, min: 0 },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

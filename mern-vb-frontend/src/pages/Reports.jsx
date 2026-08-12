@@ -256,6 +256,7 @@ const Reports = () => {
   const [pendingReportConfig, setPendingReportConfig] = useState(null);
   const [showFinesModal, setShowFinesModal] = useState(false);
   const [interestObligation, setInterestObligation] = useState(null);
+  const [contributionLiability, setContributionLiability] = useState(null);
 
   const isOfficer = ['admin', 'loan_officer', 'treasurer'].includes(user?.role);
 
@@ -264,6 +265,9 @@ const Reports = () => {
     axios.get(`${API_BASE_URL}/reports/interest-obligation`)
       .then(res => setInterestObligation(res.data))
       .catch(() => setInterestObligation(null));
+    axios.get(`${API_BASE_URL}/reports/contribution-liability`)
+      .then(res => setContributionLiability(res.data))
+      .catch(() => setContributionLiability(null));
   }, [isOfficer]);
 
   const handleViewReport = async (config) => {
@@ -415,6 +419,40 @@ const Reports = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Contribution Liabilities (Phase 4) — one table per liability-configured type */}
+      {isOfficer && contributionLiability && contributionLiability.types.length > 0 && (
+        contributionLiability.types.map(type => (
+          <div key={type.contributionTypeId} className="mb-8 border border-border-default rounded-lg p-4 bg-surface-card">
+            <div className="font-semibold mb-1 text-center text-text-primary">{type.name}</div>
+            <p className="text-sm text-center text-text-secondary mb-3">
+              Target: K{Number(type.target).toLocaleString()} per member this cycle.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-widest text-text-secondary border-b border-border-default">
+                    <th className="py-2 pr-2">Member</th>
+                    <th className="py-2 pr-2 text-right">Paid</th>
+                    <th className="py-2 text-right">Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {type.rows.map(row => (
+                    <tr key={row.memberId} className="border-b border-border-default last:border-b-0">
+                      <td className="py-2 pr-2 text-text-primary">{row.name}</td>
+                      <td className="py-2 pr-2 text-right text-text-primary">K{Number(row.paid).toLocaleString()}</td>
+                      <td className={`py-2 text-right font-semibold ${row.outstanding > 0 ? 'text-status-overdue-text' : 'text-status-paid-text'}`}>
+                        K{Number(row.outstanding).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))
       )}
 
       {exportConfigs.map(config => (

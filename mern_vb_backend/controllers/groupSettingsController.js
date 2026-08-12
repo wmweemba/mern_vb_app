@@ -38,7 +38,8 @@ exports.updateGroupSettings = async (req, res) => {
       'defaultLoanDuration', 'loanLimitMultiplier', 'latePenaltyRate',
       'overdueFineAmount', 'earlyPaymentCharge', 'partialPaymentFineAmount', 'savingsInterestRate',
       'minimumSavingsMonth1', 'minimumSavingsMonthly', 'maximumSavingsFirst3Months',
-      'savingsShortfallFine', 'profitSharingMethod', 'interestObligationAmount'
+      'savingsShortfallFine', 'profitSharingMethod', 'interestObligationAmount',
+      'cycleSettlementDeadlineDays'
     ];
 
     for (const key of allowedFields) {

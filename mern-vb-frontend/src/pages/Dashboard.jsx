@@ -3,6 +3,7 @@ import NewCycleBanner from '../components/NewCycleBanner';
 import BeginNewCycleModal from '../components/ui/BeginNewCycleModal';
 import DashboardStatsCard from '../components/ui/DashboardStatsCard';
 import InterestObligationCard from '../components/ui/InterestObligationCard';
+import ContributionLiabilityCard from '../components/ui/ContributionLiabilityCard';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
@@ -65,6 +66,7 @@ const Dashboard = () => {
       ) : (
         <>
           <InterestObligationCard />
+          <ContributionLiabilityCard />
           <DashboardStatsCard stats={stats} />
         </>
       )}

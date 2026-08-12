@@ -11,6 +11,10 @@ const {
   getInterestObligationReport,
   getMyInterestObligation
 } = require('../controllers/interestObligationController');
+const {
+  getContributionLiabilityReport,
+  getMyContributionLiability
+} = require('../controllers/contributionLiabilityController');
 
 // Get available cycles for reports
 router.get('/cycles', verifyToken, resolveGroup, checkTrial, getAvailableCyclesForReports);
@@ -23,5 +27,10 @@ router.get('/enhanced', verifyToken, resolveGroup, checkTrial, generateEnhancedR
 // for readability.
 router.get('/interest-obligation/me', verifyToken, resolveGroup, checkTrial, getMyInterestObligation);
 router.get('/interest-obligation', verifyToken, resolveGroup, checkTrial, requireRole(['admin', 'treasurer', 'loan_officer']), getInterestObligationReport);
+
+// Contribution liabilities (docs/plan_configurable_group_rules.md Phase 4) — any
+// ContributionType with targetAmountPerMember > 0 (e.g. a membership fee).
+router.get('/contribution-liability/me', verifyToken, resolveGroup, checkTrial, getMyContributionLiability);
+router.get('/contribution-liability', verifyToken, resolveGroup, checkTrial, requireRole(['admin', 'treasurer', 'loan_officer']), getContributionLiabilityReport);
 
 module.exports = router;

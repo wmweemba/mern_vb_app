@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.16.0] - 2026-08-12
+
+### Added
+- **Configurable Group Rules, Phase 4: membership fee as a liability.** No new model — `docs/plan_configurable_group_rules.md` Phase 4 turns any `ContributionType` into a per-member liability with a running balance, exactly as scoped ("small extensions to a schema that already exists").
+  - `ContributionType.targetAmountPerMember` (new field, default 0). When `> 0`, that type is a liability — e.g. Grace's group's K250 membership fee, payable in instalments (Chitalu: 50+50+50+60+40). No auto-seeded type this time; a treasurer sets a target on any existing type (including the default "Admin Fee") or a new one via Settings.
+  - `GroupSettings.cycleSettlementDeadlineDays` (new field, default 3) — stored per the plan's §7 answer, shared by loans and liability types. **Not yet enforced anywhere**: there's no real cycle end date until Phase 5's `Cycle` model ships (confirmed by inspecting `NewCycleBanner.jsx`, currently a static "Cycle 12 ends soon" stub with no live date behind it). Recorded now so Phase 5 has a value to consume rather than needing its own migration.
+  - New `controllers/contributionLiabilityController.js` — for every liability-configured type, **paid** = Σ(that type's contributions per member, not archived), **outstanding** = `max(0, target − paid)` (floors at zero, no negative "credit" for overpaying). `GET /api/reports/contribution-liability` (officers, all members, one table per type) and `GET /api/reports/contribution-liability/me` (any role, self only).
+  - `Reports.jsx` — one liability table per configured type. `Dashboard.jsx` — new `ContributionLiabilityCard.jsx` shows the signed-in member their own paid/target/outstanding for every applicable type. Both invisible when no type has a target set (every existing group, unchanged).
+  - `ContributionTypesManager.jsx` (Settings) — "Target per member" field on the create form, plus an inline editable "Target K—" badge on every existing type (click to set/change), alongside the existing routing/quota badges.
+  - 5 new backend tests (`tests/contributionLiabilityController.test.js`) locking down the paid/outstanding arithmetic, including the exact Chitalu instalment sequence from the workbook (50+50+50+60+40=250) and the overpayment floor.
+  - Verified live end-to-end with a throwaway group: set Admin Fee's target to K250 via the Settings UI, recorded a K150 contribution, confirmed the Reports table, the member's Dashboard card, and the Settings badge all read K150 paid / K100 outstanding consistently — balance audit clean.
+  - Not yet built: cycle model + settlement-deadline enforcement (Phase 5) — `cycleSettlementDeadlineDays` is stored but has no consumer yet.
+  - Architecture notes: `CLAUDE.md` § "Configurable Group Rules (Phase 4)".
+
 ## [3.15.0] - 2026-08-12
 
 ### Added
