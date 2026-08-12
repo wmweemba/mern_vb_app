@@ -7,6 +7,7 @@ const GroupTemplate = require('../models/GroupTemplate');
 const BankBalance = require('../models/BankBalance');
 const SocialFundBalance = require('../models/SocialFundBalance');
 const ContributionType = require('../models/ContributionType');
+const { openCycle } = require('../utils/cycleHelpers');
 
 exports.createGroup = async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
@@ -84,7 +85,7 @@ exports.createGroup = async (req, res) => {
         isVerified: true,
       }], { session });
 
-      await GroupSettings.create([{
+      const [groupSettings] = await GroupSettings.create([{
         groupId: group._id,
         groupName,
         meetingDay: meetingDay || null,
@@ -127,6 +128,19 @@ exports.createGroup = async (req, res) => {
         });
       }
       await ContributionType.create(defaultContributionTypes, { session, ordered: true });
+
+      // Cycle 1 opens the moment the group does — the admin's chosen (or default,
+      // today's) start date plus the template's cycle length. Every subsequent
+      // cycle boundary comes from beginNewCycle, never from this path again.
+      const cycle1Start = cycleStartDate ? new Date(cycleStartDate) : new Date();
+      await openCycle({
+        groupId: group._id,
+        cycleNumber: 1,
+        startDate: cycle1Start,
+        cycleLengthMonths: groupSettings.cycleLengthMonths,
+        settings: groupSettings,
+        session,
+      });
 
       result = {
         group: { id: group._id, name: groupName, slug },

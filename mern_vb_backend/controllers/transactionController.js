@@ -28,9 +28,9 @@ exports.getTransactionsByUser = async (req, res) => {
   }
 };
 
-exports.logTransaction = async ({ userId, type, amount, referenceId, note, groupId }, session = null) => {
+exports.logTransaction = async ({ userId, type, amount, referenceId, note, groupId, createdAt }, session = null) => {
   try {
-    const transaction = new Transaction({ userId, type, amount, referenceId, note, groupId });
+    const transaction = new Transaction({ userId, type, amount, referenceId, note, groupId, ...(createdAt ? { createdAt } : {}) });
     await transaction.save({ session });
     return transaction;
   } catch (err) {

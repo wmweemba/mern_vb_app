@@ -4,6 +4,7 @@ const GroupMember = require('../models/GroupMember');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { getSettings } = require('./groupSettingsController');
+const { resolveEntryDate } = require('../utils/cycleHelpers');
 const { Parser } = require('json2csv');
 
 exports.createSaving = async (req, res) => {
@@ -15,7 +16,14 @@ exports.createSaving = async (req, res) => {
     if (!member) return res.status(400).json({ error: 'Member not found' });
     const userId = member._id;
 
-    const savingDate = date ? new Date(date) : new Date();
+    // Backdating (a caller-supplied `date`) is restricted to admin/treasurer and
+    // must fall within the currently open cycle — see
+    // docs/plan_configurable_group_rules.md Phase 5. Any allowed role may still
+    // record a savings entry dated "now".
+    if (date && !['admin', 'treasurer'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only admin or treasurer may backdate a savings entry' });
+    }
+    const savingDate = await resolveEntryDate(req.groupId, date);
 
     let fine = 0;
     let interest = +(amount * (settings.savingsInterestRate / 100)).toFixed(2);
@@ -41,12 +49,13 @@ exports.createSaving = async (req, res) => {
       amount,
       referenceId: saving._id,
       note: `Savings of K${amount} for month ${month}.`,
-      groupId: req.groupId
+      groupId: req.groupId,
+      createdAt: savingDate,
     });
     await updateBankBalance(amount, req.groupId);
     res.status(201).json(saving);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save contribution', details: err.message });
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to save contribution', details: err.message });
   }
 };
 

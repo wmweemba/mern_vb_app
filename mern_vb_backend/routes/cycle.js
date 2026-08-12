@@ -14,4 +14,7 @@ router.get('/historical-reports', verifyToken, resolveGroup, checkTrial, cycleCo
 // Get available cycles
 router.get('/available-cycles', verifyToken, resolveGroup, checkTrial, cycleController.getAvailableCycles);
 
+// Get the currently open cycle (dates + settings snapshot)
+router.get('/current', verifyToken, resolveGroup, checkTrial, cycleController.getCurrentCycle);
+
 module.exports = router;
