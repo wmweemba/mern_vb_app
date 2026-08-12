@@ -9,6 +9,10 @@ const contributionSchema = new Schema({
   amount:             { type: Number, required: true, min: 0.01 },
   affectsMainBalance: { type: Boolean, required: true },  // resolved effective value at record time
   overrodeDefault:    { type: Boolean, default: false },  // true when recorder flipped the type's default routing
+  // Denormalized snapshot of ContributionType.countsTowardInterestObligation at record
+  // time — same defensive pattern as typeName/affectsMainBalance, so a later toggle on
+  // the type never restates a historical Interest Obligation report.
+  countsTowardInterestObligation: { type: Boolean, default: false },
   note:               { type: String },
   recordedBy:         { type: Schema.Types.ObjectId, ref: 'GroupMember', required: true },
   transactionId:      { type: Schema.Types.ObjectId, ref: 'Transaction' },

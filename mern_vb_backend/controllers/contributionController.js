@@ -39,6 +39,7 @@ exports.recordContribution = async (req, res) => {
         amount: amt,
         affectsMainBalance: effectiveAffectsMain,
         overrodeDefault,
+        countsTowardInterestObligation: type.countsTowardInterestObligation,
         note: note || null,
         recordedBy: req.memberId,
       }], { session });

@@ -113,10 +113,20 @@ exports.createGroup = async (req, res) => {
 
       await SocialFundBalance.create([{ balance: 0, groupId: group._id }], { session });
 
-      await ContributionType.create([
+      const defaultContributionTypes = [
         { groupId: group._id, name: 'Admin Fee',   affectsMainBalance: true,  isDefault: true, active: true },
         { groupId: group._id, name: 'Social Fund', affectsMainBalance: false, isDefault: true, active: true },
-      ], { session, ordered: true });
+      ];
+      // Interest quota groups (docs/plan_configurable_group_rules.md Phase 3) need a
+      // contribution type for members who service their quota in cash instead of
+      // through loan interest — this is the workbook's "Added Interest" column.
+      if (tplPolicies.interestObligation === 'per_member_quota') {
+        defaultContributionTypes.push({
+          groupId: group._id, name: 'Interest Top-Up', affectsMainBalance: true,
+          countsTowardInterestObligation: true, isDefault: true, active: true,
+        });
+      }
+      await ContributionType.create(defaultContributionTypes, { session, ordered: true });
 
       result = {
         group: { id: group._id, name: groupName, slug },
