@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { UserPlus, Pencil, RotateCw, Send } from 'lucide-react';
+import { UserPlus, Pencil, RotateCw, Send, X } from 'lucide-react';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
 import Select from '../components/ui/Select';
 import { API_BASE_URL } from '../lib/utils';
@@ -110,6 +110,7 @@ function MemberRow({ member, canSeeStatus, canEdit, onEdit, onSendInvite }) {
 
 function PendingInviteRow({ invite, canResend, onResent }) {
   const [resending, setResending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const isExpired = new Date(invite.expiresAt) < new Date();
 
   async function handleResend() {
@@ -126,6 +127,19 @@ function PendingInviteRow({ invite, canResend, onResent }) {
       toast.error(err?.response?.data?.error || 'Failed to resend invite. Please try again.');
     } finally {
       setResending(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!window.confirm(`Cancel the invite to ${invite.name} (${invite.email})?`)) return;
+    setCancelling(true);
+    try {
+      const res = await axios.delete(`${API_BASE_URL}/invites/${invite._id}`);
+      toast.success(res.data.message || 'Invite cancelled');
+      onResent();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to cancel invite. Please try again.');
+      setCancelling(false);
     }
   }
 
@@ -150,11 +164,21 @@ function PendingInviteRow({ invite, canResend, onResent }) {
         {canResend && (
           <button
             onClick={handleResend}
-            disabled={resending}
+            disabled={resending || cancelling}
             className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-page transition-colors disabled:opacity-60"
             title="Resend invite"
           >
             <RotateCw size={13} className={resending ? 'animate-spin' : ''} />
+          </button>
+        )}
+        {canResend && (
+          <button
+            onClick={handleCancel}
+            disabled={resending || cancelling}
+            className="p-1.5 rounded-md text-text-muted hover:text-status-overdue-text hover:bg-status-overdue-bg transition-colors disabled:opacity-60"
+            title="Cancel invite"
+          >
+            <X size={13} />
           </button>
         )}
       </div>

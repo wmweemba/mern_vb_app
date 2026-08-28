@@ -408,3 +408,21 @@ exports.resendInvite = async (req, res) => {
     res.status(500).json({ error: 'Failed to resend invite', details: err.message });
   }
 };
+
+exports.cancelInvite = async (req, res) => {
+  try {
+    if (req.role === 'member') {
+      return res.status(403).json({ error: 'Members cannot cancel invites' });
+    }
+
+    const invite = await PendingInvite.findOne({ _id: req.params.id, groupId: req.groupId });
+    if (!invite) return res.status(404).json({ error: 'Pending invite not found' });
+
+    await InviteToken.deleteMany({ groupId: req.groupId, email: invite.email, usedAt: null });
+    await PendingInvite.deleteOne({ _id: invite._id });
+
+    res.status(200).json({ message: `Invite to ${invite.email} cancelled` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to cancel invite', details: err.message });
+  }
+};
