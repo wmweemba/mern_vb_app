@@ -15,5 +15,6 @@ router.post('/accept', verifyToken, inviteController.acceptInvite);
 router.post('/email', verifyToken, resolveGroup, inviteController.inviteByEmail);
 router.get('/pending', verifyToken, resolveGroup, inviteController.getPendingInvites);
 router.post('/:id/resend', verifyToken, resolveGroup, inviteController.resendInvite);
+router.delete('/:id', verifyToken, resolveGroup, inviteController.cancelInvite);
 
 module.exports = router;
