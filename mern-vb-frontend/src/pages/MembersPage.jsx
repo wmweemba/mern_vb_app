@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { UserPlus, Pencil, RotateCw } from 'lucide-react';
+import { UserPlus, Pencil, RotateCw, Send } from 'lucide-react';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
 import Select from '../components/ui/Select';
 import { API_BASE_URL } from '../lib/utils';
@@ -42,7 +42,8 @@ function RoleBadge({ role }) {
   );
 }
 
-function MemberRow({ member, canSeeStatus, canEdit, onEdit }) {
+function MemberRow({ member, canSeeStatus, canEdit, onEdit, onSendInvite }) {
+  const [sending, setSending] = useState(false);
   const color = avatarColor(member.name);
   const initials = member.name
     .split(' ')
@@ -52,6 +53,15 @@ function MemberRow({ member, canSeeStatus, canEdit, onEdit }) {
     .toUpperCase();
 
   const isPending = canSeeStatus && member.isVerified === false;
+
+  async function handleSendInvite() {
+    setSending(true);
+    try {
+      await onSendInvite(member);
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-border-default last:border-b-0">
@@ -81,6 +91,16 @@ function MemberRow({ member, canSeeStatus, canEdit, onEdit }) {
           title="Edit member details"
         >
           <Pencil size={13} />
+        </button>
+      )}
+      {isPending && member.email && (
+        <button
+          onClick={handleSendInvite}
+          disabled={sending}
+          className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-page transition-colors disabled:opacity-60 flex-shrink-0"
+          title="Send invite email"
+        >
+          <Send size={13} className={sending ? 'animate-pulse' : ''} />
         </button>
       )}
       <RoleBadge role={member.role} />
@@ -365,6 +385,24 @@ export default function MembersPage() {
     setEditingMember(null);
   }
 
+  async function handleSendInvite(member) {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/invites/email`, {
+        name: member.name,
+        email: member.email,
+        role: member.role,
+      });
+      if (res.data.warning) {
+        toast.warning(`Invite saved, but email delivery failed. Share this link manually: ${res.data.signUpUrl}`);
+      } else {
+        toast.success(`Invite sent to ${member.email}`);
+      }
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to send invite. Please try again.');
+    }
+  }
+
   async function fetchData() {
     try {
       const [membersRes, pendingRes] = await Promise.all([
@@ -421,6 +459,7 @@ export default function MembersPage() {
               canSeeStatus={canInvite}
               canEdit={canEdit}
               onEdit={handleEditMember}
+              onSendInvite={handleSendInvite}
             />
           ))
         )}
