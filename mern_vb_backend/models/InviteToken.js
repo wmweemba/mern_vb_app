@@ -10,6 +10,7 @@ const inviteTokenSchema = new mongoose.Schema({
   },
   name: { type: String, required: true },
   phone: { type: String },
+  email: { type: String, lowercase: true, trim: true, default: null },
   invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember', required: true },
   expiresAt: { type: Date, required: true },
   usedAt: { type: Date, default: null },

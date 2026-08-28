@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { UserPlus, Pencil } from 'lucide-react';
+import { UserPlus, Pencil, RotateCw } from 'lucide-react';
 import SlideoverDrawer from '../components/ui/SlideoverDrawer';
 import Select from '../components/ui/Select';
 import { API_BASE_URL } from '../lib/utils';
@@ -84,6 +84,60 @@ function MemberRow({ member, canSeeStatus, canEdit, onEdit }) {
         </button>
       )}
       <RoleBadge role={member.role} />
+    </div>
+  );
+}
+
+function PendingInviteRow({ invite, canResend, onResent }) {
+  const [resending, setResending] = useState(false);
+  const isExpired = new Date(invite.expiresAt) < new Date();
+
+  async function handleResend() {
+    setResending(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/invites/${invite._id}/resend`);
+      if (res.data.warning) {
+        toast.warning(`Invite refreshed, but email delivery failed. Share this link manually: ${res.data.signUpUrl}`);
+      } else {
+        toast.success(res.data.message || `Invite resent to ${invite.email}`);
+      }
+      onResent();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to resend invite. Please try again.');
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-border-default last:border-b-0">
+      <div className="w-10 h-10 rounded-full bg-status-pending-bg flex items-center justify-center flex-shrink-0">
+        <span className="text-xs font-bold text-status-pending-text">?</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-text-primary truncate">{invite.name}</p>
+        <p className="text-xs text-text-secondary truncate">{invite.email}</p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <RoleBadge role={invite.role} />
+        <span
+          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+            isExpired ? 'bg-status-overdue-bg text-status-overdue-text' : 'bg-status-pending-bg text-status-pending-text'
+          }`}
+        >
+          {isExpired ? 'Expired' : 'Pending'}
+        </span>
+        {canResend && (
+          <button
+            onClick={handleResend}
+            disabled={resending}
+            className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-page transition-colors disabled:opacity-60"
+            title="Resend invite"
+          >
+            <RotateCw size={13} className={resending ? 'animate-spin' : ''} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -381,21 +435,7 @@ export default function MembersPage() {
             </h2>
           </div>
           {pending.map(inv => (
-            <div key={inv._id} className="flex items-center gap-3 py-3 border-b border-border-default last:border-b-0">
-              <div className="w-10 h-10 rounded-full bg-[#FFF0E0] flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-[#B85A00]">?</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary truncate">{inv.name}</p>
-                <p className="text-xs text-text-secondary truncate">{inv.email}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <RoleBadge role={inv.role} />
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#FFF0E0] text-[#B85A00]">
-                  Pending
-                </span>
-              </div>
-            </div>
+            <PendingInviteRow key={inv._id} invite={inv} canResend={canInvite} onResent={fetchData} />
           ))}
         </div>
       )}

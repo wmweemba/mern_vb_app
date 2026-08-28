@@ -14,7 +14,9 @@ const pendingInviteSchema = new mongoose.Schema({
 // Prevent duplicate pending invites for same email+group
 pendingInviteSchema.index({ email: 1, groupId: 1 }, { unique: true });
 
-// Auto-delete expired invites
-pendingInviteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Auto-delete expired invites, but not immediately — an expired invite stays
+// visible (as "Expired") in the Pending Invites list for 30 days so an admin
+// has a window to hit Resend before the record disappears for good.
+pendingInviteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 module.exports = mongoose.model('PendingInvite', pendingInviteSchema);
