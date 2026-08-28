@@ -8,10 +8,14 @@ const Transaction = require('../models/Transaction');
 exports.generateEnhancedReport = async (req, res) => {
   const { reportType, cycleType, cycleNumber } = req.query;
 
-  const allowedRoles = ['admin', 'treasurer', 'loan_officer'];
-  if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
-  }
+  // Deliberately open to every role, including 'member': every other read path
+  // for this same data (GET /loans, /savings, /transactions and their /export
+  // routes) already has no role restriction, and groups running this app track
+  // finances the same way they did on a shared spreadsheet before — full
+  // visibility for every member is the expected, often deliberately
+  // transparency-driven behaviour, not an oversight to close off here. Only
+  // the write endpoints (createLoan, createSaving, repayInstallment, etc.)
+  // stay role-gated via allowRoles() on their routes.
 
   try {
     let query = {};
@@ -180,10 +184,9 @@ async function generateTransactionsReportData(query) {
 
 // Get available cycles with better formatting
 exports.getAvailableCyclesForReports = async (req, res) => {
-  const allowedRoles = ['admin', 'treasurer', 'loan_officer'];
-  if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
-  }
+  // Same reasoning as generateEnhancedReport above — this only powers the
+  // cycle-selection step ahead of viewing a report, no different in kind from
+  // the reports themselves, so it stays open to every role too.
 
   try {
     const cycleResetTransactions = await Transaction.find({
