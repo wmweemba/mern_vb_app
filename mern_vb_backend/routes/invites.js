@@ -14,5 +14,6 @@ router.post('/accept', verifyToken, inviteController.acceptInvite);
 // Clerk email-based invites
 router.post('/email', verifyToken, resolveGroup, inviteController.inviteByEmail);
 router.get('/pending', verifyToken, resolveGroup, inviteController.getPendingInvites);
+router.post('/:id/resend', verifyToken, resolveGroup, inviteController.resendInvite);
 
 module.exports = router;
