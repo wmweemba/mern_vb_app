@@ -18,16 +18,24 @@ export const AuthProvider = ({ children }) => {
   // Interceptor: inject a fresh Clerk token before every axios request.
   // getToken() auto-refreshes when the 2-min JWT is about to expire — so this
   // always attaches a valid token regardless of how long ago the user signed in.
+  //
+  // Deliberately does NOT gate on `isSignedIn`: that value is captured in this
+  // effect's closure at registration time, and a page that fires a request the
+  // instant isSignedIn flips true (e.g. InviteAccept, right after a redirect_url
+  // sign-up) can call in before this effect re-runs with the fresh value — the
+  // stale closure still reads `false` and silently skips the auth header,
+  // producing a 401 the caller never expected. getToken() itself always reads
+  // Clerk's live session state, so it's safe to call unconditionally: it
+  // resolves to null when signed out and a valid token the instant signed in,
+  // with no dependency on effect ordering.
   useEffect(() => {
     const id = axios.interceptors.request.use(async config => {
-      if (isSignedIn) {
-        const token = await getToken();
-        if (token) config.headers['Authorization'] = `Bearer ${token}`;
-      }
+      const token = await getToken();
+      if (token) config.headers['Authorization'] = `Bearer ${token}`;
       return config;
     });
     return () => axios.interceptors.request.eject(id);
-  }, [isSignedIn, getToken]);
+  }, [getToken]);
 
   // Global 403 trial_expired handler
   useEffect(() => {
