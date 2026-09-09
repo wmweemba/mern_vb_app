@@ -303,6 +303,10 @@ These have caused bugs before. Don't repeat them.
 
 8. **`GroupMember` has `name`, not `username`** — residue from the `User` → `GroupMember` migration left 15 frontend sites reading `userId?.username`, which rendered blank on loan cards, savings/loans exports, fines dialogs, and the payment modal. Fixed 2026-08-11 (Phase 0 of `docs/plan_configurable_group_rules.md`). If you see a blank member name anywhere, grep for `?.username` first before assuming it's a new bug.
 
+9. **Tenant scope must fail closed — an unscoped query returns EVERYTHING, not nothing.** Controllers query with `find({ ...req.groupScope, ... })`. If `req.groupScope` is undefined, spreading it yields `{}` and Mongoose drops undefined keys, so the query silently widens to every group in the database. `middleware/resolveGroup.js` did exactly this for a super admin with no `GroupMember` record — dormant for months, and it went live on 2026-09-09 the moment the super admin's own group was hard-deleted. The read leak was the mild half: `cycleController.resetForNewCycle`'s `deleteMany({ groupId, archived: { $ne: true } })` would have wiped every non-archived Loan, Saving and Fine in the database. **Never let scope-resolving middleware call `next()` without setting `req.groupScope`** — refuse the request instead. And treat a latent branch as live code: ask what data currently stops it executing, because deleting that data is a deploy.
+
+10. **Cleanup scripts rot as the schema grows.** `deleteGroups.js` enumerated 10 collections when 16 models carried a `groupId` (17 once Phase 5's `Cycle` merges); `createThrowawayTestUser.js --delete` still misses several. Neither fails loudly — they just leave rows nothing can reach, because every normal query is group-scoped and an orphan belongs to no group. 21 such records accumulated across both databases before anyone noticed. Prefer deriving the model list at run time (`scripts/cleanupOrphanedRecords.js` computes orphans from the live `Group` collection); where a hardcoded list is unavoidable, keep the regenerating command beside it — `grep -l groupId mern_vb_backend/models/*.js`.
+
 ---
 
 ## What NOT to Build (Sprint Constraints)
