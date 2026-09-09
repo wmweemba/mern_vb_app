@@ -6,9 +6,78 @@
 
 ---
 
+## READ FIRST — current state as at 2026-09-09 23:00
+
+**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a step 1 (production
+soft-deletes). **Next:** Session 2a step 2 — fix `scripts/deleteGroups.js`, then the rest
+of Session 2.
+
+### ⚠️ The one mistake that would do real damage
+
+**`mern_vb_backend/.env` points at ATLAS, which is now the DEV database.** Any script run
+locally — `node scripts/anything.js` — hits dev, never production. That is correct and
+intended.
+
+It also means: **running a delete script locally would destroy the dev groups that are
+deliberately being kept in Atlas**, which is the exact opposite of the intent. Before any
+destructive script, print the target host and confirm which database you are on.
+
+Production is only reachable from inside the Coolify Docker network:
+
+```bash
+ssh -i ~/.ssh/hetzner_coolify root@78.47.128.95 "docker exec $(docker ps --format '{{.Names}}' | grep '^jgk8cwgs4s0w844cw8ksw') node scripts/<script>.js <args>"
+```
+
+Coolify renames the backend container on every redeploy, so resolve the name with `grep`
+rather than hardcoding it. Full detail in `CLAUDE.md`.
+
+### Group inventory — both databases
+
+Production and Atlas hold identical group sets (the cutover was a full copy). **Only
+Grocery Savings Group belongs in production; all six others belong only in Atlas.**
+
+| Group | `_id` | Prod | Atlas |
+|---|---|---|---|
+| Grocery Savings Group (Grace's, live customer) | `6a75a334ba20ae75b763e2cb` | keep | remove |
+| William's Group | `69d641697236ea09109643e2` | remove | keep, cycle-reset |
+| Test group 1 | `69f391848dbc4c12889e5f9f` | remove | keep |
+| ZZZ_TEST Demo Grocery Group | `6a7c48724a5ab60a09a37c67` | remove | keep |
+| Pamo Village Bank | `69f0a127b9e11b33d7209973` | remove | keep |
+| Dev Chama | `6a184f38269287ae9b38f919` | remove | keep |
+| Mfinance Grocery Chilimba | `6a90265e7de2d763a9fbf653` | remove | keep |
+
+All six non-Grace groups are currently **soft-deleted in production** (`deletedAt` set) —
+the three that were still active were soft-deleted 2026-09-09 via Platform Admin. They are
+invisible to the app and excluded from audits, but their data is still present.
+
+### Verifying anything against production
+
+`scripts/auditBankBalance.js` is strictly read-only and safe to run against production. As
+at 2026-09-09 it audits **one** group (Grace's), reports it clean, and exits 0. Six
+orphaned `BankBalance` warnings are expected and **do not** affect the exit code — that is
+driven solely by discrepancies across audited groups.
+
+Grace's group figures, confirmed identical in Atlas pre-cutover and in production after:
+recorded K-3050, 11 transactions (8 SAVING/K5600, 2 LOAN/K9000, 1 LOAN_PAYMENT/K350),
+difference K0.00. This is **trial data**, cleared in Session 7 step 1.
+
+### Confirmed environment facts
+
+- **Clerk is split into two instances.** Production (`pk_live_`, custom domain
+  `clerk.chama360.nxhub.online`) and Development (`pk_test_`, `mint-sunbird-58.clerk...`).
+  Coolify frontend and API env vars were both verified correct on the Production instance
+  2026-09-09.
+- Local dev uses the **Development** Clerk instance, so `scripts/createThrowawayTestUser.js`
+  still works exactly as `CLAUDE.md` describes — and its users now land in Atlas/dev, not
+  production.
+- Grace's 25 members carry **Production**-instance Clerk IDs, so they cannot authenticate
+  against dev. Their Atlas copy is inert as well as unwanted.
+
+---
+
 ## 0. The thing that changes the plan
 
-**Phases 2–5 are not in production.** `main` (commit `4e87ad3`, v3.13.2) has no `revolvingMonthly` strategy, no `Loan.accrualMode`/`principalBalance`/`entries[]`, no interest-quota tracking, no membership-fee liability, no `Cycle` model. All of it sits unmerged on `feature/configurable-group-rules-phase2`.
+**Phases 2–5 are not in production.** `main` (v3.13.2; head has moved past `4e87ad3` with docs commits only) has no `revolvingMonthly` strategy, no `Loan.accrualMode`/`principalBalance`/`entries[]`, no interest-quota tracking, no membership-fee liability, no `Cycle` model. All of it sits unmerged on `feature/configurable-group-rules-phase2`.
 
 Grace's group is a revolving credit line — 10%/month on outstanding, no schedule. **Her data cannot be imported into production as it stands today.** Any import against `main` would create fixed-installment loans, which is structurally the wrong shape and would have to be thrown away.
 
@@ -38,7 +107,7 @@ Still true from the original plan: **the cutover precedes the import**, so Grace
 
 Seven sessions. Session 3 is human-facing and belongs in a lunch block; the rest are evening/build work. Sessions 4 and 5 were split from one after the named-funds design landed (section 7) — merging a large feature branch and building a new model are not one session's work.
 
-### Session 1 — Coolify Mongo + cutover (~2.5h, off-peak, announce downtime)
+### Session 1 — Coolify Mongo + cutover — DONE 2026-09-09
 
 Grace's 25 members are live and paying. This is a real maintenance window, not a quiet change.
 
@@ -49,20 +118,97 @@ Grace's 25 members are live and paying. This is a real maintenance window, not a
 5. Verify: sign in as a real user; Grace's group dashboard totals match the pre-cutover figures recorded in step 2; `auditBankBalance.js --all` reproduces the same per-group numbers as before the move (including William's Group's known ~K18,177 gap — it should still be exactly K18,177, unchanged, which is itself a good integrity check).
 6. Configure backups on the Coolify Mongo **and test one restore.** Not optional — Phase 6 point 6 of the original plan, and the reason for doing the cutover before the feature deploy.
 
-**Open item to solve in this session, not after:** once Coolify Mongo is private, how do you run `auditBankBalance.js` against production? The `CLAUDE.md` verification loop depends on it. Two workable answers — pick one and write it into `CLAUDE.md`: run the script via `docker exec` inside the Coolify network, or reach it over Tailscale with a temporary port-forward. Decide now; discovering this on release night is worse.
+**Outcome.** Dedicated Mongo instance stood up (deliberately separate from NdalamaHub's, so one root credential does not span two apps' data — better than this plan's original "alongside"). Full `mongodump`/`mongorestore`. Verified: `auditBankBalance.js --all` reproduced the pre-cutover baseline exactly, William's Group's -K18,177 unchanged. Daily backups to Cloudflare R2, restore into a scratch DB tested. Production script access resolved via `docker exec`, documented in `CLAUDE.md`.
 
-### Session 2 — Dev environment (~1.5–2h)
+**Independently re-verified 2026-09-09:** `/tmp/pre-cutover-audit.txt` reproduces byte-for-byte when the audit is re-run against Atlas today (13,518 bytes, `diff` clean), which confirms both that the baseline is genuine and that Atlas has been untouched since — the rollback is intact. TCP 27017/27018 on the Hetzner IP are closed from the internet. Local `.env` still resolves to Atlas.
 
-After the cutover, Atlas *is* the dev database. Very little needs to move; the work is making the separation real rather than nominal.
+**Residual this session created — see Session 2.** "Full copy, not selective" was the right call for the cutover itself, but it carried **all 7 group documents** into production when only Grace's belongs there. Left unaddressed, William's Group's -K18,177 makes `auditBankBalance.js --all` exit non-zero against production permanently, which destroys the release gate the script was fixed in August to provide — right before an import whose verification depends on it.
+
+**Closed 2026-09-09:** Clerk is split into Production and Development instances, and the Coolify frontend and API env vars were both verified correct on the Production instance. See the READ FIRST block.
+
+**Solved during the session:** once Coolify Mongo is private, how do you run `auditBankBalance.js` against production? The `CLAUDE.md` verification loop depends on it. Two workable answers — pick one and write it into `CLAUDE.md`: run the script via `docker exec` inside the Coolify network, or reach it over Tailscale with a temporary port-forward. Decide now; discovering this on release night is worse.
+
+### Session 2 — Clean both databases + dev environment (~2.5h)
+
+After the cutover, Atlas *is* the dev database. Two jobs: get each database holding only what belongs in it, and make the separation enforced rather than nominal.
+
+**2a. Production — prune to Grace's group only.**
+
+Production currently holds 7 group documents. One belongs there.
+
+| Group | Members | Tx | Keep in prod? |
+|---|---|---|---|
+| Grocery Savings Group (Grace's) | 25 | 11 | **Yes — the only one** |
+| William's Group | 23 | 176 | No — dev/demo, carries the -K18,177 drift |
+| Test group 1 | 1 | 2 | No |
+| ZZZ_TEST Demo Grocery Group | 1 | 3 | No — throwaway, should have been cleaned up |
+| Pamo Village Bank *(already soft-deleted)* | 2 | 0 | No |
+| Dev Chama *(already soft-deleted)* | 1 | 2 | No |
+| Mfinance Grocery Chilimba *(already soft-deleted)* | 1 | 0 | No |
+
+**Step 1 — DONE 2026-09-09. Soft-deleted the three active ones via the Platform Admin Danger Zone.**
+`adminGroupsController.softDeleteGroup` sets `deletedAt`, and there is a restore path that
+nulls it. No script, no database access, no risk of hitting the wrong database — it runs
+through the app's own supported path as super admin.
+
+This **restored the audit gate**, confirmed by running the audit on production: one group
+audited (Grace's), clean, `EXIT=0`. `--all` targets `Group.find({ deletedAt: null })`. Orphaned `BankBalance`
+documents are report-only and never affect the exit code (verified in the script), so the
+orphan count rising to 6 is cosmetic.
+
+Checked: **super admin does not depend on group membership** — it resolves from the
+`SuperAdmin` collection by `clerkUserId`, so removing William's Group from production
+cannot lock anyone out.
+
+**Step 2, after — hard delete, once `scripts/deleteGroups.js` is fixed.**
+
+> **`deleteGroups.js` is incomplete and must not be run against production as it stands.**
+> It clears 10 collections; **16 models currently carry a `groupId`** (17 once Session 4
+> merges — the branch adds `Cycle`). The script predates the Contributions feature
+> (2026-05-28) and was never updated. Running it as-is orphans six collections' worth of
+> rows.
+
+**Covered today (10):** `GroupMember`, `GroupSettings`, `BankBalance`, `Loans`, `Savings`,
+`Transaction`, `Fine`, `Threshold`, `InviteToken`, `PendingInvite`.
+
+**Missing (6):** `SocialFundBalance`, `SocialFundExpense`, `ContributionType`,
+`Contribution`, `SupportRequest`, `AdminAuditLog`.
+
+**Add after Session 4 merges (1):** `Cycle`.
+
+Required behaviour for the fixed script:
+
+1. Cover every `groupId`-bearing model. Derive the list by inspection, don't trust this
+   doc to stay current — `grep -l groupId mern_vb_backend/models/*.js`.
+2. **Target by `_id`**, not slug. The six ids are in the READ FIRST inventory above.
+3. **Dry-run by default.** Print per-collection counts that *would* be deleted and exit
+   without writing. Require an explicit `--apply` to write.
+4. **Print the resolved database host before doing anything**, and refuse to `--apply`
+   against an Atlas/`mongodb+srv` URI. Running this locally would delete the dev groups
+   that are deliberately being kept — see the warning in READ FIRST.
+5. Idempotent: re-running after a successful delete reports zero and exits 0.
+6. Never touch `Group` documents not named in the id list, and never touch the
+   `SuperAdmin` collection (no `groupId`; unrelated).
+
+Take a fresh production `mongodump` immediately before `--apply`. Run via `docker exec`.
+
+After the hard delete, re-run `auditBankBalance.js --all` against production: the six
+orphaned `BankBalance` warnings should be gone, one group audited, `EXIT=0`.
+
+**Leave all six in Atlas** — that is the dev database and they are dev groups.
+
+**2b. Atlas — remove what does not belong in dev.**
 
 1. Local `mern_vb_backend/.env` already points at Atlas — leave it. Confirm it is the only place it points.
 2. **Add a production-URI guard to `scripts/`.** The whole point of the split is that a local script can no longer hit customer data, and today nothing enforces that. Add a shared check that refuses to run if `MONGODB_URI` resolves to the production Coolify host, with an explicit `--i-know` style override for the rare deliberate case. Cheap, and it closes the class of accident the cutover exists to prevent.
 3. Commit a `.env.example` for both packages so the split is documented in the repo, not just in someone's memory.
-4. **Clean Atlas down to dev/demo data.** Cycle-reset William's Group (clears the ~K18,177 test-session drift, as agreed). Decide what to do with the copy of Grace's real group now sitting in the dev database — recommendation: soft-delete it rather than keeping live customer PII in a database that throwaway test accounts get created against daily.
+4. **Clean Atlas down to dev/demo data.** Cycle-reset William's Group (clears the ~K18,177 test-session drift, as agreed). Remove the copy of Grace's real group — keeping live customer PII in a database that throwaway test accounts get created against daily is the thing this whole split exists to stop. Note her 25 members carry **Production-instance** Clerk IDs, so they are inert in dev anyway: the Development Clerk instance cannot authenticate any of them.
 5. Resolve the two orphaned `BankBalance` documents `auditBankBalance.js` reports.
 6. Update `CLAUDE.md`: the database section, the throwaway-test-user safety note (its warning about touching production stops being true), and the production-audit access method from Session 1.
 
-**Flagged, not resolved here — Clerk is not being split.** Local uses `sk_test_`/`pk_test_`. If production runs on the same test instance, then the dev/prod separation is database-only: a sign-up in dev still creates a user visible to production's auth. If production runs a live instance, then Atlas-as-dev holds members bound to Clerk IDs dev cannot authenticate as. Either way it is worth knowing which. **Verify what `CLERK_SECRET_KEY` actually is on the Coolify API service during Session 1**, while you are already in the env vars. Splitting Clerk is a separate decision, not a blocker for this migration.
+**Clerk — resolved, no action needed here.** Clerk was already split into Production and
+Development instances; both Coolify services were verified on Production 2026-09-09. Local
+dev is on the Development instance. Nothing in this session touches Clerk.
 
 ### Session 3 — Reconciliation with Simon (lunch block, human-facing) — DONE 2026-09-09
 
@@ -79,17 +225,65 @@ import gate is lifted.**
 
 ### Session 5 — Named funds (~2.5–3h, may run long)
 
-Build section 7. Backend first; the Settings fund-manager UI can follow after the import if the session runs out.
+Design is section 7 — read it before writing code. Backend first; the Settings
+fund-manager UI can follow after the import if the session runs out.
 
 1. `GroupFund` model + backfill from existing `SocialFundBalance` docs.
 2. `ContributionType.fundId`; backfill from `affectsMainBalance`.
-3. `SocialFundExpense` → `FundExpense` with `fundId`; add `app_subscription` to the category enum.
-4. `fund_credit`/`fund_debit` transaction types; audit script handles both at `balanceEffect = 0`.
-5. Seed the App Subscription Fund platform-wide — every group, every template, plus a backfill for existing groups. Inactive by default.
+3. `SocialFundExpense` → `FundExpense` with `fundId`; add `app_subscription` to the
+   category enum.
+4. `fund_credit`/`fund_debit` transaction types; audit script handles both at
+   `balanceEffect = 0`.
+5. Seed the App Subscription Fund platform-wide — every group, every template, plus a
+   backfill for existing groups. Inactive by default.
 6. Dashboard renders a card per active fund instead of the hardcoded Social Fund card.
 7. Full verification loop. `auditSocialFund.js` still passes, or is updated alongside.
 
+**Touchpoints — verified by grep 2026-09-09, confirm before editing.** `SocialFund*`
+appears in 13 files:
+
+| Area | Files |
+|---|---|
+| Models | `SocialFundBalance.js`, `SocialFundExpense.js`, `ContributionType.js`, `Contribution.js`, `Transaction.js` (enum) |
+| Controllers | `socialFundController.js` (106 lines), `contributionController.js` (87), `contributionTypeController.js` (57), `groupController.js` (per-group seeding at creation), `adminGroupsController.js` |
+| Scripts | `seedContributionDefaults.js`, `seedGroupTemplates.js`, `auditBankBalance.js`, `auditSocialFund.js` |
+| Frontend | `components/ui/DashboardStatsCard.jsx`, `components/settings/ContributionTypesManager.jsx`, `pages/Contributions.jsx`, `pages/OperationsPage.jsx`, `features/contributions/RecordSocialFundExpenseForm.jsx` — "Social Fund" is hardcoded in 10 places across the first four |
+| Tests | `tests/contributionController.test.js` |
+
+**Non-negotiables:** `BankBalance` and its formula are not touched. Existing
+`social_fund_credit`/`social_fund_debit` transaction rows are never migrated or rewritten.
+`Contribution` keeps writing `affectsMainBalance` for one release alongside the new
+`fundId`/`fundName` snapshots. Backfills are idempotent and dry-run against Atlas first.
+
+**UI work follows `UI_SPEC.md`** — per `CLAUDE.md`, read the relevant section before
+writing JSX, not after.
+
 ### Session 6 — Write and dry-run the import script (~2.5h)
+
+**Source workbook structure** — 5 sheets, and two columns are easy to misread:
+
+- `Membership` — membership-fee instalments per member per month (K250 target each).
+- `Total Interest` — interest-quota tracking. Per month: `Loan Interest` (interest paid on
+  a real loan) and `Added Interest` (cash paid against the notional loan). `Balance` counts
+  down from K1,050.
+- `June / July / August Contribution` — one row per member. Columns:
+  - `Monthly Contribution` — always K700, the savings deposit.
+  - `New Loan Requested` — new disbursement or top-up that month.
+  - `Loan Repayment` — principal repaid.
+  - `Loan Interest 10%` — interest **paid in cash**, not capitalised.
+  - `Outstanding Loan Balance` — balance *after* adding that month's new loan.
+  - **`New Loan total` — the CLOSING balance for the month.** This is the figure to import
+    as each member's outstanding balance, not `Outstanding Loan Balance`.
+  - `Membership Fee Paid`, `Added Interest` — as above.
+  - `System` (August only) — K12/member for the Chama360 subscription. Routes to the App
+    Subscription Fund, never the main balance. Mateba did not pay; total K288.
+  - **`Total Balance` is that month's cash delta, NOT a running total.** -33 / -36 / +111.
+    Simon confirmed it carries into the next month as opening balance with no interest, so
+    the cumulative position at 31 Aug is **K42** from a zero opening.
+
+Names: the workbook uses `Mwenzi` in June/July and `Malambo` in August — **one person**,
+onboarded in the app as Malambo. The `Membership` sheet spells it lowercase `malambo`.
+Match on a normalised name. Roster is 25.
 
 1. Write `scripts/importGraceCycle.js` — idempotent, session-wrapped, writes a pre-import backup, and is explicitly one-off tooling rather than production code.
 2. **Dry-run it against Atlas (dev)**, on a clone of Grace's group. This is now possible precisely because the databases are split — the first real payoff of Sessions 1–2.
@@ -212,7 +406,9 @@ If any of the four disagrees, stop and reconcile. Do not adjust a number to make
 | Phases 2–5 misbehave against Grace's real group | Deployed against a restorable database; verified on a throwaway grocery_chilimba group first |
 | ~~Import built on unreconciled figures~~ | Closed — Simon signed off in full 2026-09-09 (section 3) |
 | Production audit becomes unrunnable once Mongo is private | Access method decided and documented in Session 1, not later |
-| Dev work still reaches customer data | Script-level production-URI guard (Session 2 step 2) |
+| Dev work still reaches customer data | Script-level production-URI guard (Session 2b step 2) |
+| ~~Full copy carries dev groups into production~~ | **Realised.** All 7 groups came across; only Grace's belongs. Soft-delete restores the audit gate immediately; hard delete follows once `deleteGroups.js` is fixed (Session 2a) |
+| `deleteGroups.js` orphans 6 collections | Fix to cover all 16 `groupId`-bearing models before it is ever pointed at production; fresh `mongodump` first |
 | Named-funds refactor breaks existing contributions | Additive throughout: `BankBalance` untouched, old `social_fund_*` transaction rows never migrated, `affectsMainBalance` still written for one release. Backfills are idempotent, dry-run on Atlas first |
 | Session 5 runs long and delays the import | Backend is the critical path; the Settings fund-manager UI can ship after the import. Funds are seeded from code, so nothing blocks on it |
 
