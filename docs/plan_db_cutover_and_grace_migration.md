@@ -6,11 +6,23 @@
 
 ---
 
-## READ FIRST — current state as at 2026-09-09 23:00
+## READ FIRST — current state as at 2026-09-09 23:30
 
-**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a step 1 (production
-soft-deletes). **Next:** Session 2a step 2 — fix `scripts/deleteGroups.js`, then the rest
-of Session 2.
+**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a (both steps — soft-
+delete, then `scripts/deleteGroups.js` fixed and used to hard-delete). **Next:** Session
+2b — production-URI guard on scripts, `.env.example`, Atlas cleanup.
+
+**Session 2a step 2 outcome (2026-09-09).** `scripts/deleteGroups.js` rewritten to cover
+all 16 `groupId`-bearing models (was 10), target by `_id` not slug, dry-run by default,
+and refuse `--apply` against an Atlas (`mongodb+srv://`) URI. Dry-run verified against
+both Atlas and production before any write — numbers matched the inventory table exactly.
+Fresh production `mongodump` taken immediately before `--apply` (kept locally,
+`backups/pre-session2a-dump-20260909/`). Hard delete executed against production,
+matched the dry-run exactly. Post-delete: `auditBankBalance.js --all` shows **zero**
+orphaned `BankBalance` warnings (down from 6), one group audited (Grace's), `EXIT=0`.
+Re-running `deleteGroups.js` confirms idempotency — every count zero, every group
+reports "already gone." **Production now holds exactly one group: Grocery Savings
+Group (Grace's).**
 
 ### ⚠️ The one mistake that would do real damage
 

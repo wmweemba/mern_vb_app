@@ -11,74 +11,113 @@ const Fine = require('../models/Fine');
 const Threshold = require('../models/Threshold');
 const InviteToken = require('../models/InviteToken');
 const PendingInvite = require('../models/PendingInvite');
+const SocialFundBalance = require('../models/SocialFundBalance');
+const SocialFundExpense = require('../models/SocialFundExpense');
+const ContributionType = require('../models/ContributionType');
+const Contribution = require('../models/Contribution');
+const SupportRequest = require('../models/SupportRequest');
+const AdminAuditLog = require('../models/AdminAuditLog');
 
-// ─── GROUPS TO DELETE ─────────────────────────────────────────────────────────
-const SLUGS_TO_DELETE = [
-  'pamodzi-savings-group',
-  'together-savings-group',
+// ─── GROUPS TO DELETE (by _id — never by slug/name) ───────────────────────────
+// Derived from docs/plan_db_cutover_and_grace_migration.md READ FIRST inventory,
+// 2026-09-09. Re-derive with `grep -l groupId models/*.js` before trusting this
+// list if models have changed since.
+const GROUPS_TO_DELETE = [
+  { id: '69d641697236ea09109643e2', name: "William's Group" },
+  { id: '69f391848dbc4c12889e5f9f', name: 'Test group 1' },
+  { id: '6a7c48724a5ab60a09a37c67', name: 'ZZZ_TEST Demo Grocery Group' },
+  { id: '69f0a127b9e11b33d7209973', name: 'Pamo Village Bank' },
+  { id: '6a184f38269287ae9b38f919', name: 'Dev Chama' },
+  { id: '6a90265e7de2d763a9fbf653', name: 'Mfinance Grocery Chilimba' },
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 
-const clientOptions = {
-  serverApi: { version: '1', strict: true, deprecationErrors: true },
-};
+// Every model carrying a groupId, as of 2026-09-09 (16 — `Cycle` will be a 17th
+// once feature/configurable-group-rules-phase2 merges). SuperAdmin is deliberately
+// never touched — it has no groupId and is unrelated to any group's lifecycle.
+const COLLECTIONS = [
+  { label: 'GroupMembers', model: GroupMember },
+  { label: 'GroupSettings', model: GroupSettings },
+  { label: 'BankBalance', model: BankBalance },
+  { label: 'Loans', model: Loans },
+  { label: 'Savings', model: Savings },
+  { label: 'Transactions', model: Transaction },
+  { label: 'Fines', model: Fine },
+  { label: 'Thresholds', model: Threshold },
+  { label: 'InviteTokens', model: InviteToken },
+  { label: 'PendingInvites', model: PendingInvite },
+  { label: 'SocialFundBalance', model: SocialFundBalance },
+  { label: 'SocialFundExpenses', model: SocialFundExpense },
+  { label: 'ContributionTypes', model: ContributionType },
+  { label: 'Contributions', model: Contribution },
+  { label: 'SupportRequests', model: SupportRequest },
+  { label: 'AdminAuditLogs', model: AdminAuditLog },
+];
 
-async function deleteGroup(group) {
-  const id = group._id;
-  const label = `${group.name} (${group.slug})`;
+const APPLY = process.argv.includes('--apply');
 
-  console.log(`\n  Deleting: ${label}`);
+function maskUri(uri) {
+  if (!uri) return '(none)';
+  return uri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:***@');
+}
 
-  const results = await Promise.all([
-    GroupMember.deleteMany({ groupId: id }),
-    GroupSettings.deleteMany({ groupId: id }),
-    BankBalance.deleteMany({ groupId: id }),
-    Loans.deleteMany({ groupId: id }),
-    Savings.deleteMany({ groupId: id }),
-    Transaction.deleteMany({ groupId: id }),
-    Fine.deleteMany({ groupId: id }),
-    Threshold.deleteMany({ groupId: id }),
-    InviteToken.deleteMany({ groupId: id }),
-    PendingInvite.deleteMany({ groupId: id }),
-  ]);
+function isAtlasUri(uri) {
+  return /mongodb\+srv:\/\//i.test(uri || '');
+}
 
-  const [members, settings, balance, loans, savings, transactions, fines, thresholds, invites, pending] = results;
+async function processGroup({ id, name }) {
+  const group = await Group.findById(id);
+  const label = group ? `${group.name} (${id})` : `${name} (${id}) — Group document already gone`;
 
-  console.log(`    GroupMembers:   ${members.deletedCount}`);
-  console.log(`    GroupSettings:  ${settings.deletedCount}`);
-  console.log(`    BankBalance:    ${balance.deletedCount}`);
-  console.log(`    Loans:          ${loans.deletedCount}`);
-  console.log(`    Savings:        ${savings.deletedCount}`);
-  console.log(`    Transactions:   ${transactions.deletedCount}`);
-  console.log(`    Fines:          ${fines.deletedCount}`);
-  console.log(`    Thresholds:     ${thresholds.deletedCount}`);
-  console.log(`    InviteTokens:   ${invites.deletedCount}`);
-  console.log(`    PendingInvites: ${pending.deletedCount}`);
+  console.log(`\n  ${APPLY ? 'Deleting' : 'Would delete'}: ${label}`);
 
-  await Group.deleteOne({ _id: id });
-  console.log(`    ✅  Group document deleted`);
+  for (const { label: colLabel, model } of COLLECTIONS) {
+    if (APPLY) {
+      const result = await model.deleteMany({ groupId: id });
+      console.log(`    ${colLabel}: ${result.deletedCount}`);
+    } else {
+      const count = await model.countDocuments({ groupId: id });
+      console.log(`    ${colLabel}: ${count}`);
+    }
+  }
+
+  if (group) {
+    if (APPLY) {
+      await Group.deleteOne({ _id: id });
+      console.log(`    Group document: deleted`);
+    } else {
+      console.log(`    Group document: would delete`);
+    }
+  }
 }
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI, clientOptions);
-
+  const uri = process.env.MONGODB_URI;
   console.log('\n🗑️   Group cleanup script');
-  console.log('─'.repeat(52));
+  console.log('─'.repeat(60));
+  console.log(`\n  Mode: ${APPLY ? 'APPLY (writes will happen)' : 'DRY RUN (no writes — pass --apply to execute)'}`);
+  console.log(`  Target database: ${maskUri(uri)}`);
 
-  for (const slug of SLUGS_TO_DELETE) {
-    const group = await Group.findOne({ slug });
-    if (!group) {
-      console.log(`\n  ⚠️  Group not found: "${slug}" — skipping`);
-      continue;
-    }
-    await deleteGroup(group);
+  if (APPLY && isAtlasUri(uri)) {
+    console.error(
+      '\n❌  Refusing to --apply against an Atlas (mongodb+srv) URI.\n' +
+      '    Atlas is the dev/staging database and holds these exact groups deliberately —\n' +
+      '    this script is for pruning PRODUCTION down to Grace\'s group only.\n' +
+      '    Run this against the Coolify production Mongo via docker exec instead.\n'
+    );
+    process.exit(1);
   }
 
-  // Confirm what remains
-  const remaining = await Group.find({}).select('name slug');
-  console.log('\n─'.repeat(52));
-  console.log(`\n✅  Done. Remaining groups (${remaining.length}):`);
-  remaining.forEach(g => console.log(`    • ${g.name}  (${g.slug})`));
+  await mongoose.connect(uri);
+
+  for (const g of GROUPS_TO_DELETE) {
+    await processGroup(g);
+  }
+
+  const remaining = await Group.find({}).select('name slug deletedAt');
+  console.log('\n' + '─'.repeat(60));
+  console.log(`\n${APPLY ? 'Done' : 'Dry run complete'}. Remaining groups (${remaining.length}):`);
+  remaining.forEach(g => console.log(`    • ${g.name}  (${g.slug})${g.deletedAt ? '  [soft-deleted]' : ''}`));
   console.log('');
 
   await mongoose.disconnect();
