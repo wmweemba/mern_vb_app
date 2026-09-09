@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Infrastructure
+
+### Changed
+- **Production database migrated from MongoDB Atlas to a self-hosted Coolify Mongo instance.** Session 1 of `docs/plan_db_cutover_and_grace_migration.md`. No application code changed. New dedicated Mongo service stood up on the Hetzner box — a separate instance from NdalamaHub's, deliberately, to avoid sharing one root credential across two apps' data. Full `mongodump`/`mongorestore` migration; verified via `scripts/auditBankBalance.js --all` matching every group's numbers exactly against a pre-cutover baseline, including William's Group's known ~K18,177 dev/demo drift (unchanged). Scheduled backups configured (daily, Cloudflare R2 via Coolify's S3 backup feature) and a real restore into a scratch database was tested and confirmed working before closing out the session. Atlas now serves as the dev/staging database going forward. Production audit/maintenance scripts must now run via `docker exec` into the backend container, since the new database is private to the Coolify Docker network — see `CLAUDE.md`.
+
 ## [3.13.2] - 2026-08-12
 
 ### Fixed
