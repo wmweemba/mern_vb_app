@@ -22,19 +22,41 @@ async function resolveGroup(req, res, next) {
     const superAdmin = await SuperAdmin.findOne({ clerkUserId, revokedAt: null });
     if (superAdmin) {
       req.isSuperAdmin = true;
-      // Super admin may also be a group member — resolve their group so they
-      // can use the app as a normal user for their own group.
-      const member = await GroupMember.findOne({ clerkUserId, active: true });
-      if (member) {
-        req.groupId = member.groupId;
-        req.memberId = member._id;
-        req.role = member.role;
-        req.member = member;
-        req.groupScope = { groupId: member.groupId };
-        req.user = { id: member._id, role: member.role, groupId: member.groupId };
-      } else {
-        req.user = { id: null, role: 'admin', groupId: null };
+      // A super admin may ALSO be an ordinary member of a group, in which case they
+      // can use the app normally for that group. If they are not, this middleware
+      // must FAIL CLOSED — see below.
+      const member = await GroupMember.findOne({ clerkUserId, active: true, deletedAt: null });
+
+      // Fail closed. Previously this branch called next() with req.groupId and
+      // req.groupScope left undefined, and controllers do `find({ ...req.groupScope })`.
+      // Spreading undefined yields {}, and Mongoose drops undefined keys from a query —
+      // so every group-scoped read returned the entire collection, and
+      // cycleController.resetForNewCycle's `deleteMany({ groupId, archived: {$ne: true} })`
+      // would have deleted every non-archived Loan/Saving/Fine in the database.
+      // Went live 2026-09-09 when the super admin's own group was hard-deleted, which
+      // removed their GroupMember record and made this the first request to take the
+      // else-branch. A super admin with no membership now gets the same NO_GROUP
+      // response as any other user without one.
+      // Safe: no route in routes/admin.js mounts resolveGroup — the Platform Admin
+      // panel authenticates via requireSuperAdmin and is unaffected.
+      if (!member) {
+        return res.status(403).json({
+          error: 'No group membership found — super admin access is via the admin panel',
+          code: 'NO_GROUP',
+        });
       }
+
+      const superGroup = await Group.findById(member.groupId);
+      if (!superGroup || superGroup.deletedAt) {
+        return res.status(403).json({ error: 'Group has been deleted', code: 'GROUP_DELETED' });
+      }
+
+      req.groupId = member.groupId;
+      req.memberId = member._id;
+      req.role = member.role;
+      req.member = member;
+      req.groupScope = { groupId: member.groupId };
+      req.user = { id: member._id, role: member.role, groupId: member.groupId };
       return next();
     }
 
