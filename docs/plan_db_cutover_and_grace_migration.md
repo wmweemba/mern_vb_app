@@ -172,7 +172,8 @@ Checked: **super admin does not depend on group membership** — it resolves fro
 `SuperAdmin` collection by `clerkUserId`, so removing William's Group from production
 cannot lock anyone out.
 
-**Step 2, after — hard delete, once `scripts/deleteGroups.js` is fixed.**
+**Step 2 — DONE 2026-09-09. Hard delete, after `scripts/deleteGroups.js` was fixed
+(`01175f4`).** All six groups removed. Production went from 7 group documents to 1.
 
 > **`deleteGroups.js` is incomplete and must not be run against production as it stands.**
 > It clears 10 collections; **16 models currently carry a `groupId`** (17 once Session 4
@@ -204,15 +205,46 @@ Required behaviour for the fixed script:
 
 Take a fresh production `mongodump` immediately before `--apply`. Run via `docker exec`.
 
-After the hard delete, re-run `auditBankBalance.js --all` against production: the six
-orphaned `BankBalance` warnings should be gone, one group audited, `EXIT=0`.
+**Verified after the hard delete:** no orphan warnings, one group audited, `EXIT=0`.
+
+---
+
+**Step 3 — DONE 2026-09-09. Two problems the hard delete exposed.**
+
+**(a) A latent super-admin scoping bug went live.** `middleware/resolveGroup.js`'s
+super-admin branch called `next()` with `req.groupId` and `req.groupScope` left undefined
+when the super admin had no `GroupMember` record. Controllers do
+`find({ ...req.groupScope })` — spreading `undefined` yields `{}`, and Mongoose drops
+undefined keys — so **every group-scoped query returned the entire collection**, and
+`cycleController.resetForNewCycle`'s `deleteMany({ groupId, archived: { $ne: true } })`
+would have deleted every non-archived Loan, Saving and Fine in the database. The dashboard
+was rendering a live "Begin New Cycle" button at the time.
+
+It fired for the first time because deleting William's Group removed his own `GroupMember`
+record. Fixed in `af33073` — that branch now fails closed with the same `403 NO_GROUP` any
+other groupless user gets, and additionally filters `deletedAt: null` and checks the group
+is not deleted, which it previously skipped. Safe because no route in `routes/admin.js`
+mounts `resolveGroup`. 64/64 backend tests pass.
+
+**(b) 21 orphaned records, in both databases.** Records whose `groupId` pointed at no
+existing Group, invisible in normal use because every query is group-scoped. Mostly
+leftovers from throwaway test groups, plus one pre-multi-tenancy loan (K18,177) with no
+`groupId` at all. New `scripts/cleanupOrphanedRecords.js` (`8fec431`) computes orphans at
+run time rather than hardcoding ids, dry-runs by default, prints the resolved host, and
+refuses to delete more than 100 without `--force`. Applied to both databases; both now
+report zero.
+
+> **Follow-up, not yet done — `createThrowawayTestUser.js --delete` is incomplete.** It
+> removes the Group but not everything attached to it, which is where most of those 21
+> orphans came from. Same defect class `deleteGroups.js` had. Worth fixing before Session
+> 5, which leans on throwaway groups for verification, or the orphans simply refill.
 
 **Leave all six in Atlas** — that is the dev database and they are dev groups.
 
 **2b. Atlas — remove what does not belong in dev.**
 
 1. Local `mern_vb_backend/.env` already points at Atlas — leave it. Confirm it is the only place it points.
-2. **Add a production-URI guard to `scripts/`.** The whole point of the split is that a local script can no longer hit customer data, and today nothing enforces that. Add a shared check that refuses to run if `MONGODB_URI` resolves to the production Coolify host, with an explicit `--i-know` style override for the rare deliberate case. Cheap, and it closes the class of accident the cutover exists to prevent.
+2. **Add a shared database-safety helper to `scripts/`** — *revised 2026-09-09, do not build the blanket rule this originally specified.* A guard that refuses to run against production is now wrong: production scripts are **meant** to run against production via `docker exec`, which is how the audit and the orphan cleanup both ran. The correct shape, already implemented ad hoc in `deleteGroups.js` and `cleanupOrphanedRecords.js`, is: always print the resolved host; dry-run by default for anything destructive; require an explicit `--apply`; and have each script refuse the database that is wrong *for its own intent* (`deleteGroups.js` refuses Atlas, because those groups are deliberately kept there). Extract that into one helper rather than one rule.
 3. Commit a `.env.example` for both packages so the split is documented in the repo, not just in someone's memory.
 4. **Clean Atlas down to dev/demo data.** Cycle-reset William's Group (clears the ~K18,177 test-session drift, as agreed). Remove the copy of Grace's real group — keeping live customer PII in a database that throwaway test accounts get created against daily is the thing this whole split exists to stop. Note her 25 members carry **Production-instance** Clerk IDs, so they are inert in dev anyway: the Development Clerk instance cannot authenticate any of them.
 5. Resolve the two orphaned `BankBalance` documents `auditBankBalance.js` reports.
