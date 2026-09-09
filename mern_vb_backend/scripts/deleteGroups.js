@@ -17,6 +17,7 @@ const ContributionType = require('../models/ContributionType');
 const Contribution = require('../models/Contribution');
 const SupportRequest = require('../models/SupportRequest');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const { isAtlasUri, maskUri } = require('./utils/productionGuard');
 
 // ─── GROUPS TO DELETE (by _id — never by slug/name) ───────────────────────────
 // Derived from docs/plan_db_cutover_and_grace_migration.md READ FIRST inventory,
@@ -55,15 +56,6 @@ const COLLECTIONS = [
 ];
 
 const APPLY = process.argv.includes('--apply');
-
-function maskUri(uri) {
-  if (!uri) return '(none)';
-  return uri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:***@');
-}
-
-function isAtlasUri(uri) {
-  return /mongodb\+srv:\/\//i.test(uri || '');
-}
 
 async function processGroup({ id, name }) {
   const group = await Group.findById(id);

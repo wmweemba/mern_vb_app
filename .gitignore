@@ -12,6 +12,7 @@ pnpm-debug.log*
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # OS generated files
 .DS_Store
@@ -53,6 +54,7 @@ backups/
 mern_vb_backend/node_modules/
 mern_vb_backend/.env
 mern_vb_backend/.env.*
+!mern_vb_backend/.env.example
 mern_vb_backend/logs
 mern_vb_backend/coverage/
 mern_vb_backend/dist/

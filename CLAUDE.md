@@ -432,11 +432,20 @@ around the *signup* flow's magic-link step, only the *sign-in* OTP step).
 **Safety:**
 - The script refuses to run unless `CLERK_SECRET_KEY` starts with `sk_test_` — never
   point this at a live Clerk instance.
-- MongoDB is currently still the shared production Atlas database (see the DB section
-  above) — every `--group` run creates a real `Group`/`GroupMember`/`GroupSettings`/
-  `BankBalance`/`SocialFundBalance`/`ContributionType` set of documents. **Always
-  clean up with `--delete` when done**, and prefix test group names with `ZZZ_TEST`
-  so they're easy to spot if a cleanup is ever missed.
+- **Atlas is the dev/staging database (since the 2026-09-09 cutover — see the DB
+  section above), not production.** Every `--group` run still creates a real
+  `Group`/`GroupMember`/`GroupSettings`/`BankBalance`/`SocialFundBalance`/
+  `ContributionType` set of documents there, so **still clean up with `--delete` when
+  done**, and prefix test group names with `ZZZ_TEST` so they're easy to spot if a
+  cleanup is ever missed — but a missed cleanup no longer risks live customer data,
+  only dev-database clutter.
+- **`--delete` is known incomplete** — it removes the `Group` document but not
+  everything attached to it, the same defect class `deleteGroups.js` had before it was
+  fixed. This is where most of the 21 orphaned records found 2026-09-09 came from
+  (`scripts/cleanupOrphanedRecords.js` cleans these up after the fact — see Known
+  History & Gotchas #10). Worth fixing before Session 5 of
+  `docs/plan_db_cutover_and_grace_migration.md`, which leans on throwaway groups for
+  verification, or the orphans simply refill.
 - `Clerk.setActive({ session })` from the browser console does **not** reliably work
   for this — a session minted via the Backend API isn't bound to the browser's own
   Clerk `client`, so `__client_uat` stays `0` and the app never sees it as signed in.

@@ -6,11 +6,43 @@
 
 ---
 
-## READ FIRST — current state as at 2026-09-09 23:30
+## READ FIRST — current state as at 2026-09-10 00:30
 
-**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a (both steps — soft-
-delete, then `scripts/deleteGroups.js` fixed and used to hard-delete). **Next:** Session
-2b — production-URI guard on scripts, `.env.example`, Atlas cleanup.
+**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a (soft-delete, fixed
+`deleteGroups.js`, hard-delete, plus the two problems it exposed — see Step 3 below),
+Session 2b steps 1–3 and 6 (shared script helper, `.env.example`, `CLAUDE.md`). **Next:**
+finish Session 2b step 4 (two actions need a human in the loop — see below), then step 5
+(resolved by explanation, see below), then Session 4.
+
+**Session 2b outcome (2026-09-10).** Step 2's spec was revised the same night this was
+first attempted — a blanket "refuse production" guard is wrong, since production scripts
+are *meant* to run there via `docker exec` (the audit and the orphan sweep both do). One
+session round-trip built the wrong (blanket) version before reading the revision; corrected
+immediately: `scripts/utils/productionGuard.js` now exports composable primitives
+(`isAtlasUri`, `isProductionUri`, `maskUri`, `printTarget`) with no enforcing function, and
+`deleteGroups.js`/`removeGraceCopyFromAtlas.js`/`cleanupOrphanedRecords.js` each use them to
+build their own database-specific refusal. `.env.example` written for both packages —
+required a `.gitignore` fix, since the blanket `.env.*` pattern was silently swallowing
+`.env.example` too. `CLAUDE.md`'s throwaway-test-user note updated: Atlas framing (not
+production), plus the `--delete`-is-incomplete caveat from Step 3(b) below.
+
+**Step 4 still needs two actions from William, not a script:**
+1. **Cycle-reset William's Group in Atlas**, via the app's own "Begin New Cycle" (Operations
+   page) — run locally (`pnpm dev`, `.env` → Atlas), signed in as William's Group's admin.
+   Deliberately not a script — same reasoning as Session 2a's soft-deletes: use the
+   supported path, not a raw balance mutation.
+2. **Remove Grace's inert Atlas copy** — `scripts/removeGraceCopyFromAtlas.js`, dry-run
+   verified (25 members, 11 transactions, 10 invite tokens — matches her trial data
+   exactly). Refuses to run against anything that isn't Atlas. Needs `--apply`.
+
+**Step 5 — resolved by explanation, no deletion.** `auditBankBalance.js` reports 3
+orphaned `BankBalance` documents in Atlas (Pamo Village Bank, Dev Chama, Mfinance Grocery
+Chilimba — not 2, as originally written here; Mfinance's soft-delete came later). All three
+are soft-deleted groups **deliberately kept in Atlas** per the inventory table below —
+`auditBankBalance.js`'s own "orphan" definition just means "belongs to a soft-deleted
+Group," reported for visibility only, never modified. Deleting them would contradict the
+"keep" instruction for those three groups. No action needed; this is expected, by-design
+output, not a defect.
 
 **Session 2a step 2 outcome (2026-09-09).** `scripts/deleteGroups.js` rewritten to cover
 all 16 `groupId`-bearing models (was 10), target by `_id` not slug, dry-run by default,
@@ -243,12 +275,12 @@ report zero.
 
 **2b. Atlas — remove what does not belong in dev.**
 
-1. Local `mern_vb_backend/.env` already points at Atlas — leave it. Confirm it is the only place it points.
-2. **Add a shared database-safety helper to `scripts/`** — *revised 2026-09-09, do not build the blanket rule this originally specified.* A guard that refuses to run against production is now wrong: production scripts are **meant** to run against production via `docker exec`, which is how the audit and the orphan cleanup both ran. The correct shape, already implemented ad hoc in `deleteGroups.js` and `cleanupOrphanedRecords.js`, is: always print the resolved host; dry-run by default for anything destructive; require an explicit `--apply`; and have each script refuse the database that is wrong *for its own intent* (`deleteGroups.js` refuses Atlas, because those groups are deliberately kept there). Extract that into one helper rather than one rule.
-3. Commit a `.env.example` for both packages so the split is documented in the repo, not just in someone's memory.
-4. **Clean Atlas down to dev/demo data.** Cycle-reset William's Group (clears the ~K18,177 test-session drift, as agreed). Remove the copy of Grace's real group — keeping live customer PII in a database that throwaway test accounts get created against daily is the thing this whole split exists to stop. Note her 25 members carry **Production-instance** Clerk IDs, so they are inert in dev anyway: the Development Clerk instance cannot authenticate any of them.
-5. Resolve the two orphaned `BankBalance` documents `auditBankBalance.js` reports.
-6. Update `CLAUDE.md`: the database section, the throwaway-test-user safety note (its warning about touching production stops being true), and the production-audit access method from Session 1.
+1. **DONE.** Local `mern_vb_backend/.env` already points at Atlas — confirmed the only place it points (only two `.env` files in the repo: backend and frontend; frontend's has no DB connection string).
+2. **DONE — see the READ FIRST outcome above for the corrected shape.** `scripts/utils/productionGuard.js` exports primitives, not a blanket rule; `deleteGroups.js`, `removeGraceCopyFromAtlas.js`, and `cleanupOrphanedRecords.js` each build their own database-specific check from them.
+3. **DONE.** `.env.example` committed for both packages; `.gitignore`'s blanket `.env.*` pattern fixed with explicit `!.env.example` exceptions so it doesn't silently swallow them.
+4. **Two human actions still open** — see READ FIRST above. Cycle-reset William's Group via the app; `removeGraceCopyFromAtlas.js --apply`.
+5. **DONE — resolved by explanation, not deletion.** See READ FIRST above.
+6. **DONE.** `CLAUDE.md`'s database section, throwaway-test-user safety note, and production-audit access method are all current.
 
 **Clerk — resolved, no action needed here.** Clerk was already split into Production and
 Development instances; both Coolify services were verified on Production 2026-09-09. Local

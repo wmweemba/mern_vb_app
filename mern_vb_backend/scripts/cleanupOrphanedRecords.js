@@ -23,6 +23,7 @@
  *     "docker exec <backend-container> node scripts/cleanupOrphanedRecords.js"
  */
 require('dotenv').config();
+const { maskUri } = require('./utils/productionGuard');
 const mongoose = require('mongoose');
 const Group = require('../models/Group');
 
@@ -45,11 +46,6 @@ const FORCE = process.argv.includes('--force');
 
 const clientOptions = { serverApi: { version: '1', strict: true, deprecationErrors: true } };
 
-function hostOf(uri) {
-  try { return uri.replace(/\/\/[^@]*@/, '//<credentials>@').split('?')[0]; }
-  catch { return '<unparseable>'; }
-}
-
 async function run() {
   const uri = process.env.MONGODB_URI;
   if (!uri) { console.error('MONGODB_URI is not set.'); process.exit(1); }
@@ -57,7 +53,7 @@ async function run() {
   await mongoose.connect(uri, clientOptions);
 
   console.log('\n🔎 Orphaned-record cleanup');
-  console.log(`   Target : ${hostOf(uri)}`);
+  console.log(`   Target : ${maskUri(uri)}`);
   console.log(`   Mode   : ${APPLY ? 'APPLY (deletes will happen)' : 'DRY RUN (no writes — pass --apply to execute)'}\n`);
 
   const groupIds = new Set((await Group.find({}).select('_id').lean()).map(g => String(g._id)));
