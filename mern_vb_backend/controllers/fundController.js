@@ -13,10 +13,10 @@ const APP_SUBSCRIPTION_KEY = 'app_subscription';
  * Idempotent fund seeding. Safe to call on every group creation and from backfills.
  * Never resets an existing fund's balance or active flag.
  */
-async function ensureFund(groupId, key, name, { active = true, isDefault = false, balance = 0 } = {}, session = null) {
+async function ensureFund(groupId, key, name, { active = true, isDefault = false, balance = 0, resetsOnCycle = true } = {}, session = null) {
   const existing = await GroupFund.findOne({ groupId, key }).session(session);
   if (existing) return existing;
-  const [created] = await GroupFund.create([{ groupId, key, name, balance, active, isDefault }], { session, ordered: true });
+  const [created] = await GroupFund.create([{ groupId, key, name, balance, active, isDefault, resetsOnCycle }], { session, ordered: true });
   return created;
 }
 

@@ -70,10 +70,18 @@ async function run() {
     }
 
     const appFund = await GroupFund.findOne({ groupId, key: APP_SUBSCRIPTION_KEY });
+    // Repair, not just create: app subscription funds created before resetsOnCycle
+    // existed took the schema default (true), which would let a cycle reset wipe
+    // money the group has already collected toward next month's bill.
+    if (appFund && appFund.resetsOnCycle !== false) {
+      changes.push('correct app_subscription to resetsOnCycle:false (would otherwise be wiped at cycle end)');
+      if (APPLY) await GroupFund.updateOne({ _id: appFund._id }, { $set: { resetsOnCycle: false } });
+      totals.funds++;
+    }
     if (!appFund) {
       changes.push('create app_subscription (inactive)');
       if (APPLY) {
-        await GroupFund.create({ groupId, key: APP_SUBSCRIPTION_KEY, name: 'App Subscription Fund', balance: 0, active: false, isDefault: true });
+        await GroupFund.create({ groupId, key: APP_SUBSCRIPTION_KEY, name: 'App Subscription Fund', balance: 0, active: false, isDefault: true, resetsOnCycle: false });
       }
       totals.funds++;
     }

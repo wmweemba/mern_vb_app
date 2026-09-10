@@ -46,13 +46,16 @@ export default function Contributions() {
   const [tab, setTab] = useState('contributions');
   const [contributions, setContributions] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [sfBalance, setSfBalance] = useState(null);
+  const [funds, setFunds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [allTypes, setAllTypes] = useState([]);
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
+  // Which pot the "+ Expense" button was pressed on, so the form opens on that
+  // fund rather than defaulting to the first one.
+  const [expenseFundId, setExpenseFundId] = useState(null);
 
   const canRecord = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
   const canRecordExpense = ['admin', 'treasurer'].includes(user?.role);
@@ -62,13 +65,13 @@ export default function Contributions() {
     try {
       const [cRes, eRes, sfRes, tRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/contributions`),
-        axios.get(`${API_BASE_URL}/social-fund/expenses`),
-        axios.get(`${API_BASE_URL}/social-fund/balance`),
+        axios.get(`${API_BASE_URL}/funds/expenses`),
+        axios.get(`${API_BASE_URL}/funds?active=true`),
         axios.get(`${API_BASE_URL}/contribution-types`),
       ]);
       setContributions(cRes.data);
       setExpenses(eRes.data);
-      setSfBalance(sfRes.data.balance);
+      setFunds(Array.isArray(sfRes.data) ? sfRes.data : []);
       setAllTypes(tRes.data);
     } catch {
       setError('Failed to load contributions data');
@@ -97,26 +100,33 @@ export default function Contributions() {
     return acc;
   }, {});
 
-  // Build social fund ledger: merge credits (affectsMainBalance=false) and expenses
-  const sfCredits = contributions
-    .filter(c => !c.affectsMainBalance)
-    .map(c => ({ ...c, _ledgerType: 'credit', _date: new Date(c.date || c.createdAt) }));
-  const sfDebits = expenses
-    .filter(e => !e.cancelled)
-    .map(e => ({ ...e, _ledgerType: 'debit', _date: new Date(e.date || e.createdAt) }));
-  const ledger = [...sfCredits, ...sfDebits].sort((a, b) => a._date - b._date);
-
-  // Compute running balances
-  let running = 0;
-  const ledgerWithBalance = ledger.map(tx => {
-    running += tx._ledgerType === 'credit' ? Number(tx.amount) : -Number(tx.amount);
-    return { ...tx, _running: running };
-  });
-  const ledgerDisplay = [...ledgerWithBalance].reverse(); // newest first for display
+  // Ledger is built PER FUND. Pooling every pot's credits and debits into one
+  // running balance produced a number that matched no fund once a group ran more
+  // than one — which the app subscription pot makes the normal case.
+  const buildLedger = (fundId) => {
+    const credits = contributions
+      .filter(c => !c.affectsMainBalance && String(c.fundId) === String(fundId))
+      .map(c => ({ ...c, _ledgerType: 'credit', _date: new Date(c.date || c.createdAt) }));
+    const debits = expenses
+      .filter(e => !e.cancelled && String(e.fundId) === String(fundId))
+      .map(e => ({ ...e, _ledgerType: 'debit', _date: new Date(e.date || e.createdAt) }));
+    let running = 0;
+    return [...credits, ...debits]
+      .sort((a, b) => a._date - b._date)
+      .map(tx => {
+        running += tx._ledgerType === 'credit' ? Number(tx.amount) : -Number(tx.amount);
+        return { ...tx, _running: running };
+      })
+      .reverse(); // newest first for display
+  };
 
   const totalContributions = contributions.reduce((s, c) => s + Number(c.amount), 0);
   const mainBalanceContributions = contributions.filter(c => c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
-  const socialFundContributions = contributions.filter(c => !c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
+  const fundContributions = contributions.filter(c => !c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
+  // Summed across every pot. Previously this page put a social-fund-only balance
+  // directly above a ledger of every fund's expenses — two numbers that stopped
+  // agreeing the moment a group ran a second pot.
+  const fundsTotal = (funds || []).reduce((s, f) => s + Number(f.balance || 0), 0);
   const totalExpenses = expenses.filter(e => !e.cancelled).reduce((s, e) => s + Number(e.amount), 0);
 
   return (
@@ -146,15 +156,17 @@ export default function Contributions() {
             </div>
             <p className="text-xl font-bold text-text-primary">{fmt(totalContributions)}</p>
             <p className="text-xs text-text-secondary mt-0.5">
-              {fmt(mainBalanceContributions)} main · {fmt(socialFundContributions)} fund
+              {fmt(mainBalanceContributions)} main · {fmt(fundContributions)} funds
             </p>
           </div>
           <div className="bg-surface-card rounded-lg p-4 border border-blue-100">
             <div className="flex items-center gap-1.5 mb-1">
               <Wallet size={14} className="text-blue-600" />
-              <p className="text-xs font-medium uppercase tracking-widest text-blue-600">Social Fund</p>
+              <p className="text-xs font-medium uppercase tracking-widest text-blue-600">
+                {funds.length === 1 ? funds[0].name : 'Funds'}
+              </p>
             </div>
-            <p className="text-xl font-bold text-text-primary">{fmt(sfBalance)}</p>
+            <p className="text-xl font-bold text-text-primary">{fmt(fundsTotal)}</p>
             <p className="text-xs text-text-secondary mt-0.5">{fmt(totalExpenses)} spent</p>
           </div>
         </div>
@@ -180,7 +192,7 @@ export default function Contributions() {
               : 'text-text-secondary hover:text-text-primary'
           }`}
         >
-          Social Fund
+          {funds.length === 1 ? funds[0].name : 'Funds'}
         </button>
       </div>
 
@@ -256,20 +268,31 @@ export default function Contributions() {
         </>
       )}
 
-      {/* ── Social Fund tab ── */}
+      {/* ── Funds tab — one card per active pot, each with only its own expenses.
+             A group can hold several (welfare, app subscription, treasurer-added),
+             so a single balance over a pooled expense ledger would not reconcile. ── */}
       {!loading && !error && tab === 'social-fund' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {funds.length === 0 && (
+            <p className="text-sm text-text-secondary">No funds configured for this group.</p>
+          )}
+          {funds.map(fund => {
+            const fundExpenses = expenses.filter(e => String(e.fundId) === String(fund._id));
+            const fundSpent = fundExpenses.filter(e => !e.cancelled).reduce((sum, e) => sum + Number(e.amount), 0);
+            const ledgerDisplay = buildLedger(fund._id);
+            return (
+            <div key={fund._id} className="space-y-4">
           {/* Current balance + record expense button */}
           <div className="bg-surface-dark rounded-xl p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium uppercase tracking-widest text-text-on-dark-muted mb-1">
-                Social Fund Balance
+                {fund.name}
               </p>
-              <p className="text-3xl font-bold text-white">{fmt(sfBalance)}</p>
+              <p className="text-3xl font-bold text-white">{fmt(fund.balance)}</p>
             </div>
             {canRecordExpense && (
               <button
-                onClick={() => setShowAddExpense(true)}
+                onClick={() => { setExpenseFundId(fund._id); setShowAddExpense(true); }}
                 className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-full px-4 py-2 transition-colors border border-white/20"
               >
                 + Expense
@@ -281,7 +304,7 @@ export default function Contributions() {
           {ledgerDisplay.length === 0 ? (
             <div className="text-center py-10 border border-dashed border-border-dashed rounded-md">
               <Wallet className="mx-auto mb-2 text-text-muted" size={24} />
-              <p className="text-sm text-text-secondary">No social fund activity yet</p>
+              <p className="text-sm text-text-secondary">No {fund.name} activity yet</p>
             </div>
           ) : (
             <div className="border border-border-default rounded-md overflow-hidden">
@@ -329,6 +352,9 @@ export default function Contributions() {
               })}
             </div>
           )}
+            </div>
+            );
+          })}
         </div>
       )}
 
@@ -361,6 +387,7 @@ export default function Contributions() {
         }
       >
         <RecordSocialFundExpenseForm
+          initialFundId={expenseFundId}
           formId="record-expense-form-page"
           onSuccess={() => { setShowAddExpense(false); fetchAll(); }}
         />

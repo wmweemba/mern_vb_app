@@ -84,6 +84,21 @@ exports.beginNewCycle = async (req, res) => {
   }
 };
 
+// json2csv throws "Data should not be empty or the \"fields\" option should be
+// included" when handed an empty array, which made beginNewCycle fail outright for
+// any group missing a whole category. That is not an edge case: the
+// grocery_chilimba template sets features.fines=false, so those groups never have
+// a single fine and could never close a cycle at all. Passing explicit fields also
+// means an empty report is a header row rather than an empty string.
+const LOAN_FIELDS = ['Name', 'LoanAmount', 'Month', 'Principal', 'Interest', 'Total', 'PaidAmount', 'Paid', 'PaymentDate', 'LateInterest', 'OverdueFine', 'EarlyPaymentCharge', 'LoanCreatedAt', 'FullyPaid'];
+const SAVING_FIELDS = ['Name', 'Month', 'Amount', 'Fine', 'InterestEarned', 'Date'];
+const TRANSACTION_FIELDS = ['Name', 'Type', 'Amount', 'Note', 'Date'];
+const FINE_FIELDS = ['Name', 'Amount', 'Note', 'IssuedBy', 'IssuedAt', 'Paid', 'PaidAt'];
+
+function toCSV(rows, fields) {
+  return new Parser({ fields }).parse(rows || []);
+}
+
 // Generate backup reports before reset
 async function generateBackupReports(groupId) {
   try {
@@ -141,13 +156,11 @@ async function generateBackupReports(groupId) {
       PaidAt: f.paidAt ? f.paidAt.toISOString().split('T')[0] : ''
     }));
 
-    const parser = new Parser();
-
     return {
-      loansCSV: parser.parse(loansData),
-      savingsCSV: parser.parse(savingsData),
-      transactionsCSV: parser.parse(transactionsData),
-      finesCSV: parser.parse(finesData),
+      loansCSV: toCSV(loansData, LOAN_FIELDS),
+      savingsCSV: toCSV(savingsData, SAVING_FIELDS),
+      transactionsCSV: toCSV(transactionsData, TRANSACTION_FIELDS),
+      finesCSV: toCSV(finesData, FINE_FIELDS),
       reportGeneratedAt: new Date().toISOString()
     };
 
@@ -192,8 +205,11 @@ async function resetForNewCycle(groupId, session) {
       { balance: 0 },
       { upsert: true, session }
     );
+    // Only funds whose money belongs to the cycle. The app subscription pot is
+    // seeded resetsOnCycle:false — members pay in one month for the next month's
+    // bill, so zeroing it at cycle end would destroy money the group still owes.
     await GroupFund.updateMany(
-      { groupId },
+      { groupId, resetsOnCycle: { $ne: false } },
       { balance: 0 },
       { session }
     );

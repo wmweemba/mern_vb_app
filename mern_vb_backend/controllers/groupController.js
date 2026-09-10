@@ -118,7 +118,7 @@ exports.createGroup = async (req, res) => {
       // (P-013). It starts inactive so groups that don't collect for it separately
       // never see an empty pot on their dashboard.
       const socialFund = await ensureFund(group._id, SOCIAL_FUND_KEY, 'Social Fund', { isDefault: true }, session);
-      await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true }, session);
+      await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true, resetsOnCycle: false }, session);
 
       const defaultContributionTypes = [
         { groupId: group._id, name: 'Admin Fee',   fundId: null,           affectsMainBalance: true,  isDefault: true, active: true },

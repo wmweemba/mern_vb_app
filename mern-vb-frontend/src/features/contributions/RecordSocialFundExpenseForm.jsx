@@ -16,7 +16,7 @@ const CATEGORIES = [
   { value: 'other',        label: 'Other' },
 ];
 
-const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form' }) => {
+const RecordSocialFundExpenseForm = ({ onSuccess, initialFundId = null, formId = 'record-expense-form' }) => {
   const [funds, setFunds] = useState([]);
   const [form, setForm] = useState({
     fundId: '',
@@ -35,10 +35,10 @@ const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form'
     axios.get(`${API_BASE_URL}/funds?active=true`)
       .then(res => {
         setFunds(res.data);
-        if (res.data.length) setForm(f => ({ ...f, fundId: f.fundId || res.data[0]._id }));
+        if (res.data.length) setForm(f => ({ ...f, fundId: initialFundId || f.fundId || res.data[0]._id }));
       })
       .catch(() => setFunds([]));
-  }, []);
+  }, [initialFundId]);
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 

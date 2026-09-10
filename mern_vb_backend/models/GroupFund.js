@@ -27,6 +27,13 @@ const groupFundSchema = new Schema({
   name:     { type: String, required: true, trim: true },
   balance:  { type: Number, required: true, default: 0 },
   active:   { type: Boolean, default: true },
+  // Whether a cycle reset zeroes this fund. True for a welfare pot, whose money
+  // belongs to the cycle that raised it. FALSE for the app subscription pot:
+  // members contribute in one month to pay the following month's Chama360 bill,
+  // so that money deliberately spans cycles and zeroing it would destroy real
+  // funds at cycle end. A fund with resetsOnCycle:false is audited against its
+  // LIFETIME credits and debits — see scripts/auditFunds.js.
+  resetsOnCycle: { type: Boolean, default: true },
   isDefault:{ type: Boolean, default: false },
 }, { timestamps: true });
 

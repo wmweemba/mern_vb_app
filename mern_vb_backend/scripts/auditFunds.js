@@ -10,9 +10,11 @@
  * every group pooled together. Its output was meaningless on a multi-group
  * database.
  *
- * Scoped to the current cycle (`archived: { $ne: true }`), matching
- * auditBankBalance.js's convention — cycleController zeroes fund balances and
- * archives their contributions and expenses together at a cycle reset.
+ * Funds that reset each cycle are scoped to the current cycle
+ * (`archived: { $ne: true }`), matching auditBankBalance.js — cycleController
+ * zeroes them and archives their contributions and expenses together. Funds with
+ * `resetsOnCycle: false` (the app subscription pot) keep their balance across a
+ * reset, so they are audited against lifetime credits and debits instead.
  *
  *   node scripts/auditFunds.js                 # list groups and exit
  *   node scripts/auditFunds.js --group <id>
@@ -50,13 +52,19 @@ async function auditGroup(group) {
 
   const results = [];
   for (const fund of funds) {
-    const credits = await sum(Contribution, { groupId: group._id, fundId: fund._id, archived: { $ne: true } });
-    const debits = await sum(FundExpense, { groupId: group._id, fundId: fund._id, archived: { $ne: true } });
+    // A fund that resets each cycle is audited against the current cycle only,
+    // matching auditBankBalance.js. A fund that persists across cycles (the app
+    // subscription pot) keeps its balance while its contributions are archived, so
+    // it must be audited against LIFETIME credits and debits — scoping it to the
+    // current cycle would report a false discrepancy the moment a cycle turns over.
+    const cycleScope = fund.resetsOnCycle === false ? {} : { archived: { $ne: true } };
+    const credits = await sum(Contribution, { groupId: group._id, fundId: fund._id, ...cycleScope });
+    const debits = await sum(FundExpense, { groupId: group._id, fundId: fund._id, ...cycleScope });
     const expected = credits - debits;
     const diff = fund.balance - expected;
     const clean = Math.abs(diff) <= DISCREPANCY_THRESHOLD;
     console.log(
-      `  ${clean ? '✅' : '❌'} ${fund.name.padEnd(24)} ${fund.active ? '        ' : '(inactive)'} ` +
+      `  ${clean ? '✅' : '❌'} ${fund.name.padEnd(24)} ${fund.active ? '        ' : '(inactive)'}${fund.resetsOnCycle === false ? ' [persists]' : '           '} ` +
       `recorded K${fund.balance.toFixed(2).padStart(10)} | expected K${expected.toFixed(2).padStart(10)} | diff K${diff.toFixed(2).padStart(8)}` +
       `   (credits K${credits} − expenses K${debits})`
     );

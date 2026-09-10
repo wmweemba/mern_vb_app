@@ -749,7 +749,11 @@ Added 2026-09-10 (Session 5 of `docs/plan_db_cutover_and_grace_migration.md`). K
 
 7. **`SocialFundBalance` is deprecated, not dropped**, and `socialFundController` is a thin shim delegating to `fundController` — so there is exactly one balance per pot. Never reintroduce a second write path to a fund's balance.
 
-8. **Audit pots with `scripts/auditFunds.js`, never the old `auditSocialFund.js`** (deleted). That script had the same zero-`groupId` multi-tenancy defect `auditBankBalance.js` was fixed for in August, and was never fixed alongside it — its output was meaningless on a multi-group database.
+8. **`GroupFund.resetsOnCycle` — the app subscription pot must NOT reset.** Members pay in one month for the next month's Chama360 bill, so that money spans cycles by design; `resetForNewCycle` skips funds with `resetsOnCycle: false`. `auditFunds.js` matches: resetting funds are audited against the current cycle, persisting funds against **lifetime** credits and debits. Changing either half without the other produces a false discrepancy at the first cycle turnover.
+
+9. **`generateBackupReports` must pass explicit `fields` to json2csv.** Without them the parser throws on an empty array, and `beginNewCycle` fails outright — which meant every `grocery_chilimba` group (no fines by template) could never close a cycle. Do not remove the field lists.
+
+10. **Audit pots with `scripts/auditFunds.js`, never the old `auditSocialFund.js`** (deleted). That script had the same zero-`groupId` multi-tenancy defect `auditBankBalance.js` was fixed for in August, and was never fixed alongside it — its output was meaningless on a multi-group database.
 
 ---
 

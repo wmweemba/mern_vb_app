@@ -144,7 +144,7 @@ async function createFlow(args) {
     // Mirror groupController.createGroup's fund seeding, so a throwaway group is a
     // faithful stand-in for a real one during verification.
     const socialFund = await ensureFund(group._id, SOCIAL_FUND_KEY, 'Social Fund', { isDefault: true });
-    await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true });
+    await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true, resetsOnCycle: false });
     await ContributionType.create([
       { groupId: group._id, name: 'Admin Fee', fundId: null, affectsMainBalance: true, isDefault: true, active: true },
       { groupId: group._id, name: 'Social Fund', fundId: socialFund._id, affectsMainBalance: false, isDefault: true, active: true },
