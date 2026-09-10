@@ -10,9 +10,10 @@
 
 **Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a (soft-delete, fixed
 `deleteGroups.js`, hard-delete, plus the two problems it exposed — see Step 3 below),
-Session 2b steps 1–3 and 6 (shared script helper, `.env.example`, `CLAUDE.md`). **Next:**
-finish Session 2b step 4 (two actions need a human in the loop — see below), then step 5
-(resolved by explanation, see below), then Session 4.
+**Session 2b — all six items, fully complete as of 2026-09-10.** Atlas holds exactly the
+6 dev groups the inventory table says it should; William's Group's drift is cleared;
+production holds exactly Grace's group, `paid`, auditing clean. **Next:** Session 4 —
+merge and deploy Phases 2–5.
 
 **Session 2b outcome (2026-09-10).** Step 2's spec was revised the same night this was
 first attempted — a blanket "refuse production" guard is wrong, since production scripts
@@ -26,14 +27,38 @@ required a `.gitignore` fix, since the blanket `.env.*` pattern was silently swa
 `.env.example` too. `CLAUDE.md`'s throwaway-test-user note updated: Atlas framing (not
 production), plus the `--delete`-is-incomplete caveat from Step 3(b) below.
 
-**Step 4 still needs two actions from William, not a script:**
-1. **Cycle-reset William's Group in Atlas**, via the app's own "Begin New Cycle" (Operations
-   page) — run locally (`pnpm dev`, `.env` → Atlas), signed in as William's Group's admin.
-   Deliberately not a script — same reasoning as Session 2a's soft-deletes: use the
-   supported path, not a raw balance mutation.
-2. **Remove Grace's inert Atlas copy** — `scripts/removeGraceCopyFromAtlas.js`, dry-run
-   verified (25 members, 11 transactions, 10 invite tokens — matches her trial data
-   exactly). Refuses to run against anything that isn't Atlas. Needs `--apply`.
+**Step 4 — DONE 2026-09-10.** Both actions completed:
+1. **Cycle-reset William's Group in Atlas**, via the app's own "Begin New Cycle."
+   Verified: `auditBankBalance.js --group 69d641697236ea09109643e2` now reports K0/K0,
+   diff K0.00 — the ~K18,177 drift is gone.
+2. **Removed Grace's inert Atlas copy** — `removeGraceCopyFromAtlas.js --apply` matched
+   its dry-run exactly (25 members, 11 transactions, etc.). Full `--all` audit afterward:
+   3 remaining active groups all reconcile cleanly, `cleanupOrphanedRecords.js` reports
+   zero. Atlas now holds exactly the 6 groups the inventory table says it should.
+
+**Unplanned but blocking — a stale Clerk ID had to be found and fixed before step 4(1)
+could even be attempted.** William's Group's admin `GroupMember` record
+(`wmweemba@gmail.com`) carried `clerkUserId: user_3CLqpqNySrSSRbL7Nwd2l8ZGIjs`, which
+returns **404 from Clerk's own API** — that user no longer exists in the Development
+instance, likely left over from before it was split from Production. His actual, only,
+currently-valid Clerk identity for that email (`user_3C5I28pYWOS3NXbNjx5FwM025gi`, Google
+OAuth only, confirmed via `GET /v1/users?email_address=...`) already happened to be linked
+to a throwaway "WSM" membership in Dev Chama — so every sign-in attempt (email/password,
+which didn't exist as an option; Google; fresh incognito) correctly authenticated him, just
+into the wrong group, with no error message pointing at the real cause. `resolveGroup.js`
+has no way to detect "this GroupMember's clerkUserId doesn't correspond to who actually
+signed in" — it only checks "does *some* GroupMember match this clerkUserId."
+
+**Fix applied directly to Atlas** (dev database, not a code change): repointed William's
+Group's admin record to the live Clerk ID, and deactivated (`active: false`, reversible)
+the conflicting Dev Chama membership so `resolveGroup`'s `findOne` resolves deterministically.
+Confirmed via `GET https://api.clerk.com/v1/users/<id>` before touching anything — don't
+guess which Clerk ID is live, ask Clerk.
+
+**Worth a `CLAUDE.md` gotcha entry** (added) since this class of bug — a `GroupMember`
+pointing at a since-deleted Clerk user, silently resolving to nothing or to the wrong
+group with no diagnostic — could recur for any dev/test account and has no built-in
+detection today.
 
 **Step 5 — resolved by explanation, no deletion.** `auditBankBalance.js` reports 3
 orphaned `BankBalance` documents in Atlas (Pamo Village Bank, Dev Chama, Mfinance Grocery
@@ -278,7 +303,7 @@ report zero.
 1. **DONE.** Local `mern_vb_backend/.env` already points at Atlas — confirmed the only place it points (only two `.env` files in the repo: backend and frontend; frontend's has no DB connection string).
 2. **DONE — see the READ FIRST outcome above for the corrected shape.** `scripts/utils/productionGuard.js` exports primitives, not a blanket rule; `deleteGroups.js`, `removeGraceCopyFromAtlas.js`, and `cleanupOrphanedRecords.js` each build their own database-specific check from them.
 3. **DONE.** `.env.example` committed for both packages; `.gitignore`'s blanket `.env.*` pattern fixed with explicit `!.env.example` exceptions so it doesn't silently swallow them.
-4. **Two human actions still open** — see READ FIRST above. Cycle-reset William's Group via the app; `removeGraceCopyFromAtlas.js --apply`.
+4. **DONE.** Cycle-reset William's Group via the app (blocked by an unrelated stale-Clerk-ID bug, found and fixed — see READ FIRST above); `removeGraceCopyFromAtlas.js --apply` executed and verified.
 5. **DONE — resolved by explanation, not deletion.** See READ FIRST above.
 6. **DONE.** `CLAUDE.md`'s database section, throwaway-test-user safety note, and production-audit access method are all current.
 
