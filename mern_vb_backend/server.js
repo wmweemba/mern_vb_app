@@ -37,6 +37,20 @@ app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/contribution-types', require('./routes/contributionTypes'));
 app.use('/api/contributions', require('./routes/contributions'));
+// Health endpoint — exposes whether transactions are available, so a broken
+// replica set is visible to monitoring and not only in the boot log.
+let dbStatus = { ok: null };
+app.get('/api/health', (req, res) => {
+  const transactionsAvailable = dbStatus.ok === true;
+  res.status(transactionsAvailable ? 200 : 503).json({
+    status: transactionsAvailable ? 'ok' : 'degraded',
+    mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    replicaSet: dbStatus.setName || null,
+    transactionsAvailable,
+    ...(transactionsAvailable ? {} : { detail: 'MongoDB is not a replica set — all transactional writes (payments, contributions, loans, cycle resets, group creation) will fail.' }),
+  });
+});
+
 app.use('/api/funds', require('./routes/funds'));
 app.use('/api/social-fund', require('./routes/socialFund'));  // deprecated — delegates to fundController
 
@@ -48,9 +62,14 @@ const clientOptions = {
   },
 };
 
+const { assertReplicaSet } = require('./utils/assertReplicaSet');
+
 mongoose.connect(process.env.MONGODB_URI, clientOptions)
-  .then(() => {
-    console.log("✅ MongoDB Atlas connected");
+  .then(async () => {
+    console.log("✅ MongoDB connected");
+    // Transactions need a replica set; a standalone breaks every write path in the
+    // app. Fails loud, never blocks startup. See utils/assertReplicaSet.js.
+    dbStatus = await assertReplicaSet();
     app.listen(process.env.PORT || 5000, () => {
       console.log(`🚀 Server running on port ${process.env.PORT || 5000}`);
     });
