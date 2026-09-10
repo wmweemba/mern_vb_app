@@ -27,14 +27,7 @@ const { maskUri } = require('./utils/productionGuard');
 const mongoose = require('mongoose');
 const Group = require('../models/Group');
 
-// Every model carrying a groupId. Keep in sync with:
-//   grep -l groupId mern_vb_backend/models/*.js
-const MODEL_NAMES = [
-  'AdminAuditLog', 'BankBalance', 'Contribution', 'ContributionType',
-  'Cycle', 'Fine', 'GroupMember', 'GroupSettings', 'InviteToken', 'Loans',
-  'PendingInvite', 'Savings', 'SocialFundBalance', 'SocialFundExpense',
-  'SupportRequest', 'Threshold', 'Transaction',
-];
+const { groupScopedModels } = require('./utils/groupScopedModels');
 
 // Refuse to delete more than this without --force. A run that suddenly wants to
 // remove hundreds of records means the Group collection is wrong, not that there
@@ -60,8 +53,7 @@ async function run() {
   console.log(`   ${groupIds.size} Group document(s) found — records pointing outside this set are orphans.\n`);
 
   const plan = [];
-  for (const name of MODEL_NAMES) {
-    const Model = require(`../models/${name}`);
+  for (const { name, model: Model } of groupScopedModels()) {
     const docs = await Model.find({}).select('groupId').lean();
     const orphanIds = docs
       .filter(d => !d.groupId || !groupIds.has(String(d.groupId)))

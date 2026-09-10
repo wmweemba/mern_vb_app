@@ -1,23 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Group = require('../models/Group');
-const GroupMember = require('../models/GroupMember');
-const GroupSettings = require('../models/GroupSettings');
-const BankBalance = require('../models/BankBalance');
-const Loans = require('../models/Loans');
-const Savings = require('../models/Savings');
-const Transaction = require('../models/Transaction');
-const Fine = require('../models/Fine');
-const Threshold = require('../models/Threshold');
-const InviteToken = require('../models/InviteToken');
-const PendingInvite = require('../models/PendingInvite');
-const SocialFundBalance = require('../models/SocialFundBalance');
-const SocialFundExpense = require('../models/SocialFundExpense');
-const ContributionType = require('../models/ContributionType');
-const Contribution = require('../models/Contribution');
-const SupportRequest = require('../models/SupportRequest');
-const AdminAuditLog = require('../models/AdminAuditLog');
-const Cycle = require('../models/Cycle');
 const { isAtlasUri, maskUri } = require('./utils/productionGuard');
 
 // ─── GROUPS TO DELETE (by _id — never by slug/name) ───────────────────────────
@@ -34,28 +17,13 @@ const GROUPS_TO_DELETE = [
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Every model carrying a groupId, as of 2026-09-09 (16 — `Cycle` will be a 17th
-// once feature/configurable-group-rules-phase2 merges). SuperAdmin is deliberately
-// never touched — it has no groupId and is unrelated to any group's lifecycle.
-const COLLECTIONS = [
-  { label: 'GroupMembers', model: GroupMember },
-  { label: 'GroupSettings', model: GroupSettings },
-  { label: 'BankBalance', model: BankBalance },
-  { label: 'Loans', model: Loans },
-  { label: 'Savings', model: Savings },
-  { label: 'Transactions', model: Transaction },
-  { label: 'Fines', model: Fine },
-  { label: 'Thresholds', model: Threshold },
-  { label: 'InviteTokens', model: InviteToken },
-  { label: 'PendingInvites', model: PendingInvite },
-  { label: 'SocialFundBalance', model: SocialFundBalance },
-  { label: 'SocialFundExpenses', model: SocialFundExpense },
-  { label: 'ContributionTypes', model: ContributionType },
-  { label: 'Contributions', model: Contribution },
-  { label: 'SupportRequests', model: SupportRequest },
-  { label: 'AdminAuditLogs', model: AdminAuditLog },
-  { label: 'Cycles', model: Cycle },
-];
+// Derived at run time from the models directory, so a new group-scoped model is
+// covered the moment it exists rather than the next time someone remembers to
+// update a list. `Group` is excluded (keyed by _id) and deleted separately below;
+// `SuperAdmin` is deliberately never touched — no groupId, unrelated to any
+// group's lifecycle. See scripts/utils/groupScopedModels.js.
+const { groupScopedModels } = require('./utils/groupScopedModels');
+const COLLECTIONS = groupScopedModels().map(({ name, model }) => ({ label: name, model }));
 
 const APPLY = process.argv.includes('--apply');
 

@@ -62,22 +62,22 @@ async function deleteFlow(args) {
   if (args.groupId) {
     await mongoose.connect(process.env.MONGODB_URI);
     const Group = require('../models/Group');
-    const GroupMember = require('../models/GroupMember');
-    const GroupSettings = require('../models/GroupSettings');
-    const BankBalance = require('../models/BankBalance');
-    const SocialFundBalance = require('../models/SocialFundBalance');
-    const ContributionType = require('../models/ContributionType');
+    // Derived at run time — this used to be a hardcoded list of 6 models when 17
+    // carry a groupId, which left Loans/Transactions/Savings/Fines behind on every
+    // run. See scripts/utils/groupScopedModels.js and CLAUDE.md gotcha #10.
+    const { groupScopedModels } = require('./utils/groupScopedModels');
 
     const { groupId } = args;
-    await Promise.all([
-      Group.deleteOne({ _id: groupId }),
-      GroupMember.deleteMany({ groupId }),
-      GroupSettings.deleteOne({ groupId }),
-      BankBalance.deleteOne({ groupId }),
-      SocialFundBalance.deleteOne({ groupId }),
-      ContributionType.deleteMany({ groupId }),
-    ]);
-    console.log(`✅ Deleted Group ${groupId} and its GroupMember/GroupSettings/BankBalance/SocialFundBalance/ContributionType docs`);
+    let removed = 0;
+    for (const { name, model } of groupScopedModels()) {
+      const res = await model.deleteMany({ groupId });
+      if (res.deletedCount) {
+        console.log(`   ${name}: ${res.deletedCount}`);
+        removed += res.deletedCount;
+      }
+    }
+    await Group.deleteOne({ _id: groupId });
+    console.log(`✅ Deleted Group ${groupId} and ${removed} attached document(s) across all group-scoped models`);
     await mongoose.disconnect();
   }
 }

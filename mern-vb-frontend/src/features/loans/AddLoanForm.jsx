@@ -17,6 +17,21 @@ const AddLoanForm = ({ onSuccess, formId = 'add-loan-form' }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [settings, setSettings] = useState(null);
+
+  // A revolving group has no term and no fixed schedule, so interest rate and
+  // duration are meaningless on this form — the rate lives in group settings and
+  // accrues monthly on the outstanding balance. Detected from the group's policy
+  // rather than from existing loans, because the first loan in a new group has to
+  // get this right too.
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/group-settings`)
+      .then(res => setSettings(res.data))
+      .catch(() => setSettings(null));
+  }, []);
+
+  const isRevolving = settings?.policies?.loanAccrual === 'revolving_monthly';
+  const revolvingRate = settings?.interestRate;
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -25,7 +40,10 @@ const AddLoanForm = ({ onSuccess, formId = 'add-loan-form' }) => {
     setLoading(true);
     setError('');
     try {
-      await axios.post(`${API_BASE_URL}/loans`, { ...form });
+      const payload = isRevolving
+        ? { username: form.username, amount: form.amount, startDate: form.startDate, notes: form.notes }
+        : { ...form };
+      await axios.post(`${API_BASE_URL}/loans`, payload);
       setForm({ username: '', amount: '', interest: '', startDate: '', duration: '', notes: '' });
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -49,18 +67,28 @@ const AddLoanForm = ({ onSuccess, formId = 'add-loan-form' }) => {
         <label className={labelCls}>Amount (ZMW)</label>
         <input name="amount" value={form.amount} onChange={handleChange} type="number" min="0" placeholder="0.00" className={inputCls} required />
       </div>
-      <div>
-        <label className={labelCls}>Interest Rate (%)</label>
-        <input name="interest" value={form.interest} onChange={handleChange} type="number" min="0" step="0.01" placeholder="e.g. 10" className={inputCls} required />
-      </div>
+      {!isRevolving && (
+        <div>
+          <label className={labelCls}>Interest Rate (%)</label>
+          <input name="interest" value={form.interest} onChange={handleChange} type="number" min="0" step="0.01" placeholder="e.g. 10" className={inputCls} required />
+        </div>
+      )}
       <div>
         <label className={labelCls}>Start Date</label>
         <input name="startDate" value={form.startDate} onChange={handleChange} type="date" className={inputCls} required />
       </div>
-      <div>
-        <label className={labelCls}>Duration (months)</label>
-        <input name="duration" value={form.duration} onChange={handleChange} type="number" min="1" placeholder="e.g. 6" className={inputCls} required />
-      </div>
+      {!isRevolving && (
+        <div>
+          <label className={labelCls}>Duration (months)</label>
+          <input name="duration" value={form.duration} onChange={handleChange} type="number" min="1" placeholder="e.g. 6" className={inputCls} required />
+        </div>
+      )}
+      {isRevolving && (
+        <p className="text-xs text-text-secondary leading-relaxed">
+          Revolving credit line{revolvingRate ? ` — interest accrues at ${revolvingRate}% per month` : ' — interest accrues monthly'} on the outstanding balance, with no fixed term.
+          If this member already has an open loan, this amount tops it up instead of creating a second one.
+        </p>
+      )}
       <div>
         <label className={labelCls}>Notes (optional)</label>
         <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Any notes..." rows={3}
