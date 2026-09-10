@@ -6,80 +6,31 @@
 
 ---
 
-## READ FIRST — current state as at 2026-09-10 00:30
+## READ FIRST — current state as at 2026-09-10
 
-**Done:** Session 1 (cutover), Session 3 (reconciliation), Session 2a (soft-delete, fixed
-`deleteGroups.js`, hard-delete, plus the two problems it exposed — see Step 3 below),
-**Session 2b — all six items, fully complete as of 2026-09-10.** Atlas holds exactly the
-6 dev groups the inventory table says it should; William's Group's drift is cleared;
-production holds exactly Grace's group, `paid`, auditing clean. **Next:** Session 4 —
-merge and deploy Phases 2–5.
+**Done: Sessions 1, 2, 3, 4 and 5.** Production runs on a dedicated private Coolify Mongo
+holding exactly one group (Grace's), auditing clean. Atlas is the dev database holding
+exactly the 6 dev groups the inventory table specifies. Phases 2–5 are merged and
+deployed. Named funds are shipped, and the fund backfill has been applied to **both**
+databases.
 
-**Session 2b outcome (2026-09-10).** Step 2's spec was revised the same night this was
-first attempted — a blanket "refuse production" guard is wrong, since production scripts
-are *meant* to run there via `docker exec` (the audit and the orphan sweep both do). One
-session round-trip built the wrong (blanket) version before reading the revision; corrected
-immediately: `scripts/utils/productionGuard.js` now exports composable primitives
-(`isAtlasUri`, `isProductionUri`, `maskUri`, `printTarget`) with no enforcing function, and
-`deleteGroups.js`/`removeGraceCopyFromAtlas.js`/`cleanupOrphanedRecords.js` each use them to
-build their own database-specific refusal. `.env.example` written for both packages —
-required a `.gitignore` fix, since the blanket `.env.*` pattern was silently swallowing
-`.env.example` too. `CLAUDE.md`'s throwaway-test-user note updated: Atlas framing (not
-production), plus the `--delete`-is-incomplete caveat from Step 3(b) below.
+**Next: Session 6** — write and dry-run `scripts/importGraceCycle.js`.
 
-**Step 4 — DONE 2026-09-10.** Both actions completed:
-1. **Cycle-reset William's Group in Atlas**, via the app's own "Begin New Cycle."
-   Verified: `auditBankBalance.js --group 69d641697236ea09109643e2` now reports K0/K0,
-   diff K0.00 — the ~K18,177 drift is gone.
-2. **Removed Grace's inert Atlas copy** — `removeGraceCopyFromAtlas.js --apply` matched
-   its dry-run exactly (25 members, 11 transactions, etc.). Full `--all` audit afterward:
-   3 remaining active groups all reconcile cleanly, `cleanupOrphanedRecords.js` reports
-   zero. Atlas now holds exactly the 6 groups the inventory table says it should.
+**Production verified 2026-09-10 after the funds backfill:**
 
-**Unplanned but blocking — a stale Clerk ID had to be found and fixed before step 4(1)
-could even be attempted.** William's Group's admin `GroupMember` record
-(`wmweemba@gmail.com`) carried `clerkUserId: user_3CLqpqNySrSSRbL7Nwd2l8ZGIjs`, which
-returns **404 from Clerk's own API** — that user no longer exists in the Development
-instance, likely left over from before it was split from Production. His actual, only,
-currently-valid Clerk identity for that email (`user_3C5I28pYWOS3NXbNjx5FwM025gi`, Google
-OAuth only, confirmed via `GET /v1/users?email_address=...`) already happened to be linked
-to a throwaway "WSM" membership in Dev Chama — so every sign-in attempt (email/password,
-which didn't exist as an option; Google; fresh incognito) correctly authenticated him, just
-into the wrong group, with no error message pointing at the real cause. `resolveGroup.js`
-has no way to detect "this GroupMember's clerkUserId doesn't correspond to who actually
-signed in" — it only checks "does *some* GroupMember match this clerkUserId."
+- `auditBankBalance.js --all` — one group, K-3050, reconciles, `EXIT=0`, no orphan
+  warnings. Byte-identical before and after the backfill, which is the proof it touched
+  no main-balance money.
+- `auditFunds.js --all` — Grace's two pots both reconcile at K0. The App Subscription Fund
+  shows `(inactive) [persists]`. **`[persists]` is the marker that matters**: it means a
+  cycle reset will not wipe subscription money, which it would have done silently at their
+  November cycle end before this was fixed.
+- Her social fund carried across at K0, confirming nothing was lost during the window when
+  production briefly had the named-funds code with no `GroupFund` rows.
 
-**Fix applied directly to Atlas** (dev database, not a code change): repointed William's
-Group's admin record to the live Clerk ID, and deactivated (`active: false`, reversible)
-the conflicting Dev Chama membership so `resolveGroup`'s `findOne` resolves deterministically.
-Confirmed via `GET https://api.clerk.com/v1/users/<id>` before touching anything — don't
-guess which Clerk ID is live, ask Clerk.
-
-**Worth a `CLAUDE.md` gotcha entry** (added) since this class of bug — a `GroupMember`
-pointing at a since-deleted Clerk user, silently resolving to nothing or to the wrong
-group with no diagnostic — could recur for any dev/test account and has no built-in
-detection today.
-
-**Step 5 — resolved by explanation, no deletion.** `auditBankBalance.js` reports 3
-orphaned `BankBalance` documents in Atlas (Pamo Village Bank, Dev Chama, Mfinance Grocery
-Chilimba — not 2, as originally written here; Mfinance's soft-delete came later). All three
-are soft-deleted groups **deliberately kept in Atlas** per the inventory table below —
-`auditBankBalance.js`'s own "orphan" definition just means "belongs to a soft-deleted
-Group," reported for visibility only, never modified. Deleting them would contradict the
-"keep" instruction for those three groups. No action needed; this is expected, by-design
-output, not a defect.
-
-**Session 2a step 2 outcome (2026-09-09).** `scripts/deleteGroups.js` rewritten to cover
-all 16 `groupId`-bearing models (was 10), target by `_id` not slug, dry-run by default,
-and refuse `--apply` against an Atlas (`mongodb+srv://`) URI. Dry-run verified against
-both Atlas and production before any write — numbers matched the inventory table exactly.
-Fresh production `mongodump` taken immediately before `--apply` (kept locally,
-`backups/pre-session2a-dump-20260909/`). Hard delete executed against production,
-matched the dry-run exactly. Post-delete: `auditBankBalance.js --all` shows **zero**
-orphaned `BankBalance` warnings (down from 6), one group audited (Grace's), `EXIT=0`.
-Re-running `deleteGroups.js` confirms idempotency — every count zero, every group
-reports "already gone." **Production now holds exactly one group: Grocery Savings
-Group (Grace's).**
+**Run backfills as part of the deploy, not after it.** The window above happened because
+the fund backfill was applied to Atlas and then the code was pushed, which auto-deploys.
+Low impact here only because the fund was empty.
 
 ### ⚠️ The one mistake that would do real damage
 
