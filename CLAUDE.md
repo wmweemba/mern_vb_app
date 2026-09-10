@@ -120,8 +120,9 @@ cd mern-vb-frontend && pnpm dev   # frontend only (vite)
 | Threshold | Threshold.js | Loan eligibility thresholds |
 | ContributionType | ContributionType.js | Treasurer-configured catalog of contribution kinds (e.g. "Admin Fee", "Social Fund"); per-group; soft-deleted only |
 | Contribution | Contribution.js | One row per recorded contribution; denormalized `typeName` snapshot; resolved `affectsMainBalance` + `overrodeDefault` stored at record time |
-| SocialFundBalance | SocialFundBalance.js | Single-doc social fund pot per group (mirrors BankBalance structure) |
-| SocialFundExpense | SocialFundExpense.js | Debit side of social fund mini-ledger; amount stored positive; direction implied by transaction type |
+| GroupFund | GroupFund.js | **Named pot** alongside the main lending pool — `social_fund`, `app_subscription`, or any treasurer-added key. Source of truth for pot balances |
+| FundExpense | FundExpense.js | Debit side of a fund's mini-ledger (formerly SocialFundExpense; bound to the same `socialfundexpenses` collection). Amount positive; direction implied by transaction type |
+| SocialFundBalance | SocialFundBalance.js | **DEPRECATED** — superseded by GroupFund. No longer read or written by app code; left un-dropped as the pre-migration record |
 
 ---
 
@@ -138,15 +139,16 @@ Bank Balance (lending pool) = Starting Balance (cycle_reset)
              - All Payouts                       (payout)        (-)
 ```
 
-**social_fund_credit** and **social_fund_debit** are NOT part of the main balance.
+**social_fund_credit**, **social_fund_debit**, **fund_credit** and **fund_debit** are NOT part of the main balance. The last two are the generic named-fund pair; the first two are legacy rows that are never rewritten.
 
 ```
-Social Fund Balance = Σ social_fund_credit  (contributions where affectsMainBalance=false)  (+)
-                    - Σ social_fund_debit    (expenses)                                      (-)
+Fund Balance (per GroupFund) = Σ contributions with that fundId   (fund_credit)  (+)
+                             - Σ expenses with that fundId        (fund_debit)   (-)
 ```
+Audit a group's pots with `node scripts/auditFunds.js --group <id>` (or `--all`).
 
 ### Transaction Types (Transaction model enum)
-`['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset', 'contribution', 'social_fund_credit', 'social_fund_debit']`
+`['loan', 'saving', 'fine', 'payment', 'loan_payment', 'payout', 'cycle_reset', 'contribution', 'social_fund_credit', 'social_fund_debit', 'fund_credit', 'fund_debit']`
 
 ### Interest Calculation (utils/loanCalculator.js)
 **This is the most critical file in the backend. Treat with extreme care.**
@@ -565,9 +567,9 @@ If anything is not clean, state what failed and fix it first.
 | Global state | `mern-vb-frontend/src/store/` |
 | PDF/Excel export | `mern-vb-frontend/src/lib/export.js` |
 | Balance audit scripts | `mern_vb_backend/scripts/auditBankBalance.js` |
-| Social fund audit | `mern_vb_backend/scripts/auditSocialFund.js` |
+| Fund audit (all pots) | `mern_vb_backend/scripts/auditFunds.js` |
 | Contribution recording | `mern_vb_backend/controllers/contributionController.js` |
-| Social fund expense | `mern_vb_backend/controllers/socialFundController.js` |
+| Fund balances + expenses | `mern_vb_backend/controllers/fundController.js` (socialFundController is a deprecated shim) |
 | Contribution type config | `mern_vb_backend/controllers/contributionTypeController.js` |
 | Backfill existing groups | `mern_vb_backend/scripts/seedContributionDefaults.js` |
 
@@ -726,6 +728,28 @@ Added 2026-08-12 (Phase 5 of `docs/plan_configurable_group_rules.md`: Cycle mode
 7. **The backdated date is threaded through to the `Transaction` log, not just the source record.** `logTransaction` now accepts an optional `createdAt`; every call site in the three controllers above passes the resolved entry date through. Without this, a backdated loan would show correctly on the Loan document but still appear in Recent Activity / exports dated "today" — the two would disagree.
 
 8. **`GroupSettings.cycleStartDate` doesn't exist as a stored field — cycle boundaries live only on `Cycle`.** Don't add a duplicate date field to `GroupSettings` for this; the settings document is intentionally single-cycle-snapshot-free, and `Cycle.settingsSnapshot` is where a frozen copy of settings belongs once a cycle closes.
+
+---
+
+## Named Funds — Architecture Notes
+
+Added 2026-09-10 (Session 5 of `docs/plan_db_cutover_and_grace_migration.md`). Key decisions recorded here to prevent regression:
+
+1. **`fundId: null` means the main lending pool — the main pool is NOT a GroupFund.** Folding `BankBalance` into a generic fund abstraction would rewrite the most load-bearing arithmetic in the app to solve a side-pot problem. Do not "tidy" this by giving the main pool a fund row.
+
+2. **`ContributionType.affectsMainBalance` is deprecated but still written**, derived as `!fundId`. It is not the source of truth. **Destination resolution has a deliberate fallback:** a type with `affectsMainBalance: false` and no `fundId` (i.e. not yet backfilled) routes to the group's social fund. Removing that fallback would silently start crediting the main lending pool instead of the pot — the existing test suite catches this, so do not "simplify" it away.
+
+3. **`FundExpense` is bound to the existing `socialfundexpenses` collection.** The rename from `SocialFundExpense` was a naming fix, not a data migration. Do not add a migration to rename the collection.
+
+4. **`fund_credit` / `fund_debit` must stay explicitly handled at `balanceEffect = 0`** in `auditBankBalance.js`. The old `default: balanceEffect = amount` catch-all would silently count them and manufacture a discrepancy — the same trap the social-fund pair already documents.
+
+5. **The App Subscription Fund is platform-layer, not template-layer.** Every group gets it on every template, seeded **inactive**. Paying for Chama360 is true of every customer; fines, share-out and social funds genuinely vary by group model. See P-013 in the second brain.
+
+6. **Pointing a contribution type at a fund auto-activates that fund** (`contributionTypeController.resolveFundId`). That is the moment a group starts using the pot, and it removes the need for a separate activation screen.
+
+7. **`SocialFundBalance` is deprecated, not dropped**, and `socialFundController` is a thin shim delegating to `fundController` — so there is exactly one balance per pot. Never reintroduce a second write path to a fund's balance.
+
+8. **Audit pots with `scripts/auditFunds.js`, never the old `auditSocialFund.js`** (deleted). That script had the same zero-`groupId` multi-tenancy defect `auditBankBalance.js` was fixed for in August, and was never fixed alongside it — its output was meaningless on a multi-group database.
 
 ---
 

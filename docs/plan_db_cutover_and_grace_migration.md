@@ -324,7 +324,7 @@ import gate is lifted.**
 3. Verify live against a throwaway Clerk test group on the **grocery_chilimba** template before this touches Grace's group (technique: `systems/NS-020`).
 4. Deploy to Coolify production.
 
-### Session 5 — Named funds (~2.5–3h, may run long)
+### Session 5 — Named funds — DONE 2026-09-10
 
 Design is section 7 — read it before writing code. Backend first; the Settings
 fund-manager UI can follow after the import if the session runs out.
@@ -338,7 +338,13 @@ fund-manager UI can follow after the import if the session runs out.
 5. Seed the App Subscription Fund platform-wide — every group, every template, plus a
    backfill for existing groups. Inactive by default.
 6. Dashboard renders a card per active fund instead of the hardcoded Social Fund card.
-7. Full verification loop. `auditSocialFund.js` still passes, or is updated alongside.
+7. Full verification loop. ~~`auditSocialFund.js` still passes, or is updated alongside~~ — **replaced**: it carried the same zero-`groupId` multi-tenancy defect `auditBankBalance.js` was fixed for in August and was never fixed alongside it. Now `scripts/auditFunds.js`, per-group and per-fund.
+
+**Outcome.** All seven items done, plus a backfill (`scripts/backfillGroupFunds.js`, applied to Atlas, idempotent) and the throwaway-script fund seeding. 104/104 tests, clean build, both audits clean. **Verified live in a browser:** the App Subscription Fund seeded inactive and hidden; creating a contribution type pointed at it auto-activated it and it appeared as its own dashboard card; Phase 4's liability card picked up its K12 target with no extra wiring; recording K12 credited the fund and left `BankBalance` at K0; `fund_credit` correctly excluded from the main-pool formula.
+
+**One defect the test suite caught during the work:** a legacy `ContributionType` with `affectsMainBalance: false` and no `fundId` would have routed to the **main lending pool**. On un-backfilled production data that is silent money misrouting. Destination resolution now falls back to the social fund for any type still carrying the deprecated boolean.
+
+**Deferred, not blocking the import:** `Contributions.jsx` and `OperationsPage.jsx` still speak of "the social fund" and show a single pot. They keep working — the deprecated `/social-fund` routes delegate to `fundController` — but they should become fund-aware (a tab or filter per fund) before a group runs more than two pots in anger.
 
 **Touchpoints — verified by grep 2026-09-09, confirm before editing.** `SocialFund*`
 appears in 13 files:
