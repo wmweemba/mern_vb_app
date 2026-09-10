@@ -14,7 +14,12 @@ exactly the 6 dev groups the inventory table specifies. Phases 2–5 are merged 
 deployed. Named funds are shipped, and the fund backfill has been applied to **both**
 databases.
 
-**Next: Session 6** — write and dry-run `scripts/importGraceCycle.js`.
+**Next: Session 7** — run the import against production.
+
+**Session 6 done 2026-09-10.** `scripts/extractGraceWorkbook.js` + `scripts/importGraceCycle.js`,
+rehearsed end to end against a 25-member clone in Atlas: all control totals match, both
+audits reconcile. **The signed-off outstanding total is now K62,875, not K60,675** — see
+section 3.
 
 **Production verified 2026-09-10 after the funds backfill:**
 
@@ -379,7 +384,7 @@ import gate is lifted.**
   Emmanuel 250/800, Lucy 500/550, Tommy 550/500, Miyoba 150/900, Malambo 350/700. The
   Total Interest sheet's monthly columns now reconcile exactly with the monthly sheets
   in both directions (loan interest 0 / 1,800 / 3,922; added interest 125 / 675 / 1,750).
-- **Outstanding loans at 31 August: K60,675.** Unchanged, confirmed.
+- **Outstanding loans at 31 August: K62,875** — revised 2026-09-10 from the K60,675 originally signed off. Kondwani's August closing-balance cell was blank while his K2,200 fresh loan appeared in `New Loan Requested`, in the column total, and in the cash delta that Simon confirmed. Chitalu is the identical case in the same month — fresh loan, no prior balance, no interest yet — and shows K4,500. Simon also confirmed K220 of interest falls due for Kondwani in September, which is 10% of K2,200: the interest timing he described and the principal balance are separate things, and his own figure confirms the principal. Agreed by William as an omission on Simon's part.
 - **September is a clean break.** Simon enters it in the app himself after the import.
   Nothing past 31 August gets migrated.
 
@@ -447,7 +452,7 @@ section 3 above.
 ## 4. Verification — four independent checks, all must pass
 
 1. `scripts/auditBankBalance.js --group <graceGroupId>` reports a discrepancy under ZMW 1.
-2. Every member's outstanding loan balance in-app matches the signed-off August closing figure, member by member — and the total is **K60,675**.
+2. Every member's outstanding loan balance in-app matches the signed-off August closing figure, member by member — and the total is **K62,875**.
 3. The Interest Obligation report reproduces the corrected Balance column exactly, member by member. Spot-check the seven that changed: Maluba 350, Patricia 538, Simon Peter 850, Emmanuel 800, Lucy 550, Tommy 500, Miyoba 900.
 4. The main bank balance lands on **K42**, from a zero opening at 1 June. The subscription fund shows **K288** and is excluded from that number. Intermediate month-end values should read -33 (June) and -69 (July).
 

@@ -23,15 +23,29 @@ const XLSX = require('xlsx');
 const NAME_ALIASES = {
   // Simon confirmed 2026-09-09: one person, renamed mid-cycle. Onboarded as Malambo.
   mwenzi: 'Malambo',
-  // Spelling variant between the workbook and the app roster ("Tabita Mtonga").
-  // Near-certain, but it is a member's identity and money — CONFIRM WITH SIMON
-  // before the production import.
+  // Confirmed by William 2026-09-10: the app's member record is authoritative and
+  // the workbook has a typo. The app spells her "Tabita Mtonga".
   tabitha: 'Tabita',
 };
 
+/**
+ * Documented corrections to the source workbook, each agreed with the treasurer.
+ * Applied after parsing and logged on every run, so a correction is never silent.
+ */
+const CORRECTIONS = [
+  {
+    month: '2026-08', name: 'Kondwani', field: 'closingLoanBalance', value: 2200,
+    reason: 'Closing-balance cell left blank. He borrowed K2,200 fresh in August, and '
+          + 'Chitalu — the identical case in the same month, fresh loan with no prior '
+          + 'balance and no interest yet — shows K4,500. Simon also confirmed K220 of '
+          + 'interest falls due in September, which is 10% of K2,200. Confirmed as an '
+          + 'omission by William 2026-09-10; group total rises 60,675 -> 62,875.',
+  },
+];
+
 const CONTROL_TOTALS = {
   members: 25,
-  outstandingAt31Aug: 60675,
+  outstandingAt31Aug: 62875,
   cashAt31Aug: 42,
   membershipFeesCollected: 2145,
   subscriptionCollected: 288,
@@ -100,7 +114,37 @@ function main() {
     return { key, label, entries };
   });
 
+  // ── Apply documented corrections ─────────────────────────────────────────
+  for (const c of CORRECTIONS) {
+    const month = months.find(m => m.key === c.month);
+    const row = month && month.entries.find(e => e.name.toLowerCase() === c.name.toLowerCase());
+    if (!row) throw new Error(`Correction target not found: ${c.name} ${c.month}`);
+    const before = row[c.field];
+    row[c.field] = c.value;
+    console.log(`\n   📝 Correction applied — ${c.name} ${c.month} ${c.field}: ${before} -> ${c.value}`);
+    console.log(`      ${c.reason}\n`);
+  }
+
   const sum = (arr, f) => Math.round(arr.reduce((s, e) => s + f(e), 0) * 100) / 100;
+
+  // Cross-check: closing balances stated in the workbook must equal the balances
+  // implied by chaining each member's own monthly movements. Any divergence beyond
+  // the documented corrections above means the sheet has a new internal
+  // inconsistency and must go back to the treasurer, not into the database.
+  const chained = new Map();
+  for (const m of months) {
+    for (const e of m.entries) {
+      chained.set(e.name, Math.round(((chained.get(e.name) || 0) - e.loanRepayment + e.newLoan) * 100) / 100);
+    }
+  }
+  const stated = new Map(months[2].entries.map(e => [e.name, e.closingLoanBalance]));
+  const divergent = [...chained.entries()].filter(([n, v]) => Math.abs(v - (stated.get(n) || 0)) > 0.01);
+  if (divergent.length) {
+    console.error('\n❌ Closing balances disagree with each member\'s own monthly movements:');
+    divergent.forEach(([n, v]) => console.error(`   ${n}: chained K${v} vs stated K${stated.get(n) || 0}`));
+    console.error('   Resolve with the treasurer before importing.\n');
+    process.exit(1);
+  }
 
   const totals = {
     members: members.length,

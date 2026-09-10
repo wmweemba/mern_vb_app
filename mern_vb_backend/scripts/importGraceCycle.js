@@ -61,8 +61,10 @@ function monthEndDate(key) {
 
 /**
  * Match a workbook first name to exactly one GroupMember. Ambiguity is fatal:
- * this group contains both "Maluba Siakapa" and "Mateba Siakapa", and guessing
- * would post one member's money to another.
+ * this group contains both "Maluba Siakapa" and "Mateba Siakapa" — two different
+ * members who are related and share a surname (confirmed by William 2026-09-10) —
+ * and guessing would post one member's money to another. Matching on the first
+ * name keeps them distinct; never relax this to a surname or substring match.
  */
 function sharedPrefix(a, b) {
   let i = 0;
