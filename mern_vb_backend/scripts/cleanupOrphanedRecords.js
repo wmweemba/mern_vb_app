@@ -31,7 +31,7 @@ const Group = require('../models/Group');
 //   grep -l groupId mern_vb_backend/models/*.js
 const MODEL_NAMES = [
   'AdminAuditLog', 'BankBalance', 'Contribution', 'ContributionType',
-  'Fine', 'GroupMember', 'GroupSettings', 'InviteToken', 'Loans',
+  'Cycle', 'Fine', 'GroupMember', 'GroupSettings', 'InviteToken', 'Loans',
   'PendingInvite', 'Savings', 'SocialFundBalance', 'SocialFundExpense',
   'SupportRequest', 'Threshold', 'Transaction',
 ];

@@ -17,6 +17,7 @@ const ContributionType = require('../models/ContributionType');
 const Contribution = require('../models/Contribution');
 const SupportRequest = require('../models/SupportRequest');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const Cycle = require('../models/Cycle');
 const { isAtlasUri, maskUri } = require('./utils/productionGuard');
 
 // ─── GROUPS TO DELETE (by _id — never by slug/name) ───────────────────────────
@@ -53,6 +54,7 @@ const COLLECTIONS = [
   { label: 'Contributions', model: Contribution },
   { label: 'SupportRequests', model: SupportRequest },
   { label: 'AdminAuditLogs', model: AdminAuditLog },
+  { label: 'Cycles', model: Cycle },
 ];
 
 const APPLY = process.argv.includes('--apply');
