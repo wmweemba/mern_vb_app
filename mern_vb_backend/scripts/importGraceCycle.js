@@ -86,8 +86,18 @@ function resolveMembers(workbookNames, members) {
       // Offer near-misses. Spelling variants between the workbook and the app are
       // common and easy to resolve by eye — "Tabitha" vs "Tabita Mtonga" — but they
       // must be confirmed and aliased explicitly, never guessed at here.
+      // Compare against every token of the member's name, not just the leading
+      // characters — the workbook uses a surname for at least one member
+      // ("Saasa" -> "Batizani Saasa"), which a leading-prefix check misses entirely.
       const close = members
-        .map(m => ({ name: m.name, score: sharedPrefix(needle, String(m.name || '').toLowerCase()) }))
+        .map(m => {
+          const full = String(m.name || '').toLowerCase();
+          const best = Math.max(
+            sharedPrefix(needle, full),
+            ...full.split(/\s+/).map(tok => (tok.startsWith(needle) || needle.startsWith(tok) ? Math.min(tok.length, needle.length) : sharedPrefix(needle, tok)))
+          );
+          return { name: m.name, score: best };
+        })
         .filter(c => c.score >= 4)
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)

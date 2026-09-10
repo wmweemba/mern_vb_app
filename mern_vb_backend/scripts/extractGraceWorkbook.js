@@ -26,6 +26,11 @@ const NAME_ALIASES = {
   // Confirmed by William 2026-09-10: the app's member record is authoritative and
   // the workbook has a typo. The app spells her "Tabita Mtonga".
   tabitha: 'Tabita',
+  // Same class as Tabitha — spelling variant. App: "Immanuel Nchimunya".
+  emmanuel: 'Immanuel',
+  // NOT a typo: the workbook uses this member's SURNAME where every other row uses
+  // a first name. App: "Batizani Saasa", the only Saasa on the roster.
+  saasa: 'Batizani Saasa',
 };
 
 /**

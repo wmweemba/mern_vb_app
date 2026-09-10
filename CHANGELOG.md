@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Infrastructure
 
+### Fixed
+- **Production MongoDB was a standalone, which silently broke every transactional write path in the app.** Found 2026-09-10 when the Grace import failed with *"Transaction numbers are only allowed on a replica set member or mongos"*. Seven controllers use `session.withTransaction()` — `paymentController`, `contributionController`, `loanController`, `fundController`, `cycleController`, `groupController`, `adminGroupsController` — so since the 2026-09-09 Atlas→Coolify cutover the live group could not record a repayment, a contribution or a loan, could not run a cycle reset, and **no new group could be onboarded at all**. Atlas is always a replica set; the cutover moved production to a standalone and broke all of it at that moment. It went unnoticed for a day because the only live group was mid-migration and not transacting, and because every local test, browser smoke test and import rehearsal runs against Atlas.
+  - Fixed by converting the Coolify Mongo to a **single-node replica set**: `mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile`. A replica set with authentication requires a keyFile — `--replSet` alone crash-loops on `security.keyFile is required when authorization is enabled with replica sets`. `rs.initiate()` advertises the container hostname, not `localhost`, so the API container can reach the primary.
+  - Verified over the app's own `MONGODB_URI`: a transaction that commits, and one that throws and rolls back.
+  - **Known hazard, see `CLAUDE.md` #12:** this lives in a Coolify-generated compose file that may be regenerated, silently dropping `--replSet`. Check `rs.status()` after any Coolify database redeploy.
+
+### Changed
+- Two more workbook→app name aliases for the Grace import, both confirmed against the live roster: **"Emmanuel" → "Immanuel Nchimunya"** (spelling variant, same class as Tabitha/Tabita) and **"Saasa" → "Batizani Saasa"** — the latter is not a typo but the one row where the workbook uses a member's *surname* where every other row uses a first name. The import's near-miss suggester now compares against every token of a member's name rather than only leading characters, which is what would have surfaced the surname case immediately.
+
 ### Added
 - **`scripts/extractGraceWorkbook.js` + `scripts/importGraceCycle.js`** — Session 6 of `docs/plan_db_cutover_and_grace_migration.md`. One-off migration tooling, not production code.
   - **Extraction is separate from import, on purpose.** Reading a spreadsheet and writing to a financial database are different jobs with different failure modes, and the JSON artifact between them is reviewable by a human — including by the treasurer, against the figures he signed off. The extractor asserts all eight signed-off control totals (25 members, K60,675 outstanding, K42 cash, K2,145 membership fees, K288 subscription, and the -33/-36/+111 monthly deltas) and refuses to emit output if any drifts.
