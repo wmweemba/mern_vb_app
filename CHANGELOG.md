@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Infrastructure
 
+### Added
+- **`scripts/extractGraceWorkbook.js` + `scripts/importGraceCycle.js`** — Session 6 of `docs/plan_db_cutover_and_grace_migration.md`. One-off migration tooling, not production code.
+  - **Extraction is separate from import, on purpose.** Reading a spreadsheet and writing to a financial database are different jobs with different failure modes, and the JSON artifact between them is reviewable by a human — including by the treasurer, against the figures he signed off. The extractor asserts all eight signed-off control totals (25 members, K60,675 outstanding, K42 cash, K2,145 membership fees, K288 subscription, and the -33/-36/+111 monthly deltas) and refuses to emit output if any drifts.
+  - **The artifact is customer financial data and is never committed** — `.gitignore`d, generated locally, `docker cp`'d into the backend container to run against production, deleted after.
+  - **The import drives the real accrual strategy and balance helpers**, not hand-written document writes; re-implementing the arithmetic is the exact risk the import exists to avoid. Order within a month is load-bearing: accrue on the opening balance, then take payments, then disburse new loans — verified against every row of the workbook.
+  - **Interest accrues at an effective rate derived from the treasurer's own figures, not a flat 10%.** His book rounds — Patricia's August interest is K512 where 10% of K5,113 is K511.30 — and a flat rate would leave K0.70 outstanding forever, permanently out of step with the group's records. Verified: after import, `interestOutstanding` is K0 on all 13 loans.
+  - Refuses to write when the projected end state disagrees with the signed-off totals, when a workbook name matches no member (offering near-miss suggestions), or when a name is ambiguous — this group contains both "Maluba Siakapa" and "Mateba Siakapa", and guessing would post one member's money to another. Requires an empty cycle unless `--reset-first` is passed.
+  - **Rehearsed end to end against a 25-member clone in Atlas.** Every spot-checked closing balance matched the workbook exactly (Mwiza K5,500, Patricia K10,913, Saasa K5,262), bank balance K42, subscription fund K288, both audits reconciling.
+
+### Fixed
+- `Loan.durationMonths` and `Loan.interestRate` are `required` even for revolving lines. The import now sets them as `loanController` does — `interestRate` is not decorative, since Run Month-End Interest reads it for every accrual after the import.
+- `Saving.month` is the **cycle** month number (1-based), not a calendar month; the group's savings rules key off "month 1" vs "month > 1".
+
 ### Fixed
 - **Three defects found by a live UI smoke test of the Phases 2–5 merge**, none of which the 104-test suite or a clean build caught — they were only visible by driving the app in a browser.
   - **The Add Loan form showed "Interest Rate (%)" and "Duration (months)" on revolving groups.** The backend correctly ignored both and produced a proper revolving loan, so nothing was broken — but a treasurer on a `grocery_chilimba` group would fill in a duration that does nothing, on a credit line that by definition has no term. `AddLoanForm.jsx` now reads `GET /group-settings` and hides both fields when `policies.loanAccrual === 'revolving_monthly'`, replacing them with a line stating the real monthly rate from settings and explaining that an amount for a member with an open loan tops it up rather than creating a second one. Detected from the group's **policy**, not from existing loans, because the first loan in a new group has to get this right too. Falls back to showing every field if the settings request fails.

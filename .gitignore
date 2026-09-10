@@ -60,3 +60,6 @@ mern_vb_backend/coverage/
 mern_vb_backend/dist/
 mern_vb_backend/build/
 mern_vb_backend/*.log 
+# Customer financial data extracted from client workbooks — never commit
+mern_vb_backend/scripts/data/
+*grace-cycle*.json
