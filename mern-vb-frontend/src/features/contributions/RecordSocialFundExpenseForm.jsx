@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
 import MemberSelect from '../../components/ui/MemberSelect';
@@ -12,11 +12,14 @@ const CATEGORIES = [
   { value: 'bereavement',  label: 'Bereavement' },
   { value: 'stationery',   label: 'Stationery' },
   { value: 'refreshments', label: 'Refreshments' },
+  { value: 'app_subscription', label: 'App Subscription' },
   { value: 'other',        label: 'Other' },
 ];
 
 const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form' }) => {
+  const [funds, setFunds] = useState([]);
   const [form, setForm] = useState({
+    fundId: '',
     amount: '',
     category: 'other',
     description: '',
@@ -26,6 +29,17 @@ const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // A group can hold several pots, so the expense has to say which one it comes
+  // out of. Defaults to the first active fund, which for most groups is the only one.
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/funds?active=true`)
+      .then(res => {
+        setFunds(res.data);
+        if (res.data.length) setForm(f => ({ ...f, fundId: f.fundId || res.data[0]._id }));
+      })
+      .catch(() => setFunds([]));
+  }, []);
+
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async e => {
@@ -34,13 +48,14 @@ const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form'
     setError('');
     try {
       const payload = {
+        fundId: form.fundId || undefined,
         amount: form.amount,
         category: form.category,
         description: form.description,
         ...(form.beneficiaryName ? { beneficiaryName: form.beneficiaryName } : {}),
       };
-      await axios.post(`${API_BASE_URL}/social-fund/expenses`, payload);
-      setForm({ amount: '', category: 'other', description: '', date: '', beneficiaryName: '' });
+      await axios.post(`${API_BASE_URL}/funds/expenses`, payload);
+      setForm(f => ({ fundId: f.fundId, amount: '', category: 'other', description: '', date: '', beneficiaryName: '' }));
       window.dispatchEvent(new Event('contributionsChanged'));
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -52,6 +67,16 @@ const RecordSocialFundExpenseForm = ({ onSuccess, formId = 'record-expense-form'
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      {funds.length > 1 && (
+        <div>
+          <label className={labelCls}>Pay from</label>
+          <Select name="fundId" value={form.fundId} onChange={handleChange}>
+            {funds.map(f => (
+              <option key={f._id} value={f._id}>{f.name}</option>
+            ))}
+          </Select>
+        </div>
+      )}
       <div>
         <label className={labelCls}>Amount (ZMW)</label>
         <input

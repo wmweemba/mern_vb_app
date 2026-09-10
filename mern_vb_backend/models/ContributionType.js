@@ -4,6 +4,12 @@ const { Schema } = mongoose;
 const contributionTypeSchema = new Schema({
   groupId:            { type: Schema.Types.ObjectId, ref: 'Group', required: true, index: true },
   name:               { type: String, required: true, trim: true },
+  // null = the main lending pool (BankBalance). An ObjectId routes the credit to
+  // that GroupFund instead. Replaces the affectsMainBalance boolean, which could
+  // only ever express two destinations.
+  fundId:             { type: Schema.Types.ObjectId, ref: 'GroupFund', default: null },
+  // Deprecated, still written for one release so historical reads and any
+  // un-migrated caller keep working. Derived as `!fundId` — never set it directly.
   affectsMainBalance: { type: Boolean, required: true, default: true },
   // Phase 3 (docs/plan_configurable_group_rules.md) — contributions of this type count
   // toward a member's interest obligation quota (GroupSettings.interestObligationAmount).

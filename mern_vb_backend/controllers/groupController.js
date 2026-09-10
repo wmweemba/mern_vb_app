@@ -5,7 +5,7 @@ const GroupMember = require('../models/GroupMember');
 const GroupSettings = require('../models/GroupSettings');
 const GroupTemplate = require('../models/GroupTemplate');
 const BankBalance = require('../models/BankBalance');
-const SocialFundBalance = require('../models/SocialFundBalance');
+const { ensureFund, SOCIAL_FUND_KEY, APP_SUBSCRIPTION_KEY } = require('./fundController');
 const ContributionType = require('../models/ContributionType');
 const { openCycle } = require('../utils/cycleHelpers');
 
@@ -112,18 +112,24 @@ exports.createGroup = async (req, res) => {
 
       await BankBalance.create([{ balance: 0, groupId: group._id }], { session });
 
-      await SocialFundBalance.create([{ balance: 0, groupId: group._id }], { session });
+      // Named funds. The social fund follows the template's feature flag; the app
+      // subscription fund is seeded for EVERY group regardless of template, because
+      // paying for Chama360 is a platform fact rather than a group-model variation
+      // (P-013). It starts inactive so groups that don't collect for it separately
+      // never see an empty pot on their dashboard.
+      const socialFund = await ensureFund(group._id, SOCIAL_FUND_KEY, 'Social Fund', { isDefault: true }, session);
+      await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true }, session);
 
       const defaultContributionTypes = [
-        { groupId: group._id, name: 'Admin Fee',   affectsMainBalance: true,  isDefault: true, active: true },
-        { groupId: group._id, name: 'Social Fund', affectsMainBalance: false, isDefault: true, active: true },
+        { groupId: group._id, name: 'Admin Fee',   fundId: null,           affectsMainBalance: true,  isDefault: true, active: true },
+        { groupId: group._id, name: 'Social Fund', fundId: socialFund._id, affectsMainBalance: false, isDefault: true, active: true },
       ];
       // Interest quota groups (docs/plan_configurable_group_rules.md Phase 3) need a
       // contribution type for members who service their quota in cash instead of
       // through loan interest — this is the workbook's "Added Interest" column.
       if (tplPolicies.interestObligation === 'per_member_quota') {
         defaultContributionTypes.push({
-          groupId: group._id, name: 'Interest Top-Up', affectsMainBalance: true,
+          groupId: group._id, name: 'Interest Top-Up', fundId: null, affectsMainBalance: true,
           countsTowardInterestObligation: true, isDefault: true, active: true,
         });
       }

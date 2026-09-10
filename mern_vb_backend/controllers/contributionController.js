@@ -4,11 +4,12 @@ const Contribution = require('../models/Contribution');
 const ContributionType = require('../models/ContributionType');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
-const { updateSocialFundBalance } = require('./socialFundController');
+const GroupFund = require('../models/GroupFund');
+const { updateFundBalance, getSocialFund } = require('./fundController');
 const { resolveEntryDate } = require('../utils/cycleHelpers');
 
 exports.recordContribution = async (req, res) => {
-  const { username, userId, contributionTypeId, amount, note, affectsMainBalance, date } = req.body;
+  const { username, userId, contributionTypeId, amount, note, affectsMainBalance, fundId, date } = req.body;
 
   // Backdating (a caller-supplied `date`) is restricted to admin/treasurer and
   // must fall within the currently open cycle — see
@@ -38,8 +39,39 @@ exports.recordContribution = async (req, res) => {
       const type = await ContributionType.findOne({ _id: contributionTypeId, ...req.groupScope, active: true }).session(session);
       if (!type) throw Object.assign(new Error('Contribution type not found or inactive'), { status: 400 });
 
-      const effectiveAffectsMain = typeof affectsMainBalance === 'boolean' ? affectsMainBalance : type.affectsMainBalance;
-      const overrodeDefault = effectiveAffectsMain !== type.affectsMainBalance;
+      // Destination resolution, in priority order.
+      //
+      // 1. The type's own destination. A type that has not been backfilled yet has
+      //    fundId null but may carry the deprecated affectsMainBalance=false — that
+      //    MUST still route to the social fund, or an un-migrated type would start
+      //    silently crediting the main lending pool instead of the pot.
+      let typeDefaultFundId = type.fundId || null;
+      if (!typeDefaultFundId && type.affectsMainBalance === false) {
+        typeDefaultFundId = (await getSocialFund(req.groupId, session))._id;
+      }
+
+      // 2. An explicit fundId on the request wins outright: null means the main
+      //    pool, an id means that fund. 3. Otherwise the legacy per-transaction
+      //    affectsMainBalance override still applies, for callers not yet migrated.
+      let effectiveFundId = typeDefaultFundId;
+      if (fundId !== undefined) {
+        effectiveFundId = fundId;
+      } else if (typeof affectsMainBalance === 'boolean') {
+        effectiveFundId = affectsMainBalance
+          ? null
+          : (typeDefaultFundId || (await getSocialFund(req.groupId, session))._id);
+      }
+
+      let fund = null;
+      if (effectiveFundId) {
+        fund = await GroupFund.findOne({ _id: effectiveFundId, ...req.groupScope }).session(session);
+        if (!fund) throw Object.assign(new Error('Fund not found'), { status: 400 });
+      }
+
+      // Deprecated field, still written for one release so historical reads and any
+      // un-migrated report keep working. Derived — never the source of truth.
+      const effectiveAffectsMain = !fund;
+      const overrodeDefault = String(effectiveFundId || '') !== String(typeDefaultFundId || '');
 
       const [contribution] = await Contribution.create([{
         ...req.groupScope,
@@ -47,6 +79,8 @@ exports.recordContribution = async (req, res) => {
         contributionTypeId: type._id,
         typeName: type.name,
         amount: amt,
+        fundId: fund ? fund._id : null,
+        fundName: fund ? fund.name : null,
         affectsMainBalance: effectiveAffectsMain,
         overrodeDefault,
         countsTowardInterestObligation: type.countsTowardInterestObligation,
@@ -57,7 +91,7 @@ exports.recordContribution = async (req, res) => {
 
       const tx = await logTransaction({
         userId: member._id,
-        type: effectiveAffectsMain ? 'contribution' : 'social_fund_credit',
+        type: fund ? 'fund_credit' : 'contribution',
         amount: amt,
         referenceId: contribution._id,
         note: note || `${type.name} contribution`,
@@ -65,10 +99,10 @@ exports.recordContribution = async (req, res) => {
         createdAt: contributionDate,
       }, session);
 
-      if (effectiveAffectsMain) {
-        await updateBankBalance(amt, req.groupId, session);
+      if (fund) {
+        await updateFundBalance(fund._id, amt, session);
       } else {
-        await updateSocialFundBalance(amt, req.groupId, session);
+        await updateBankBalance(amt, req.groupId, session);
       }
 
       contribution.transactionId = tx._id;
@@ -90,7 +124,7 @@ exports.listContributions = async (req, res) => {
     if (req.role === 'member') query.userId = req.memberId;
     const contributions = await Contribution.find(query)
       .populate('userId', 'name')
-      .populate('contributionTypeId', 'name affectsMainBalance')
+      .populate('contributionTypeId', 'name affectsMainBalance fundId')
       .populate('recordedBy', 'name')
       .sort({ createdAt: -1 });
     res.json(contributions);

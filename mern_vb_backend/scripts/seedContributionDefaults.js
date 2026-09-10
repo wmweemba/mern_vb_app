@@ -1,5 +1,5 @@
 /**
- * Idempotent backfill: seeds SocialFundBalance and the two default ContributionTypes
+ * Idempotent backfill: seeds the social fund (GroupFund) and the two default ContributionTypes
  * for any existing group that was created before the contributions feature was added.
  *
  * Safe to re-run: uses existence checks / upsert — already-seeded groups are skipped.
@@ -10,7 +10,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Group = require('../models/Group');
 const GroupSettings = require('../models/GroupSettings');
-const SocialFundBalance = require('../models/SocialFundBalance');
+const GroupFund = require('../models/GroupFund');
 const ContributionType = require('../models/ContributionType');
 
 const DEFAULT_TYPES = [
@@ -40,11 +40,11 @@ async function seed() {
     const gid = group._id;
 
     // SocialFundBalance — upsert (create only if missing)
-    const sfExists = await SocialFundBalance.findOne({ groupId: gid });
+    const sfExists = await GroupFund.findOne({ groupId: gid, key: 'social_fund' });
     if (!sfExists) {
-      await SocialFundBalance.create({ balance: 0, groupId: gid });
+      await GroupFund.create({ groupId: gid, key: 'social_fund', name: 'Social Fund', balance: 0, isDefault: true });
       sfCreated++;
-      console.log(`  ✅ Created SocialFundBalance for "${group.name}"`);
+      console.log(`  ✅ Created Social Fund for "${group.name}"`);
     }
 
     // ContributionTypes — insert only if the name doesn't already exist for this group
@@ -64,7 +64,7 @@ async function seed() {
     }
   }
 
-  console.log(`\n✅ Done. SocialFundBalance docs created: ${sfCreated}, ContributionType docs created: ${typesCreated}`);
+  console.log(`\n✅ Done. Social Fund docs created: ${sfCreated}, ContributionType docs created: ${typesCreated}`);
   await mongoose.disconnect();
 }
 

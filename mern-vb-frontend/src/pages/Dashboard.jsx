@@ -24,13 +24,13 @@ const Dashboard = () => {
         axios.get(`${API_BASE_URL}/savings/dashboard`),
         axios.get(`${API_BASE_URL}/bank-balance`),
         axios.get(`${API_BASE_URL}/bank-balance/fines`),
-        axios.get(`${API_BASE_URL}/social-fund/balance`),
+        axios.get(`${API_BASE_URL}/funds?active=true`),
       ]);
       setStats({
         ...dashboardRes.data,
         bankBalance: balRes.data.balance,
         totalFines: fineRes.data.totalFines,
-        socialFundBalance: sfRes.data.balance,
+        funds: Array.isArray(sfRes.data) ? sfRes.data : [],
       });
     } catch {
       setError('Failed to load dashboard stats');

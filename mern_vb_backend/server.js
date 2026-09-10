@@ -37,7 +37,8 @@ app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/contribution-types', require('./routes/contributionTypes'));
 app.use('/api/contributions', require('./routes/contributions'));
-app.use('/api/social-fund', require('./routes/socialFund'));
+app.use('/api/funds', require('./routes/funds'));
+app.use('/api/social-fund', require('./routes/socialFund'));  // deprecated — delegates to fundController
 
 const clientOptions = {
   serverApi: {

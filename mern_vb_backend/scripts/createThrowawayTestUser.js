@@ -25,7 +25,7 @@
  *
  *   node scripts/createThrowawayTestUser.js --delete <clerkUserId> [--groupId <id>]
  *     → deletes the Clerk user (and the Group/GroupSettings/GroupMember/BankBalance/
- *       SocialFundBalance/ContributionType docs for --groupId, if given)
+ *       GroupFund/ContributionType docs for --groupId, if given)
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -111,7 +111,7 @@ async function createFlow(args) {
     const GroupMember = require('../models/GroupMember');
     const GroupSettings = require('../models/GroupSettings');
     const BankBalance = require('../models/BankBalance');
-    const SocialFundBalance = require('../models/SocialFundBalance');
+    const { ensureFund, SOCIAL_FUND_KEY, APP_SUBSCRIPTION_KEY } = require('../controllers/fundController');
     const ContributionType = require('../models/ContributionType');
     const GroupTemplate = require('../models/GroupTemplate');
 
@@ -141,10 +141,13 @@ async function createFlow(args) {
     };
     await GroupSettings.create({ groupId: group._id, groupName, ...defaults, templateKey, policies });
     await BankBalance.create({ groupId: group._id, balance: 0 });
-    await SocialFundBalance.create({ groupId: group._id, balance: 0 });
+    // Mirror groupController.createGroup's fund seeding, so a throwaway group is a
+    // faithful stand-in for a real one during verification.
+    const socialFund = await ensureFund(group._id, SOCIAL_FUND_KEY, 'Social Fund', { isDefault: true });
+    await ensureFund(group._id, APP_SUBSCRIPTION_KEY, 'App Subscription Fund', { active: false, isDefault: true });
     await ContributionType.create([
-      { groupId: group._id, name: 'Admin Fee', affectsMainBalance: true, isDefault: true, active: true },
-      { groupId: group._id, name: 'Social Fund', affectsMainBalance: false, isDefault: true, active: true },
+      { groupId: group._id, name: 'Admin Fee', fundId: null, affectsMainBalance: true, isDefault: true, active: true },
+      { groupId: group._id, name: 'Social Fund', fundId: socialFund._id, affectsMainBalance: false, isDefault: true, active: true },
     ]);
 
     console.log(`✅ Group created: "${groupName}" (template: ${templateKey}${template ? '' : ' — fallback, not seeded'})`);

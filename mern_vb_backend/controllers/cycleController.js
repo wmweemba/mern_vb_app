@@ -5,9 +5,9 @@ const Saving = require('../models/Savings');
 const Fine = require('../models/Fine');
 const Transaction = require('../models/Transaction');
 const Contribution = require('../models/Contribution');
-const SocialFundExpense = require('../models/SocialFundExpense');
+const FundExpense = require('../models/FundExpense');
 const BankBalance = require('../models/BankBalance');
-const SocialFundBalance = require('../models/SocialFundBalance');
+const GroupFund = require('../models/GroupFund');
 const GroupMember = require('../models/GroupMember');
 const GroupSettings = require('../models/GroupSettings');
 const Cycle = require('../models/Cycle');
@@ -160,7 +160,7 @@ async function generateBackupReports(groupId) {
 // `archived: { $ne: true }` (audit finding #3) — without it, a second reset
 // re-stamps every already-archived record from cycle 1 with cycle 2's
 // cycleNumber/cycleEndDate, silently rewriting history each time a new cycle
-// begins. Contribution and SocialFundExpense (audit finding #4) previously
+// begins. Contribution and FundExpense (audit finding #4) previously
 // weren't touched at all here, so their records never left the "current cycle"
 // query scope after a reset.
 async function archiveCurrentCycleData(cycleEndDate, cycleNumber, groupId, session) {
@@ -172,7 +172,7 @@ async function archiveCurrentCycleData(cycleEndDate, cycleNumber, groupId, sessi
     await Fine.updateMany(filter, update, { session });
     await Transaction.updateMany(filter, update, { session });
     await Contribution.updateMany(filter, update, { session });
-    await SocialFundExpense.updateMany(filter, update, { session });
+    await FundExpense.updateMany(filter, update, { session });
   } catch (error) {
     throw new Error(`Failed to archive cycle data: ${error.message}`);
   }
@@ -186,16 +186,16 @@ async function resetForNewCycle(groupId, session) {
     await Saving.deleteMany(filter, { session });
     await Fine.deleteMany(filter, { session });
     await Contribution.deleteMany(filter, { session });
-    await SocialFundExpense.deleteMany(filter, { session });
+    await FundExpense.deleteMany(filter, { session });
     await BankBalance.findOneAndUpdate(
       { groupId },
       { balance: 0 },
       { upsert: true, session }
     );
-    await SocialFundBalance.findOneAndUpdate(
+    await GroupFund.updateMany(
       { groupId },
       { balance: 0 },
-      { upsert: true, session }
+      { session }
     );
   } catch (error) {
     throw new Error(`Failed to reset data for new cycle: ${error.message}`);

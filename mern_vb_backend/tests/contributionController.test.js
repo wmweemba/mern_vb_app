@@ -6,7 +6,7 @@
  *
  * Test coverage:
  *  1. Happy path — contribution routes to main BankBalance
- *  2. Happy path — contribution routes to SocialFundBalance
+ *  2. Happy path — contribution routes to the social fund (GroupFund)
  *  3. Override toggle — recorder flips the type's default routing
  *  4. Rollback — invalid type causes no partial writes
  *  5. Expense reduces social fund balance
@@ -14,7 +14,7 @@
  *  7. Member cannot record a contribution (403)
  *  8. Member cannot create a contribution type (403)
  *  9. Cross-group isolation — group A data never leaks to group B
- * 10. New group seeds two default ContributionTypes + zeroed SocialFundBalance
+ * 10. New group seeds two default ContributionTypes + zeroed social fund
  */
 
 // --- Clerk mock (must be first) ---
@@ -119,10 +119,13 @@ afterEach(async () => {
 
 const GroupMember       = () => require('../models/GroupMember');
 const BankBalance       = () => require('../models/BankBalance');
-const SocialFundBalance = () => require('../models/SocialFundBalance');
+const GroupFund = () => require('../models/GroupFund');
+// The social fund is now the GroupFund with key `social_fund`. Balances live
+// there; SocialFundBalance is deprecated and no longer written by app code.
+const socialFundDoc = (groupId) => GroupFund().findOne({ groupId, key: 'social_fund' });
 const Contribution      = () => require('../models/Contribution');
 const Transaction       = () => require('../models/Transaction');
-const SocialFundExpense = () => require('../models/SocialFundExpense');
+const FundExpense = () => require('../models/FundExpense');
 const ContributionType  = () => require('../models/ContributionType');
 
 async function seedGroupA() {
@@ -131,7 +134,7 @@ async function seedGroupA() {
   // Contributing member
   await GroupMember().create({ groupId: GROUP_A, role: 'member', name: 'Alice Banda', active: true });
   await BankBalance().create({ groupId: GROUP_A, balance: 0 });
-  await SocialFundBalance().create({ groupId: GROUP_A, balance: 0 });
+  await GroupFund().create({ groupId: GROUP_A, key: 'social_fund', name: 'Social Fund', balance: 0 });
 }
 
 async function seedContributionType(groupId, affectsMainBalance = true) {
@@ -169,11 +172,11 @@ describe('Contribution recording', () => {
     const bb = await BankBalance().findOne({ groupId: GROUP_A });
     expect(bb.balance).toBe(500);
 
-    const sf = await SocialFundBalance().findOne({ groupId: GROUP_A });
+    const sf = await socialFundDoc(GROUP_A);
     expect(sf.balance).toBe(0); // social fund unchanged
   });
 
-  test('2. happy path — routes to SocialFundBalance when affectsMainBalance=false', async () => {
+  test('2. happy path — routes to the social fund when affectsMainBalance=false', async () => {
     await seedGroupA();
     const type = await seedContributionType(GROUP_A, false);
 
@@ -186,9 +189,9 @@ describe('Contribution recording', () => {
     expect(res.body.affectsMainBalance).toBe(false);
 
     const tx = await Transaction().findOne({ referenceId: res.body._id });
-    expect(tx.type).toBe('social_fund_credit');
+    expect(tx.type).toBe('fund_credit');
 
-    const sf = await SocialFundBalance().findOne({ groupId: GROUP_A });
+    const sf = await socialFundDoc(GROUP_A);
     expect(sf.balance).toBe(200);
 
     const bb = await BankBalance().findOne({ groupId: GROUP_A });
@@ -209,9 +212,9 @@ describe('Contribution recording', () => {
     expect(res.body.overrodeDefault).toBe(true);
 
     const tx = await Transaction().findOne({ referenceId: res.body._id });
-    expect(tx.type).toBe('social_fund_credit');
+    expect(tx.type).toBe('fund_credit');
 
-    const sf = await SocialFundBalance().findOne({ groupId: GROUP_A });
+    const sf = await socialFundDoc(GROUP_A);
     expect(sf.balance).toBe(300);
 
     const bb = await BankBalance().findOne({ groupId: GROUP_A });
@@ -243,7 +246,7 @@ describe('Contribution recording', () => {
 describe('Social fund expense', () => {
   test('5. happy path — expense reduces social fund balance, main balance untouched', async () => {
     await seedGroupA();
-    await SocialFundBalance().findOneAndUpdate({ groupId: GROUP_A }, { balance: 1000 });
+    await GroupFund().findOneAndUpdate({ groupId: GROUP_A, key: 'social_fund' }, { balance: 1000 });
 
     const res = await request(app)
       .post('/api/social-fund/expenses')
@@ -255,10 +258,10 @@ describe('Social fund expense', () => {
     expect(res.body.category).toBe('birthday');
 
     const tx = await Transaction().findOne({ referenceId: res.body._id });
-    expect(tx.type).toBe('social_fund_debit');
+    expect(tx.type).toBe('fund_debit');
     expect(tx.amount).toBe(300);
 
-    const sf = await SocialFundBalance().findOne({ groupId: GROUP_A });
+    const sf = await socialFundDoc(GROUP_A);
     expect(sf.balance).toBe(700);
 
     const bb = await BankBalance().findOne({ groupId: GROUP_A });
@@ -267,7 +270,7 @@ describe('Social fund expense', () => {
 
   test('6. overspend guard — 400 when expense exceeds available social fund', async () => {
     await seedGroupA();
-    await SocialFundBalance().findOneAndUpdate({ groupId: GROUP_A }, { balance: 200 });
+    await GroupFund().findOneAndUpdate({ groupId: GROUP_A, key: 'social_fund' }, { balance: 200 });
 
     const res = await request(app)
       .post('/api/social-fund/expenses')
@@ -277,10 +280,10 @@ describe('Social fund expense', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toMatch(/insufficient/i);
 
-    const count = await SocialFundExpense().countDocuments({ groupId: GROUP_A });
+    const count = await FundExpense().countDocuments({ groupId: GROUP_A });
     expect(count).toBe(0);
 
-    const sf = await SocialFundBalance().findOne({ groupId: GROUP_A });
+    const sf = await socialFundDoc(GROUP_A);
     expect(sf.balance).toBe(200); // unchanged
   });
 });
@@ -315,7 +318,7 @@ describe('Group scoping', () => {
     await GroupMember().create({ _id: ADMIN_B, clerkUserId: 'user_admin2', groupId: GROUP_B, role: 'admin', name: 'Admin B', active: true });
     await GroupMember().create({ groupId: GROUP_B, role: 'member', name: 'Bob Phiri', active: true });
     await BankBalance().create({ groupId: GROUP_B, balance: 0 });
-    await SocialFundBalance().create({ groupId: GROUP_B, balance: 0 });
+    await GroupFund().create({ groupId: GROUP_B, key: 'social_fund', name: 'Social Fund', balance: 0 });
     const typeB = await seedContributionType(GROUP_B, true);
 
     // Record a contribution in group B
@@ -341,7 +344,7 @@ describe('Group scoping', () => {
 });
 
 describe('Group seeding', () => {
-  test('10. new group createGroup seeds 2 default ContributionTypes + zeroed SocialFundBalance', async () => {
+  test('10. new group createGroup seeds 2 default ContributionTypes + zeroed social fund', async () => {
     const { getAuth } = require('@clerk/express');
 
     // Build a minimal Express app that uses the real groupController
@@ -380,7 +383,7 @@ describe('Group seeding', () => {
     expect(socialFund.affectsMainBalance).toBe(false);
     expect(socialFund.isDefault).toBe(true);
 
-    const sf = await SocialFundBalance().findOne({ groupId: gid });
+    const sf = await socialFundDoc(gid);
     expect(sf).not.toBeNull();
     expect(sf.balance).toBe(0);
   });

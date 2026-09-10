@@ -7,7 +7,9 @@ const contributionSchema = new Schema({
   contributionTypeId: { type: Schema.Types.ObjectId, ref: 'ContributionType', required: true },
   typeName:           { type: String, required: true },   // denormalized snapshot — preserves history if type is renamed/deactivated
   amount:             { type: Number, required: true, min: 0.01 },
-  affectsMainBalance: { type: Boolean, required: true },  // resolved effective value at record time
+  fundId:             { type: Schema.Types.ObjectId, ref: 'GroupFund', default: null },  // resolved destination at record time; null = main pool
+  fundName:           { type: String, default: null },   // denormalized snapshot — same defensive pattern as typeName
+  affectsMainBalance: { type: Boolean, required: true },  // resolved effective value at record time (deprecated, derived as !fundId)
   overrodeDefault:    { type: Boolean, default: false },  // true when recorder flipped the type's default routing
   // Denormalized snapshot of ContributionType.countsTowardInterestObligation at record
   // time — same defensive pattern as typeName/affectsMainBalance, so a later toggle on

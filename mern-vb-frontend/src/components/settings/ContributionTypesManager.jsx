@@ -2,18 +2,25 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../lib/utils';
 import { Plus, ToggleLeft, ToggleRight, Pencil, Check, X } from 'lucide-react';
+import Select from '../ui/Select';
 
 const inputCls = 'h-10 w-full border border-border-default rounded-md px-3 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
 const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
 
-function RoutingBadge({ affectsMainBalance }) {
-  return affectsMainBalance ? (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-brand-light text-brand-primary">
-      Main Account
-    </span>
-  ) : (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-blue-50 text-blue-700">
-      Social Fund
+// The destination is now a named fund, so the badge shows that fund's own name.
+// A type with no fundId goes to the main lending pool.
+function RoutingBadge({ type, funds }) {
+  const fund = type.fundId ? funds.find(f => f._id === (type.fundId._id || type.fundId)) : null;
+  if (!fund) {
+    return (
+      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-brand-light text-brand-primary flex-shrink-0">
+        Main Account
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-blue-50 text-blue-700 flex-shrink-0">
+      {fund.name}
     </span>
   );
 }
@@ -22,7 +29,8 @@ export default function ContributionTypesManager() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' });
+  const [funds, setFunds] = useState([]);
+  const [addForm, setAddForm] = useState({ name: '', fundId: '', countsTowardInterestObligation: false, targetAmountPerMember: '' });
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -39,7 +47,13 @@ export default function ContributionTypesManager() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchTypes(); }, []);
+  const fetchFunds = () => {
+    axios.get(`${API_BASE_URL}/funds`)
+      .then(res => setFunds(res.data))
+      .catch(() => setFunds([]));
+  };
+
+  useEffect(() => { fetchTypes(); fetchFunds(); }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -47,9 +61,10 @@ export default function ContributionTypesManager() {
     setAddLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/contribution-types`, addForm);
-      setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' });
+      setAddForm({ name: '', fundId: '', countsTowardInterestObligation: false, targetAmountPerMember: '' });
       setShowAdd(false);
       fetchTypes();
+      fetchFunds();
     } catch (err) {
       setAddError(err.response?.data?.error || 'Failed to add type');
     } finally {
@@ -149,7 +164,7 @@ export default function ContributionTypesManager() {
                 )}
               </div>
 
-              <RoutingBadge affectsMainBalance={type.affectsMainBalance} />
+              <RoutingBadge type={type} funds={funds} />
               {type.countsTowardInterestObligation && (
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide bg-status-paid-bg text-status-paid-text flex-shrink-0">
                   Counts to Quota
@@ -235,38 +250,18 @@ export default function ContributionTypesManager() {
           {/* Routing toggle */}
           <div>
             <label className={labelCls}>Where does this go?</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setAddForm({ ...addForm, affectsMainBalance: true })}
-                className={`flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                  addForm.affectsMainBalance
-                    ? 'bg-brand-light border-brand-primary/40 text-brand-primary'
-                    : 'bg-surface-card border-border-default text-text-secondary'
-                }`}
-              >
-                <div className={`w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 ${addForm.affectsMainBalance ? 'bg-brand-primary' : 'bg-border-default'}`} />
-                <div>
-                  <p className="text-xs font-semibold leading-tight">Main account</p>
-                  <p className="text-xs leading-tight opacity-70">Available to lend</p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAddForm({ ...addForm, affectsMainBalance: false })}
-                className={`flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                  !addForm.affectsMainBalance
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                    : 'bg-surface-card border-border-default text-text-secondary'
-                }`}
-              >
-                <div className={`w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 ${!addForm.affectsMainBalance ? 'bg-blue-600' : 'bg-border-default'}`} />
-                <div>
-                  <p className="text-xs font-semibold leading-tight">Social fund</p>
-                  <p className="text-xs leading-tight opacity-70">Tracked separately</p>
-                </div>
-              </button>
-            </div>
+            {/* A group can hold several named pots, so this is a fund selector rather
+                than the old main/social two-way toggle. Empty value = the main
+                lending pool. Select per UI_SPEC.md §6.8 — never a raw <select>. */}
+            <Select
+              value={addForm.fundId}
+              onChange={e => setAddForm({ ...addForm, fundId: e.target.value })}
+            >
+              <option value="">Main account — available to lend</option>
+              {funds.map(f => (
+                <option key={f._id} value={f._id}>{f.name} — tracked separately</option>
+              ))}
+            </Select>
           </div>
 
           {/* Interest obligation toggle */}
@@ -298,7 +293,7 @@ export default function ContributionTypesManager() {
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', affectsMainBalance: true, countsTowardInterestObligation: false, targetAmountPerMember: '' }); }}
+              onClick={() => { setShowAdd(false); setAddError(''); setAddForm({ name: '', fundId: '', countsTowardInterestObligation: false, targetAmountPerMember: '' }); }}
               className="flex-1 border border-border-default text-text-primary rounded-md py-2 text-sm hover:bg-surface-card transition-colors"
             >
               Cancel

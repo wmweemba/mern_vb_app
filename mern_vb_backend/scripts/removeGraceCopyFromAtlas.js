@@ -28,7 +28,7 @@ const Threshold = require('../models/Threshold');
 const InviteToken = require('../models/InviteToken');
 const PendingInvite = require('../models/PendingInvite');
 const SocialFundBalance = require('../models/SocialFundBalance');
-const SocialFundExpense = require('../models/SocialFundExpense');
+const FundExpense = require('../models/FundExpense');
 const ContributionType = require('../models/ContributionType');
 const Contribution = require('../models/Contribution');
 const SupportRequest = require('../models/SupportRequest');
@@ -49,7 +49,7 @@ const COLLECTIONS = [
   { label: 'InviteTokens', model: InviteToken },
   { label: 'PendingInvites', model: PendingInvite },
   { label: 'SocialFundBalance', model: SocialFundBalance },
-  { label: 'SocialFundExpenses', model: SocialFundExpense },
+  { label: 'FundExpenses', model: FundExpense },
   { label: 'ContributionTypes', model: ContributionType },
   { label: 'Contributions', model: Contribution },
   { label: 'SupportRequests', model: SupportRequest },

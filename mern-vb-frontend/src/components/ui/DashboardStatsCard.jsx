@@ -26,19 +26,24 @@ const DashboardStatsCard = ({ stats }) => (
         <p className="text-xs text-text-on-dark-muted mt-1 opacity-70">Lending pool</p>
       </div>
 
-      {/* Social fund */}
-      <div className="bg-surface-card rounded-xl p-4 md:p-5 border border-blue-100 col-span-2 sm:col-span-1">
-        <div className="flex items-center gap-1.5 mb-1">
-          <Wallet size={13} className="text-blue-600 flex-shrink-0" />
-          <p className="text-xs font-medium uppercase tracking-widest text-blue-600">
-            Social Fund
+      {/* One card per active named fund. Replaces a hardcoded "Social Fund" card —
+          a group can now hold several pots (welfare, app subscription, and whatever
+          a treasurer adds), and the fund's own name is the label, so no separate
+          vocabulary mapping is needed. */}
+      {(stats.funds || []).map(fund => (
+        <div key={fund._id} className="bg-surface-card rounded-xl p-4 md:p-5 border border-blue-100 col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Wallet size={13} className="text-blue-600 flex-shrink-0" />
+            <p className="text-xs font-medium uppercase tracking-widest text-blue-600">
+              {fund.name}
+            </p>
+          </div>
+          <p className="text-3xl md:text-4xl font-bold text-text-primary leading-tight">
+            {fmt(fund.balance)}
           </p>
+          <p className="text-xs text-text-secondary mt-1 opacity-70">Tracked separately</p>
         </div>
-        <p className="text-3xl md:text-4xl font-bold text-text-primary leading-tight">
-          {fmt(stats.socialFundBalance)}
-        </p>
-        <p className="text-xs text-text-secondary mt-1 opacity-70">Tracked separately</p>
-      </div>
+      ))}
     </div>
 
     {/* Secondary stat cards — 2 cols mobile, 3 cols desktop */}

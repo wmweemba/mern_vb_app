@@ -53,6 +53,12 @@ function balanceEffect(type, amount) {
     case 'cycle_reset':
     case 'social_fund_credit':
     case 'social_fund_debit':
+    // Generic named-fund movements. Excluded from the main lending pool for the
+    // same reason as the legacy social-fund pair — the money never enters it.
+    // Must stay explicit: the old `default: balanceEffect = amount` catch-all
+    // would silently count these and manufacture a discrepancy.
+    case 'fund_credit':
+    case 'fund_debit':
       return 0;
     default:
       return amount;
