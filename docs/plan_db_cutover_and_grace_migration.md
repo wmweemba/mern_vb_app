@@ -409,6 +409,8 @@ Aug   -69 + (24,011 - 23,900) = +42
 the pot — his workbook has no cumulative row anywhere, which is exactly how that happens.
 No K69 opening adjustment; nothing to invent.
 
+> **Post-import resolution, 2026-09-11.** Simon confirmed all figures after the import except this one, and explained the K69: **he covered the June (−33) and July (−36) shortfalls from his own money**, which the workbook never recorded. Recorded on production as two backdated contributions against Simon Peter under a new main-pool type "Treasurer Top-Up" (K33 @ 30 Jun, K36 @ 31 Jul) via `scripts/recordBackdatedContribution.js`. **Bank balance is now K111**, both audits clean. The instinct above — import faithfully, don't invent K69 — was right: the explanation came from the treasurer, and the entries carry his name and the reason.
+
 Worth recording, because it will look odd later: **the -33 and -36 are not physically
 possible** from a zero opening — they mean the group disbursed more cash in June and July
 than it took in that month. Almost certainly recording artifacts (a loan rounded up on

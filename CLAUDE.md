@@ -590,6 +590,7 @@ If anything is not clean, state what failed and fix it first.
 | Fund balances + expenses | `mern_vb_backend/controllers/fundController.js` (socialFundController is a deprecated shim) |
 | Contribution type config | `mern_vb_backend/controllers/contributionTypeController.js` |
 | Backfill existing groups | `mern_vb_backend/scripts/seedContributionDefaults.js` |
+| Backdated entry the treasurer's book had but the app didn't | `mern_vb_backend/scripts/recordBackdatedContribution.js` (dry-run default) |
 
 ---
 
