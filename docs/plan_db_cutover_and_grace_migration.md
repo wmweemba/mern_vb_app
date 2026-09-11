@@ -300,7 +300,7 @@ fund-manager UI can follow after the import if the session runs out.
 
 **One defect the test suite caught during the work:** a legacy `ContributionType` with `affectsMainBalance: false` and no `fundId` would have routed to the **main lending pool**. On un-backfilled production data that is silent money misrouting. Destination resolution now falls back to the social fund for any type still carrying the deprecated boolean.
 
-**Deferred, not blocking the import:** `Contributions.jsx` and `OperationsPage.jsx` still speak of "the social fund" and show a single pot. They keep working — the deprecated `/social-fund` routes delegate to `fundController` — but they should become fund-aware (a tab or filter per fund) before a group runs more than two pots in anger.
+~~**Deferred, not blocking the import:** `Contributions.jsx` and `OperationsPage.jsx` still speak of "the social fund" and show a single pot.~~ **Closed 2026-09-11 (v3.18.2).** The real gap turned out to be one level down: `AddContributionForm.jsx` still offered a main/social two-way toggle and posted the deprecated `affectsMainBalance`, so the App Subscription pot was unreachable from the Record Contribution drawer and a mis-flip would have put subscription money in the lending pool. Replaced with a fund `Select` posting `fundId`. Badges now name the actual pot, the Operations card and both drawers say "Record Fund Expense", the single Funds tab (kept deliberately — it scales to any number of pots) shows per-pot balance and spent. Verified live with a two-pot throwaway group; both audits clean.
 
 **Touchpoints — verified by grep 2026-09-09, confirm before editing.** `SocialFund*`
 appears in 13 files:

@@ -94,14 +94,14 @@ export default function OperationsPage() {
         {
           icon: Coins,
           title: 'Record Contribution',
-          description: 'Record a member\'s contribution — admin fee, social fund, or custom type',
+          description: 'Record a member\'s contribution to the main pool or any named fund',
           roles: ['admin', 'treasurer', 'loan_officer'],
           action: () => setShowContribution(true),
         },
         {
           icon: Wallet,
-          title: 'Record Social Fund Expense',
-          description: 'Disburse funds from the social fund for group welfare expenses',
+          title: 'Record Fund Expense',
+          description: 'Pay out of a named fund — welfare, the app subscription, or any pot the group keeps',
           roles: ['admin', 'treasurer'],
           action: () => setShowExpense(true),
         },
@@ -218,7 +218,7 @@ export default function OperationsPage() {
       <SlideoverDrawer
         open={showExpense}
         onClose={() => setShowExpense(false)}
-        title="Record Social Fund Expense"
+        title="Record Fund Expense"
         footer={
           <button type="submit" form="record-expense-form" className="w-full bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md py-3 text-sm transition-colors">
             Record Expense

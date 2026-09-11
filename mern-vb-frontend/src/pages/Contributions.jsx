@@ -13,14 +13,17 @@ import { FaCoins } from 'react-icons/fa';
 const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md w-full py-3 text-sm transition-colors';
 const fmt = (v) => `K${Number(v || 0).toLocaleString()}`;
 
-function RoutingBadge({ affectsMainBalance, overrodeDefault }) {
+// Names the actual pot the money landed in. fundName is the snapshot taken at
+// record time; rows from before named funds existed carry none, and the only
+// pot that existed then was the social fund.
+function RoutingBadge({ affectsMainBalance, fundName, overrodeDefault }) {
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0 ${
       affectsMainBalance
         ? 'bg-brand-light text-brand-primary'
         : 'bg-blue-50 text-blue-700'
     }`}>
-      {affectsMainBalance ? 'Main' : 'Social Fund'}
+      {affectsMainBalance ? 'Main' : (fundName || 'Social Fund')}
       {overrodeDefault && ' *'}
     </span>
   );
@@ -32,6 +35,7 @@ function CategoryBadge({ category }) {
     bereavement: 'Bereavement',
     stationery: 'Stationery',
     refreshments: 'Refreshments',
+    app_subscription: 'App Subscription',
     other: 'Other',
   };
   return (
@@ -167,7 +171,9 @@ export default function Contributions() {
               </p>
             </div>
             <p className="text-xl font-bold text-text-primary">{fmt(fundsTotal)}</p>
-            <p className="text-xs text-text-secondary mt-0.5">{fmt(totalExpenses)} spent</p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              {funds.length > 1 ? `${funds.length} pots · ` : ''}{fmt(totalExpenses)} spent
+            </p>
           </div>
         </div>
       )}
@@ -247,7 +253,7 @@ export default function Contributions() {
                             <div className="flex items-center gap-2 justify-between">
                               <span className="text-sm font-medium text-text-primary">{c.typeName}</span>
                               <div className="flex items-center gap-2">
-                                <RoutingBadge affectsMainBalance={c.affectsMainBalance} overrodeDefault={c.overrodeDefault} />
+                                <RoutingBadge affectsMainBalance={c.affectsMainBalance} fundName={c.fundName} overrodeDefault={c.overrodeDefault} />
                                 <span className="font-bold text-amount-positive text-sm">{fmt(c.amount)}</span>
                               </div>
                             </div>
@@ -289,6 +295,7 @@ export default function Contributions() {
                 {fund.name}
               </p>
               <p className="text-3xl font-bold text-white">{fmt(fund.balance)}</p>
+              <p className="text-xs text-text-on-dark-muted mt-1">{fmt(fundSpent)} spent</p>
             </div>
             {canRecordExpense && (
               <button
@@ -379,7 +386,7 @@ export default function Contributions() {
       <SlideoverDrawer
         open={showAddExpense}
         onClose={() => setShowAddExpense(false)}
-        title="Record Social Fund Expense"
+        title="Record Fund Expense"
         footer={
           <button type="submit" form="record-expense-form-page" className={btnPrimary}>
             Record Expense

@@ -97,7 +97,7 @@ export default function Settings() {
           {canManageTypes && (
             <SectionCard title="Contribution Types">
               <p className="text-sm text-text-secondary mb-4">
-                Configure which contribution types are available and where they are routed — to the main lending account or the social fund pot.
+                Configure which contribution types are available and where they are routed — to the main lending account or one of the group's named funds (social fund, app subscription, or any pot you add).
               </p>
               <ContributionTypesManager />
             </SectionCard>

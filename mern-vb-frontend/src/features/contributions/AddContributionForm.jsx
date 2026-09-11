@@ -7,43 +7,6 @@ import Select from '../../components/ui/Select';
 const inputCls = 'h-12 w-full border border-border-default rounded-md px-3.5 text-sm text-text-primary bg-surface-card focus:border-brand-primary focus:outline-none transition-colors placeholder:text-text-muted';
 const labelCls = 'block text-xs font-medium uppercase tracking-widest text-text-secondary mb-1';
 
-function RoutingToggle({ value, onChange }) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(true)}
-        className={`flex items-start gap-2.5 px-3 py-3 rounded-md border text-left transition-colors ${
-          value
-            ? 'bg-brand-light border-brand-primary/40 text-brand-primary'
-            : 'bg-surface-card border-border-default text-text-secondary'
-        }`}
-      >
-        <div className={`w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 ${value ? 'bg-brand-primary' : 'bg-border-default'}`} />
-        <div>
-          <p className="text-xs font-semibold leading-tight">Goes to main account</p>
-          <p className="text-xs leading-tight opacity-70 mt-0.5">Available to lend</p>
-        </div>
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange(false)}
-        className={`flex items-start gap-2.5 px-3 py-3 rounded-md border text-left transition-colors ${
-          !value
-            ? 'bg-blue-50 border-blue-300 text-blue-700'
-            : 'bg-surface-card border-border-default text-text-secondary'
-        }`}
-      >
-        <div className={`w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 ${!value ? 'bg-blue-600' : 'bg-border-default'}`} />
-        <div>
-          <p className="text-xs font-semibold leading-tight">Goes to social fund</p>
-          <p className="text-xs leading-tight opacity-70 mt-0.5">Tracked separately</p>
-        </div>
-      </button>
-    </div>
-  );
-}
-
 const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) => {
   const [form, setForm] = useState({
     username: '',
@@ -51,9 +14,10 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
     amount: '',
     date: '',
     note: '',
-    affectsMainBalance: true,
+    fundId: '',   // '' = main lending pool; otherwise a GroupFund id
   });
   const [types, setTypes] = useState([]);
+  const [funds, setFunds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,7 +25,23 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
     axios.get(`${API_BASE_URL}/contribution-types?active=true`)
       .then(res => setTypes(res.data))
       .catch(() => {});
+    axios.get(`${API_BASE_URL}/funds?active=true`)
+      .then(res => setFunds(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
   }, []);
+
+  // A type's default destination. Legacy types that predate named funds carry
+  // only affectsMainBalance=false with no fundId — the backend routes those to
+  // the social fund, so mirror that here rather than showing "Main".
+  const defaultFundIdFor = (type) => {
+    if (!type) return '';
+    if (type.fundId) return String(type.fundId);
+    if (type.affectsMainBalance === false) {
+      const social = funds.find(f => f.key === 'social_fund');
+      return social ? String(social._id) : '';
+    }
+    return '';
+  };
 
   const handleTypeChange = (e) => {
     const id = e.target.value;
@@ -69,7 +49,7 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
     setForm(f => ({
       ...f,
       contributionTypeId: id,
-      affectsMainBalance: selected ? selected.affectsMainBalance : f.affectsMainBalance,
+      fundId: defaultFundIdFor(selected),
     }));
   };
 
@@ -80,8 +60,11 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
     setLoading(true);
     setError('');
     try {
-      await axios.post(`${API_BASE_URL}/contributions`, form);
-      setForm({ username: '', contributionTypeId: '', amount: '', date: '', note: '', affectsMainBalance: true });
+      // fundId null = main pool. Sending fundId explicitly (rather than the
+      // deprecated affectsMainBalance flag) is what lets a contribution land in
+      // any named pot, not just "main or social".
+      await axios.post(`${API_BASE_URL}/contributions`, { ...form, fundId: form.fundId || null });
+      setForm({ username: '', contributionTypeId: '', amount: '', date: '', note: '', fundId: '' });
       window.dispatchEvent(new Event('contributionsChanged'));
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -155,17 +138,24 @@ const AddContributionForm = ({ onSuccess, formId = 'add-contribution-form' }) =>
         />
       </div>
 
-      {/* Routing toggle — shown below type so it's clearly linked */}
+      {/* Destination — shown below type so it's clearly linked. Defaults to the
+          type's own fund; changing it is an explicit per-contribution override. */}
       {form.contributionTypeId && (
         <div>
           <label className={labelCls}>Where does this go?</label>
-          <RoutingToggle
-            value={form.affectsMainBalance}
-            onChange={val => setForm({ ...form, affectsMainBalance: val })}
-          />
-          {form.affectsMainBalance !== (types.find(t => t._id === form.contributionTypeId)?.affectsMainBalance ?? true) && (
+          <Select
+            name="fundId"
+            value={form.fundId}
+            onChange={handleChange}
+          >
+            <option value="">Main lending pool</option>
+            {funds.map(f => (
+              <option key={f._id} value={f._id}>{f.name}</option>
+            ))}
+          </Select>
+          {form.fundId !== defaultFundIdFor(types.find(t => t._id === form.contributionTypeId)) && (
             <p className="text-xs text-status-pending-text mt-1.5">
-              ⚠ This overrides the type's default routing
+              ⚠ This overrides the type's default destination
             </p>
           )}
         </div>
