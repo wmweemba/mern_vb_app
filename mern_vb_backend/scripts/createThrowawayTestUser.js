@@ -24,8 +24,17 @@
  *       account signs straight into an authenticated page instead of onboarding
  *
  *   node scripts/createThrowawayTestUser.js --delete <clerkUserId> [--groupId <id>]
- *     → deletes the Clerk user (and the Group/GroupSettings/GroupMember/BankBalance/
- *       GroupFund/ContributionType docs for --groupId, if given)
+ *     → deletes the Clerk user (and every group-scoped document for --groupId,
+ *       if given — see scripts/utils/groupScopedModels.js)
+ *
+ *   node scripts/createThrowawayTestUser.js --set-password <clerkUserId> [--password <value>] [--username <value>]
+ *     → updates an existing Clerk user's password (generates one if --password is
+ *       omitted) and, if --username is given, sets/changes their username too.
+ *       For permanent demo accounts (docs/plan_demo_environment.md) rather than
+ *       throwaway ones: create the user with --group as usual, then call this to
+ *       give it the fixed, memorable password (and a username, since the demo
+ *       Clerk instance signs in by username, not email) instead of the random
+ *       one createUser prints.
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -82,6 +91,23 @@ async function deleteFlow(args) {
   }
 }
 
+async function setPasswordFlow(args) {
+  await assertTestKey();
+
+  const userId = args['set-password'];
+  const password = typeof args.password === 'string' ? args.password : 'Demo' + Math.random().toString(36).slice(2, 10) + '!1';
+
+  const params = { password, skipPasswordChecks: true, signOutOfOtherSessions: true };
+  if (typeof args.username === 'string') params.username = args.username;
+
+  const user = await clerkClient.users.updateUser(userId, params);
+
+  console.log(`✅ Updated Clerk user ${userId}:`);
+  console.log(`   password: ${password}`);
+  if (params.username) console.log(`   username: ${user.username}`);
+  console.log('   Any existing sessions for this user were signed out.');
+}
+
 async function createFlow(args) {
   await assertTestKey();
 
@@ -91,15 +117,19 @@ async function createFlow(args) {
   const email = `chama360.throwaway+${suffix}+clerk_test@example.com`;
   const password = 'Temp' + Math.random().toString(36).slice(2, 10) + '!1';
 
-  const user = await clerkClient.users.createUser({
+  const createParams = {
     emailAddress: [email],
     password,
     firstName: 'Throwaway',
     lastName: 'Tester',
-  });
+  };
+  if (typeof args.username === 'string') createParams.username = args.username;
+
+  const user = await clerkClient.users.createUser(createParams);
 
   console.log('✅ Clerk user created (pre-verified, no email sent):');
   console.log(`   email:    ${email}`);
+  if (createParams.username) console.log(`   username: ${createParams.username}`);
   console.log(`   password: ${password}`);
   console.log(`   userId:   ${user.id}`);
   console.log('   Sign in at /sign-in with the above. A "new device" OTP challenge');
@@ -169,6 +199,8 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.delete) {
     await deleteFlow(args);
+  } else if (args['set-password']) {
+    await setPasswordFlow(args);
   } else {
     await createFlow(args);
   }
