@@ -167,8 +167,25 @@ exports.getDashboardStats = async (req, res) => {
     let totalLoaned = 0;
     let totalInterestLoans = 0;
     loans.forEach(loan => {
-      totalLoaned += loan.amount;
-      if (Array.isArray(loan.installments)) {
+      // Revolving loans are topped up on their single Loan document rather than
+      // getting a new one each time (loanController.createLoan) — loan.amount is
+      // only ever the member's first disbursement and never reflects later top-ups.
+      // principalBalance + interestOutstanding is the loan's real current total.
+      totalLoaned += loan.accrualMode === 'revolving'
+        ? (loan.principalBalance || 0) + (loan.interestOutstanding || 0)
+        : loan.amount;
+      // installments[].interest is charged across the whole schedule regardless of
+      // paid status, so this is total interest charged, not total interest collected.
+      // Revolving loans have no installments — the equivalent is each period's
+      // 'accrual' entry (utils/strategies/loanAccrual/revolvingMonthly.js), which is
+      // likewise charged whether or not it's later paid.
+      if (loan.accrualMode === 'revolving') {
+        if (Array.isArray(loan.entries)) {
+          totalInterestLoans += loan.entries
+            .filter(e => e.type === 'accrual')
+            .reduce((sum, e) => sum + (e.amount || 0), 0);
+        }
+      } else if (Array.isArray(loan.installments)) {
         totalInterestLoans += loan.installments.reduce((sum, inst) => sum + (inst.interest || 0), 0);
       }
     });
