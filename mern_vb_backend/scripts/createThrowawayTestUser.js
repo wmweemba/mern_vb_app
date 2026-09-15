@@ -53,18 +53,29 @@ function parseArgs(argv) {
   return args;
 }
 
-async function assertTestKey() {
+async function assertTestKey(args = {}) {
   const key = process.env.CLERK_SECRET_KEY || '';
-  if (!key.startsWith('sk_test_')) {
-    throw new Error(
-      `Refusing to run: CLERK_SECRET_KEY does not look like a test key (starts with "${key.slice(0, 8)}..."). ` +
-      'This script creates/deletes real Clerk users — only run it against a sk_test_ instance.'
-    );
+  if (key.startsWith('sk_test_')) return;
+  // The demo Clerk instance (docs/plan_demo_environment.md) is a *Production*
+  // Clerk app by design — sk_live_, no dev banner in front of prospects — so it
+  // legitimately fails the sk_test_ check above. --allow-live is a deliberate,
+  // visible opt-in for that one case; it does not relax the check for chama360's
+  // real customer-facing production Clerk instance, which nothing here ever
+  // has a reason to point at.
+  if (args['allow-live']) {
+    console.warn(`⚠️  Running against a non-test Clerk key ("${key.slice(0, 8)}...") — --allow-live was passed.`);
+    console.warn('   Confirm this is the DEMO Clerk instance, never the real customer-facing one.');
+    return;
   }
+  throw new Error(
+    `Refusing to run: CLERK_SECRET_KEY does not look like a test key (starts with "${key.slice(0, 8)}..."). ` +
+    'This script creates/deletes real Clerk users — only run it against a sk_test_ instance, ' +
+    'or pass --allow-live if this is deliberately the demo Clerk instance.'
+  );
 }
 
 async function deleteFlow(args) {
-  await assertTestKey();
+  await assertTestKey(args);
   await clerkClient.users.deleteUser(args.delete);
   console.log(`✅ Deleted Clerk user ${args.delete}`);
 
@@ -92,7 +103,7 @@ async function deleteFlow(args) {
 }
 
 async function setPasswordFlow(args) {
-  await assertTestKey();
+  await assertTestKey(args);
 
   const userId = args['set-password'];
   const password = typeof args.password === 'string' ? args.password : 'Demo' + Math.random().toString(36).slice(2, 10) + '!1';
@@ -109,33 +120,63 @@ async function setPasswordFlow(args) {
 }
 
 async function createFlow(args) {
-  await assertTestKey();
+  await assertTestKey(args);
 
   const suffix = Math.random().toString(36).slice(2, 8);
-  // +clerk_test@ unlocks the fixed 424242 OTP for the sign-in device-verification
-  // challenge (NOT the signup flow — admin-created users skip that entirely).
-  const email = `chama360.throwaway+${suffix}+clerk_test@example.com`;
-  const password = 'Temp' + Math.random().toString(36).slice(2, 10) + '!1';
+  const password = args.password || ('Temp' + Math.random().toString(36).slice(2, 10) + '!1');
 
   const createParams = {
-    emailAddress: [email],
     password,
     firstName: 'Throwaway',
     lastName: 'Tester',
   };
   if (typeof args.username === 'string') createParams.username = args.username;
 
+  // The username-only demo Clerk instance (docs/plan_demo_environment.md)
+  // rejects email_address outright as an unknown param — email is disabled as
+  // an identifier there, not just optional. The +clerk_test@ throwaway-email/
+  // fixed-OTP technique only applies to a sk_test_ instance anyway, so skip
+  // email entirely whenever --allow-live is set.
+  let email;
+  if (!args['allow-live']) {
+    // +clerk_test@ unlocks the fixed 424242 OTP for the sign-in device-verification
+    // challenge (NOT the signup flow — admin-created users skip that entirely).
+    email = `chama360.throwaway+${suffix}+clerk_test@example.com`;
+    createParams.emailAddress = [email];
+  }
+
   const user = await clerkClient.users.createUser(createParams);
 
   console.log('✅ Clerk user created (pre-verified, no email sent):');
-  console.log(`   email:    ${email}`);
+  if (email) console.log(`   email:    ${email}`);
   if (createParams.username) console.log(`   username: ${createParams.username}`);
   console.log(`   password: ${password}`);
   console.log(`   userId:   ${user.id}`);
-  console.log('   Sign in at /sign-in with the above. A "new device" OTP challenge');
-  console.log('   will fire — use the fixed test code: 424242');
+  if (email) {
+    console.log('   Sign in at /sign-in with the above. A "new device" OTP challenge');
+    console.log('   will fire — use the fixed test code: 424242');
+  } else {
+    console.log('   Sign in at /sign-in with the username + password above.');
+  }
 
-  if (args.group) {
+  if (args['existing-group']) {
+    // Attach this new Clerk user to an ALREADY-SEEDED group as an additional
+    // member, instead of creating a second group — for building out a demo
+    // group's other role accounts (loan officer, member) against the same
+    // group the treasurer/admin account already created.
+    await mongoose.connect(process.env.MONGODB_URI);
+    const GroupMember = require('../models/GroupMember');
+    const groupId = args['existing-group'];
+    const member = await GroupMember.create({
+      clerkUserId: user.id, groupId, role: args.role || 'member',
+      name: args.name || 'Throwaway Tester', isVerified: true,
+    });
+    console.log(`✅ Joined existing group ${groupId} as ${member.role}`);
+    console.log(`   memberId: ${member._id}`);
+    console.log('\nCleanup when done:');
+    console.log(`   node scripts/createThrowawayTestUser.js --delete ${user.id}`);
+    await mongoose.disconnect();
+  } else if (args.group) {
     await mongoose.connect(process.env.MONGODB_URI);
     const Group = require('../models/Group');
     const GroupMember = require('../models/GroupMember');
@@ -154,7 +195,7 @@ async function createFlow(args) {
     const group = await Group.create({ name: groupName, slug, clerkAdminId: user.id, trialExpiresAt, isPaid: false });
     const member = await GroupMember.create({
       clerkUserId: user.id, groupId: group._id, role: args.role || 'admin',
-      name: 'Throwaway Tester', isVerified: true,
+      name: args.name || 'Throwaway Tester', isVerified: true,
     });
     const defaults = template?.defaults || {
       cycleLengthMonths: 6, interestRate: 10, interestMethod: 'reducing',
