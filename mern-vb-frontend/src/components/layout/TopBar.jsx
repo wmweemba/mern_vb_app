@@ -45,7 +45,14 @@ export default function TopBar() {
 
   const avatarColor = getAvatarColor(displayName);
 
-  const handleSignOut = () => signOut(() => navigate('/sign-in'));
+  // A client-side navigate() here leaves the whole app (Clerk's own SDK state
+  // included) mounted across the account swap — signing in as a different
+  // user in the same tab can then race between the old session tearing down
+  // and the new one settling, bouncing between /sign-in and a blank page
+  // until a hard reload resets everything. window.location.href forces that
+  // same clean reset on every sign-out, not just when a user happens to
+  // reload manually.
+  const handleSignOut = () => signOut(() => { window.location.href = '/sign-in'; });
 
   return (
     <>
