@@ -95,6 +95,28 @@ mern_vb_app/                    ← monorepo root
 - **Backend:** Coolify (Node.js server, nixpacks build)
 - **Live URL:** https://chama360.nxhub.online/
 - **API URL:** https://api.chama360.nxhub.online/
+- **Auto Deploy: ON for both production resources** (William's own choice, applied
+  consistently across his other apps too — so he doesn't have to log into Coolify to
+  redeploy after every merge). **This means `git push origin main` is the production
+  deploy — there is no manual gate, no review window, no "are you sure" between push
+  and live.** The demo environment (`docs/plan_demo_environment.md`) is the one
+  deliberate exception: both its Coolify resources have Auto Deploy **off**, precisely
+  so it can be redeployed on purpose rather than tracking every commit.
+  - **Practical consequence: the "Verification Loop" below is the pre-push gate, not a
+    post-hoc formality.** Run it — and be satisfied with the result — *before* the
+    commit that will reach `main` is pushed, not just before saying "done." A push that
+    looks fine locally and turns out not to be has no safety net behind it.
+  - This applies with extra weight to anything touching `loanCalculator.js`,
+    `paymentController.js`, `bankBalanceController.js`, `loanController.js`, or
+    `GroupSettings` — see Step 2 of the Verification Loop. A financial-logic push with a
+    real defect is live for real customers the moment it lands, not after a deploy you
+    triggered deliberately.
+  - Scripts in `scripts/` also deploy to production's container on every push, even
+    though nothing invokes them automatically — a script that can create/delete real
+    data (e.g. `createThrowawayTestUser.js`) sitting there inert is fine, but any new
+    safety guard in such a script must assume it may one day be run against the real
+    production environment by mistake, not just the environment it was written for. See
+    that script's `--env` guard for the pattern.
 
 ### Development
 ```bash
@@ -506,6 +528,11 @@ This keeps Opus usage focused and your context clean.
 
 After completing any task, before reporting done, run this sequence in order.
 Do not skip steps. Do not say "done" until all steps pass.
+
+**Because Auto Deploy is ON for production (see Deployment above), this loop is the
+pre-push gate, not a courtesy.** Run it — and resolve anything it finds — before the
+commit reaches `origin main`, not after. There is no manual redeploy step standing
+between a bad push and real customers seeing it.
 
 ### Step 1 — Tests
 ```bash
