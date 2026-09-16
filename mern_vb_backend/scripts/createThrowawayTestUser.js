@@ -10,10 +10,15 @@
  * instead of exercising the onboarding wizard.
  *
  * SAFETY: only ever run this against a Clerk *test* instance (CLERK_SECRET_KEY
- * starting with sk_test_ — this script refuses to run against sk_live_). The
- * app's MongoDB is currently still the shared production Atlas database (no
- * dev/staging split yet — see CLAUDE.md), so any GroupMember/Group this script
- * creates is real data until you delete it with the matching --delete flag.
+ * starting with sk_test_) — this script refuses to run against any sk_live_
+ * key UNLESS both --allow-live and --env demo are passed explicitly, the one
+ * exception being the demo Clerk instance (docs/plan_demo_environment.md).
+ * Since every Coolify resource, including production, builds from this same
+ * repo/branch, this script is deployed on production's container too — the
+ * --env check exists so a typo'd or copy-pasted --allow-live command can't
+ * silently reach chama360's real customer-facing Clerk instance. Any
+ * GroupMember/Group this script creates is real data until you delete it
+ * with the matching --delete flag.
  *
  * Usage:
  *   node scripts/createThrowawayTestUser.js
@@ -53,24 +58,36 @@ function parseArgs(argv) {
   return args;
 }
 
+// The only non-test environment this script is ever allowed to touch. Every
+// Coolify resource (including production) builds from the same main branch —
+// see the "one repo, four environments" discussion in
+// docs/plan_demo_environment.md — so this script sits deployed on production
+// too, inert unless someone actually runs it there. --allow-live alone used
+// to be enough to bypass the sk_test_ guard for ANY sk_live_ key, which meant
+// nothing technical stopped it from being pointed at chama360's real
+// customer-facing production Clerk instance. Requiring --env to name this
+// exact value closes that gap: a typo or a copy-pasted command targeting the
+// wrong environment fails loudly instead of silently succeeding.
+const ALLOWED_LIVE_ENV = 'demo';
+
 async function assertTestKey(args = {}) {
   const key = process.env.CLERK_SECRET_KEY || '';
   if (key.startsWith('sk_test_')) return;
-  // The demo Clerk instance (docs/plan_demo_environment.md) is a *Production*
-  // Clerk app by design — sk_live_, no dev banner in front of prospects — so it
-  // legitimately fails the sk_test_ check above. --allow-live is a deliberate,
-  // visible opt-in for that one case; it does not relax the check for chama360's
-  // real customer-facing production Clerk instance, which nothing here ever
-  // has a reason to point at.
-  if (args['allow-live']) {
-    console.warn(`⚠️  Running against a non-test Clerk key ("${key.slice(0, 8)}...") — --allow-live was passed.`);
-    console.warn('   Confirm this is the DEMO Clerk instance, never the real customer-facing one.');
+  if (args['allow-live'] && args.env === ALLOWED_LIVE_ENV) {
+    console.warn(`⚠️  Running against a non-test Clerk key ("${key.slice(0, 8)}...") — --allow-live --env ${ALLOWED_LIVE_ENV} was passed.`);
+    console.warn('   Confirm this is genuinely the DEMO Clerk instance, never the real customer-facing one.');
     return;
+  }
+  if (args['allow-live']) {
+    throw new Error(
+      `Refusing to run: --allow-live was passed but --env was "${args.env || '(missing)'}", not "${ALLOWED_LIVE_ENV}". ` +
+      `Pass --env ${ALLOWED_LIVE_ENV} explicitly if this is deliberately the demo Clerk instance.`
+    );
   }
   throw new Error(
     `Refusing to run: CLERK_SECRET_KEY does not look like a test key (starts with "${key.slice(0, 8)}..."). ` +
     'This script creates/deletes real Clerk users — only run it against a sk_test_ instance, ' +
-    'or pass --allow-live if this is deliberately the demo Clerk instance.'
+    `or pass --allow-live --env ${ALLOWED_LIVE_ENV} if this is deliberately the demo Clerk instance.`
   );
 }
 
