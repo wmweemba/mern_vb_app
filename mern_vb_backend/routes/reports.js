@@ -15,6 +15,9 @@ const {
   getContributionLiabilityReport,
   getMyContributionLiability
 } = require('../controllers/contributionLiabilityController');
+const {
+  getCycleCollectionsSummary
+} = require('../controllers/cycleCollectionsController');
 
 // Get available cycles for reports
 router.get('/cycles', verifyToken, resolveGroup, checkTrial, getAvailableCyclesForReports);
@@ -32,5 +35,9 @@ router.get('/interest-obligation', verifyToken, resolveGroup, checkTrial, requir
 // ContributionType with targetAmountPerMember > 0 (e.g. a membership fee).
 router.get('/contribution-liability/me', verifyToken, resolveGroup, checkTrial, getMyContributionLiability);
 router.get('/contribution-liability', verifyToken, resolveGroup, checkTrial, requireRole(['admin', 'treasurer', 'loan_officer']), getContributionLiabilityReport);
+
+// "Collected This Cycle" dashboard card (docs/plan_cycle_collections_card.md) — no
+// requireRole, visible to every group role same as the main dashboard stats.
+router.get('/cycle-collections', verifyToken, resolveGroup, checkTrial, getCycleCollectionsSummary);
 
 module.exports = router;
