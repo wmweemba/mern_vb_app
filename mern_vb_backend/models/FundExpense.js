@@ -21,6 +21,7 @@ const fundExpenseSchema = new Schema({
   transactionId:       { type: Schema.Types.ObjectId, ref: 'Transaction' },
   cancelled:           { type: Boolean, default: false },
   cancelledAt:         { type: Date },
+  cancelledBy:         { type: Schema.Types.ObjectId, ref: 'GroupMember' },
   cancelReason:        { type: String },
   date:                { type: Date, default: Date.now },
   cycleNumber:         { type: Number },

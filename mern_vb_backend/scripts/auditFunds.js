@@ -58,8 +58,11 @@ async function auditGroup(group) {
     // it must be audited against LIFETIME credits and debits — scoping it to the
     // current cycle would report a false discrepancy the moment a cycle turns over.
     const cycleScope = fund.resetsOnCycle === false ? {} : { archived: { $ne: true } };
-    const credits = await sum(Contribution, { groupId: group._id, fundId: fund._id, ...cycleScope });
-    const debits = await sum(FundExpense, { groupId: group._id, fundId: fund._id, ...cycleScope });
+    // A reversed contribution/expense (cancelled: true) had its balance effect
+    // already undone via a negated Transaction — its own amount must not also be
+    // summed here, or a correctly-reversed fund reports a false discrepancy.
+    const credits = await sum(Contribution, { groupId: group._id, fundId: fund._id, cancelled: { $ne: true }, ...cycleScope });
+    const debits = await sum(FundExpense, { groupId: group._id, fundId: fund._id, cancelled: { $ne: true }, ...cycleScope });
     const expected = credits - debits;
     const diff = fund.balance - expected;
     const clean = Math.abs(diff) <= DISCREPANCY_THRESHOLD;

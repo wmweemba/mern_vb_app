@@ -805,5 +805,21 @@ Added 2026-09-10 (Session 5 of `docs/plan_db_cutover_and_grace_migration.md`). K
 
 ---
 
-*Last updated: 2026-08-12 — Phase 5 (Cycle model + per-cycle configuration snapshot) added*
+## Reversal / Corrections — Architecture Notes
+
+Added 2026-09-27 (support ticket: a treasurer double-recorded a contribution to the App Subscription fund with no way to undo it). Key decisions recorded here to prevent regression:
+
+1. **The reversal shape is copied from `paymentController.voidFine`, the only proven prior art.** `Saving`, `Contribution`, and `FundExpense` all gained `cancelled`/`cancelledAt`/`cancelledBy`/`cancelReason` (FundExpense already had the first three, unused, before this). Reversing a record: soft-flag it (never hard-delete), reverse its balance effect via the **same shared helper the original entry used** (`updateBankBalance` or `updateFundBalance`, negated), and log an offsetting `Transaction` reusing the original `type` with a negated `amount`. Never invent a new `Transaction` type for a reversal — `auditBankBalance.js`'s `balanceEffect()` switch only handles types it already knows, and a new unhandled type falls through to the dangerous `default: return amount` catch-all.
+
+2. **A Contribution reverses whichever destination it originally credited, read from its own denormalized `fundId`/`affectsMainBalance` — never re-resolved from the current `ContributionType`.** Same defensive instinct as `typeName`/`countsTowardInterestObligation` elsewhere in this model: if a type's routing is edited later, a historical contribution must still reverse against the pot it actually credited.
+
+3. **Reversal is refused once the record is `archived`** (cycle closed). Cycle boundaries are still the `archived: { $ne: true }` convention (Named Funds note #8, Phase 5 note #1) — reversing an archived record would restate a frozen cycle's numbers after the fact.
+
+4. **`scripts/auditFunds.js` computes each fund's balance from raw `Contribution`/`FundExpense` documents, not from the `Transaction` ledger — it needs its own `cancelled: { $ne: true }` filter on both sums, separately from `auditBankBalance.js`.** `auditBankBalance.js` never needed a change because it works entirely off `Transaction` records, where a reversal already nets to zero via the negated amount; `auditFunds.js` re-derives from source documents, so a reversed record's original amount would otherwise still be counted. Found live, not by the unit tests, because the tests seed fresh data with no reversed rows to expose it — a reason to prefer a live-database check over trusting a green test suite alone when adding a new state to an existing audit's source documents.
+
+5. **Never call `res.json()` (or `res.status().json()`) from inside `session.withTransaction()`'s callback.** The commit happens strictly after the callback resolves, but a response can reach the client before that commit lands — a client re-reading immediately after a `200` can see stale, pre-write data. `voidFine` and `reverseInstallmentPayment` both have this latent race (not fixed, out of scope for this change); `recordContribution`/`recordExpense` already avoid it correctly. The pattern: build the result inside the transaction, assign it to a variable declared outside, and call `res.json()` only after `await session.withTransaction(...)` resolves.
+
+---
+
+*Last updated: 2026-09-27 — Reversal/Corrections (Savings, Contributions, Fund Expenses) added*
 *Next review: April 7 (Week 1 checkpoint)*

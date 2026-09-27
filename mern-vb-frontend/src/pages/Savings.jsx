@@ -7,9 +7,13 @@ import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { FaPiggyBank, FaCalendarAlt, FaStickyNote, FaEdit } from 'react-icons/fa';
+import { FaPiggyBank, FaCalendarAlt, FaStickyNote, FaEdit, FaBan } from 'react-icons/fa';
 
 const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md w-full py-3 text-sm transition-colors';
+const btnGhost = 'border border-border-default text-text-primary rounded-full px-5 py-2 text-sm hover:bg-surface-page transition-colors';
+const btnDestructive = 'bg-status-overdue-bg text-status-overdue-text rounded-full px-5 py-2 text-sm font-semibold border border-status-overdue-text/30 transition-colors disabled:opacity-60';
+const labelClass = 'block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5';
+const inputClass = 'w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
 
 const Savings = () => {
   const { user } = useAuth();
@@ -19,6 +23,10 @@ const Savings = () => {
   const [showAddSavings, setShowAddSavings] = useState(false);
   const [editingSaving, setEditingSaving] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [reversingSaving, setReversingSaving] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [reverseLoading, setReverseLoading] = useState(false);
+  const [reverseError, setReverseError] = useState('');
   const accordionRefs = useRef({});
 
   const fetchSavings = async () => {
@@ -37,10 +45,30 @@ const Savings = () => {
 
   const canAddSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
   const canEditSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+  const canReverseSavings = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
 
   const handleEditSaving = (saving) => { setEditingSaving(saving); setIsEditModalOpen(true); };
   const handleEditSuccess = () => { setIsEditModalOpen(false); setEditingSaving(null); fetchSavings(); };
   const handleEditCancel = () => { setIsEditModalOpen(false); setEditingSaving(null); };
+
+  const handleReverse = async () => {
+    if (!cancelReason.trim()) {
+      setReverseError('Please provide a reason for reversing this entry');
+      return;
+    }
+    setReverseLoading(true);
+    setReverseError('');
+    try {
+      await axios.put(`${API_BASE_URL}/savings/${reversingSaving._id}/reverse`, { cancelReason });
+      setReversingSaving(null);
+      setCancelReason('');
+      fetchSavings();
+    } catch (err) {
+      setReverseError(err.response?.data?.error || 'Failed to reverse savings entry');
+    } finally {
+      setReverseLoading(false);
+    }
+  };
 
   const handleAccordionChange = (value) => {
     if (value && accordionRefs.current[value]) {
@@ -53,7 +81,7 @@ const Savings = () => {
   const savingsByUser = savings.reduce((acc, s) => {
     const key = s.userId?._id || s.userId || s.username;
     if (!acc[key]) acc[key] = { user: s.userId, total: 0, entries: [] };
-    acc[key].total += Number(s.amount);
+    if (!s.cancelled) acc[key].total += Number(s.amount);
     acc[key].entries.push(s);
     return acc;
   }, {});
@@ -97,18 +125,27 @@ const Savings = () => {
                 <AccordionContent>
                   <div className="flex flex-col gap-2 pb-3">
                     {entries.sort((a, b) => a.month - b.month).map((s, idx) => (
-                      <div key={s._id || idx} className="rounded-md border border-border-default p-3 flex flex-col gap-1 bg-surface-page">
+                      <div key={s._id || idx} className={`rounded-md border border-border-default p-3 flex flex-col gap-1 bg-surface-page ${s.cancelled ? 'opacity-60' : ''}`}>
                         <div className="flex items-center gap-2 text-sm">
                           <FaCalendarAlt className="text-text-secondary flex-shrink-0" />
                           <span className="text-text-secondary">Month <span className="font-semibold text-text-primary">{s.month}</span></span>
-                          <span className="ml-auto font-bold text-amount-positive">K{Number(s.amount).toLocaleString()}</span>
-                          {canEditSavings && (
+                          <span className={`ml-auto font-bold ${s.cancelled ? 'line-through text-text-secondary' : 'text-amount-positive'}`}>K{Number(s.amount).toLocaleString()}</span>
+                          {!s.cancelled && canEditSavings && (
                             <button
                               onClick={() => handleEditSaving(s)}
                               className="ml-2 border border-border-default text-text-secondary text-xs px-2 py-1 rounded-full hover:bg-surface-card flex items-center gap-1 transition-colors"
                               title="Edit savings entry"
                             >
                               <FaEdit size={10} /> Edit
+                            </button>
+                          )}
+                          {!s.cancelled && canReverseSavings && (
+                            <button
+                              onClick={() => { setReversingSaving(s); setCancelReason(''); setReverseError(''); }}
+                              className="border border-border-default text-text-secondary text-xs px-2 py-1 rounded-full hover:bg-surface-card flex items-center gap-1 transition-colors"
+                              title="Reverse savings entry"
+                            >
+                              <FaBan size={10} /> Reverse
                             </button>
                           )}
                         </div>
@@ -120,6 +157,11 @@ const Savings = () => {
                             </span>
                           )}
                         </div>
+                        {s.cancelled && (
+                          <div className="text-xs font-medium text-text-secondary mt-1">
+                            Reversed{s.cancelReason ? ` — ${s.cancelReason}` : ''}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -160,6 +202,39 @@ const Savings = () => {
           onSuccess={() => { setShowAddSavings(false); fetchSavings(); }}
         />
       </SlideoverDrawer>
+
+      {/* Reverse Savings Dialog */}
+      {reversingSaving && (
+        <Dialog open={true} onOpenChange={() => { setReversingSaving(null); setCancelReason(''); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reverse Savings Entry — {reversingSaving.userId?.name}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-text-primary mb-3">
+              Amount: <strong>K{Number(reversingSaving.amount).toLocaleString()}</strong> (Month {reversingSaving.month})
+              <span className="ml-2 font-medium" style={{ color: '#B85A00' }}>(Bank balance will be reversed)</span>
+            </p>
+            <div>
+              <label className={labelClass}>Reason <span className="text-status-overdue-text">*</span></label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className={`${inputClass} min-h-[80px] resize-none`}
+                placeholder="Explain why this entry is being reversed…"
+              />
+            </div>
+            {reverseError && <p className="text-status-overdue-text text-xs mt-1">{reverseError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverse}>
+                {reverseLoading ? 'Reversing…' : 'Reverse Entry'}
+              </button>
+              <button className={btnGhost} onClick={() => { setReversingSaving(null); setCancelReason(''); }} disabled={reverseLoading}>
+                Cancel
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

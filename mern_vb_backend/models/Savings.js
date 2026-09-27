@@ -10,7 +10,11 @@ const savingSchema = new mongoose.Schema({
     interestEarned: { type: Number, default: 0 },
     cycleNumber: { type: Number },
     cycleEndDate: { type: Date },
-    archived: { type: Boolean, default: false }
+    archived: { type: Boolean, default: false },
+    cancelled: { type: Boolean, default: false },
+    cancelledAt: { type: Date },
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMember' },
+    cancelReason: { type: String }
 });
 
 module.exports = mongoose.model('Saving', savingSchema);

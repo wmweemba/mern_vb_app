@@ -40,7 +40,7 @@ async function buildReport(req, onlyMemberId) {
 
   const loans = await Loan.find({ ...req.groupScope, archived: { $ne: true } });
   const contributions = await Contribution.find({
-    ...req.groupScope, archived: { $ne: true }, countsTowardInterestObligation: true,
+    ...req.groupScope, archived: { $ne: true }, cancelled: { $ne: true }, countsTowardInterestObligation: true,
   });
 
   const loansByMember = new Map();

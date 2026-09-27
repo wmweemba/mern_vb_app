@@ -39,6 +39,7 @@ async function buildSummary(req) {
   const contributions = await Contribution.find({
     ...req.groupScope,
     archived: { $ne: true },
+    cancelled: { $ne: true },
     $or: [
       { countsTowardInterestObligation: true },
       { contributionTypeId: { $in: liabilityTypeIds } },

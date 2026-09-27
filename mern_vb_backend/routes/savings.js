@@ -19,6 +19,7 @@ router.post('/', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loa
 router.get('/', verifyToken, resolveGroup, checkTrial, savingsController.getAllSavings);
 router.get('/user/:id', verifyToken, resolveGroup, checkTrial, savingsController.getSavingsByUser);
 router.put('/:savingId', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), savingsController.updateSaving);
+router.put('/:savingId/reverse', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), savingsController.reverseSaving);
 router.get('/export', verifyToken, resolveGroup, checkTrial, savingsController.exportSavingsReport);
 // router.get('/export/pdf', verifyToken, resolveGroup, checkTrial, savingsController.exportSavingsReportPDF);
 router.get('/dashboard', verifyToken, resolveGroup, checkTrial, savingsController.getDashboardStats);

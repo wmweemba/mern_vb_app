@@ -15,6 +15,7 @@ const allowRoles = (...roles) => (req, res, next) => {
 // Static paths before dynamic — Express 5 route-ordering gotcha (CLAUDE.md #3).
 router.get('/expenses', verifyToken, resolveGroup, checkTrial, fundController.listExpenses);
 router.post('/expenses', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer'), fundController.recordExpense);
+router.put('/expenses/:id/reverse', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer', 'loan_officer'), fundController.reverseExpense);
 router.get('/', verifyToken, resolveGroup, checkTrial, fundController.listFunds);
 router.put('/:id', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer'), fundController.updateFund);
 

@@ -8,9 +8,14 @@ import Select from '../components/ui/Select';
 import AddContributionForm from '../features/contributions/AddContributionForm';
 import RecordSocialFundExpenseForm from '../features/contributions/RecordSocialFundExpenseForm';
 import { Coins, Wallet, TrendingUp, TrendingDown, Users } from 'lucide-react';
-import { FaCoins } from 'react-icons/fa';
+import { FaCoins, FaBan } from 'react-icons/fa';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md w-full py-3 text-sm transition-colors';
+const btnGhost = 'border border-border-default text-text-primary rounded-full px-5 py-2 text-sm hover:bg-surface-page transition-colors';
+const btnDestructive = 'bg-status-overdue-bg text-status-overdue-text rounded-full px-5 py-2 text-sm font-semibold border border-status-overdue-text/30 transition-colors disabled:opacity-60';
+const labelClass = 'block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5';
+const inputClass = 'w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
 const fmt = (v) => `K${Number(v || 0).toLocaleString()}`;
 
 // Names the actual pot the money landed in. fundName is the snapshot taken at
@@ -63,6 +68,13 @@ export default function Contributions() {
 
   const canRecord = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
   const canRecordExpense = ['admin', 'treasurer'].includes(user?.role);
+  const canReverse = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+
+  const [reversingContribution, setReversingContribution] = useState(null);
+  const [reversingExpense, setReversingExpense] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [reverseLoading, setReverseLoading] = useState(false);
+  const [reverseError, setReverseError] = useState('');
 
   const fetchAll = async () => {
     setLoading(true); setError('');
@@ -99,17 +111,55 @@ export default function Contributions() {
   const byMember = filtered.reduce((acc, c) => {
     const key = c.userId?._id || c.userId || 'unknown';
     if (!acc[key]) acc[key] = { user: c.userId, total: 0, entries: [] };
-    acc[key].total += Number(c.amount);
+    if (!c.cancelled) acc[key].total += Number(c.amount);
     acc[key].entries.push(c);
     return acc;
   }, {});
+
+  const handleReverseContribution = async () => {
+    if (!cancelReason.trim()) {
+      setReverseError('Please provide a reason for reversing this contribution');
+      return;
+    }
+    setReverseLoading(true);
+    setReverseError('');
+    try {
+      await axios.put(`${API_BASE_URL}/contributions/${reversingContribution._id}/reverse`, { cancelReason });
+      setReversingContribution(null);
+      setCancelReason('');
+      fetchAll();
+    } catch (err) {
+      setReverseError(err.response?.data?.error || 'Failed to reverse contribution');
+    } finally {
+      setReverseLoading(false);
+    }
+  };
+
+  const handleReverseExpense = async () => {
+    if (!cancelReason.trim()) {
+      setReverseError('Please provide a reason for reversing this expense');
+      return;
+    }
+    setReverseLoading(true);
+    setReverseError('');
+    try {
+      await axios.put(`${API_BASE_URL}/funds/expenses/${reversingExpense._id}/reverse`, { cancelReason });
+      setReversingExpense(null);
+      setCancelReason('');
+      fetchAll();
+    } catch (err) {
+      setReverseError(err.response?.data?.error || 'Failed to reverse expense');
+    } finally {
+      setReverseLoading(false);
+    }
+  };
 
   // Ledger is built PER FUND. Pooling every pot's credits and debits into one
   // running balance produced a number that matched no fund once a group ran more
   // than one — which the app subscription pot makes the normal case.
   const buildLedger = (fundId) => {
     const credits = contributions
-      .filter(c => !c.affectsMainBalance && String(c.fundId) === String(fundId))
+      .filter(c => !c.cancelled && !c.affectsMainBalance && String(c.fundId) === String(fundId))
       .map(c => ({ ...c, _ledgerType: 'credit', _date: new Date(c.date || c.createdAt) }));
     const debits = expenses
       .filter(e => !e.cancelled && String(e.fundId) === String(fundId))
@@ -124,9 +174,10 @@ export default function Contributions() {
       .reverse(); // newest first for display
   };
 
-  const totalContributions = contributions.reduce((s, c) => s + Number(c.amount), 0);
-  const mainBalanceContributions = contributions.filter(c => c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
-  const fundContributions = contributions.filter(c => !c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
+  const activeContributions = contributions.filter(c => !c.cancelled);
+  const totalContributions = activeContributions.reduce((s, c) => s + Number(c.amount), 0);
+  const mainBalanceContributions = activeContributions.filter(c => c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
+  const fundContributions = activeContributions.filter(c => !c.affectsMainBalance).reduce((s, c) => s + Number(c.amount), 0);
   // Summed across every pot. Previously this page put a social-fund-only balance
   // directly above a ledger of every fund's expenses — two numbers that stopped
   // agreeing the moment a group ran a second pot.
@@ -249,19 +300,33 @@ export default function Contributions() {
                     <AccordionContent>
                       <div className="flex flex-col gap-2 pb-3">
                         {entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(c => (
-                          <div key={c._id} className="rounded-md border border-border-default p-3 bg-surface-page">
+                          <div key={c._id} className={`rounded-md border border-border-default p-3 bg-surface-page ${c.cancelled ? 'opacity-60' : ''}`}>
                             <div className="flex items-center gap-2 justify-between">
                               <span className="text-sm font-medium text-text-primary">{c.typeName}</span>
                               <div className="flex items-center gap-2">
                                 <RoutingBadge affectsMainBalance={c.affectsMainBalance} fundName={c.fundName} overrodeDefault={c.overrodeDefault} />
-                                <span className="font-bold text-amount-positive text-sm">{fmt(c.amount)}</span>
+                                <span className={`font-bold text-sm ${c.cancelled ? 'line-through text-text-secondary' : 'text-amount-positive'}`}>{fmt(c.amount)}</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-text-secondary">
                               <span>{c.date ? new Date(c.date).toLocaleDateString() : new Date(c.createdAt).toLocaleDateString()}</span>
                               {c.note && <span className="truncate">· {c.note}</span>}
                               {c.overrodeDefault && <span className="text-status-pending-text">· routing overridden</span>}
+                              {!c.cancelled && canReverse && (
+                                <button
+                                  onClick={() => { setReversingContribution(c); setCancelReason(''); setReverseError(''); }}
+                                  className="ml-auto border border-border-default text-text-secondary text-xs px-2 py-1 rounded-full hover:bg-surface-card flex items-center gap-1 transition-colors flex-shrink-0"
+                                  title="Reverse contribution"
+                                >
+                                  <FaBan size={10} /> Reverse
+                                </button>
+                              )}
                             </div>
+                            {c.cancelled && (
+                              <div className="text-xs font-medium text-text-secondary mt-1">
+                                Reversed{c.cancelReason ? ` — ${c.cancelReason}` : ''}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -347,6 +412,24 @@ export default function Contributions() {
                         <span>{dateStr}</span>
                         {!isCredit && tx.category && <CategoryBadge category={tx.category} />}
                         {!isCredit && tx.beneficiaryName && <span>· {tx.beneficiaryName}</span>}
+                        {isCredit && canReverse && (
+                          <button
+                            onClick={() => { setReversingContribution(tx); setCancelReason(''); setReverseError(''); }}
+                            className="ml-auto border border-border-default text-text-secondary text-xs px-2 py-1 rounded-full hover:bg-surface-page flex items-center gap-1 transition-colors flex-shrink-0"
+                            title="Reverse contribution"
+                          >
+                            <FaBan size={10} /> Reverse
+                          </button>
+                        )}
+                        {!isCredit && canReverse && (
+                          <button
+                            onClick={() => { setReversingExpense(tx); setCancelReason(''); setReverseError(''); }}
+                            className="ml-auto border border-border-default text-text-secondary text-xs px-2 py-1 rounded-full hover:bg-surface-page flex items-center gap-1 transition-colors flex-shrink-0"
+                            title="Reverse expense"
+                          >
+                            <FaBan size={10} /> Reverse
+                          </button>
+                        )}
                       </div>
                     </div>
                     {/* Running balance */}
@@ -399,6 +482,74 @@ export default function Contributions() {
           onSuccess={() => { setShowAddExpense(false); fetchAll(); }}
         />
       </SlideoverDrawer>
+
+      {/* Reverse Contribution Dialog */}
+      {reversingContribution && (
+        <Dialog open={true} onOpenChange={() => { setReversingContribution(null); setCancelReason(''); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reverse Contribution — {reversingContribution.userId?.name}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-text-primary mb-3">
+              {reversingContribution.typeName}: <strong>{fmt(reversingContribution.amount)}</strong>
+              <span className="ml-2 font-medium" style={{ color: '#B85A00' }}>
+                ({reversingContribution.affectsMainBalance ? 'Main balance' : (reversingContribution.fundName || 'Fund')} will be reversed)
+              </span>
+            </p>
+            <div>
+              <label className={labelClass}>Reason <span className="text-status-overdue-text">*</span></label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className={`${inputClass} min-h-[80px] resize-none`}
+                placeholder="Explain why this contribution is being reversed…"
+              />
+            </div>
+            {reverseError && <p className="text-status-overdue-text text-xs mt-1">{reverseError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverseContribution}>
+                {reverseLoading ? 'Reversing…' : 'Reverse Contribution'}
+              </button>
+              <button className={btnGhost} onClick={() => { setReversingContribution(null); setCancelReason(''); }} disabled={reverseLoading}>
+                Cancel
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Reverse Fund Expense Dialog */}
+      {reversingExpense && (
+        <Dialog open={true} onOpenChange={() => { setReversingExpense(null); setCancelReason(''); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reverse Fund Expense</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-text-primary mb-3">
+              {reversingExpense.description}: <strong>{fmt(reversingExpense.amount)}</strong>
+              <span className="ml-2 font-medium" style={{ color: '#B85A00' }}>(Fund balance will be credited back)</span>
+            </p>
+            <div>
+              <label className={labelClass}>Reason <span className="text-status-overdue-text">*</span></label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className={`${inputClass} min-h-[80px] resize-none`}
+                placeholder="Explain why this expense is being reversed…"
+              />
+            </div>
+            {reverseError && <p className="text-status-overdue-text text-xs mt-1">{reverseError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverseExpense}>
+                {reverseLoading ? 'Reversing…' : 'Reverse Expense'}
+              </button>
+              <button className={btnGhost} onClick={() => { setReversingExpense(null); setCancelReason(''); }} disabled={reverseLoading}>
+                Cancel
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

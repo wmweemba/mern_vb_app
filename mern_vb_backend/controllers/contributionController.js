@@ -132,3 +132,54 @@ exports.listContributions = async (req, res) => {
     res.status(500).json({ error: 'Failed to list contributions', details: err.message });
   }
 };
+
+// Reverse a wrong contribution (e.g. a duplicate credit) — keeps audit trail;
+// reverses whichever destination it originally credited (main pool or a named
+// fund, per the record's own denormalized fundId — never re-resolved live) and
+// logs an offsetting Transaction. Mirrors paymentController.voidFine.
+exports.reverseContribution = async (req, res) => {
+  const { contributionId } = req.params;
+  const { cancelReason } = req.body;
+  if (!cancelReason || !cancelReason.trim()) {
+    return res.status(400).json({ error: 'A cancel reason is required to reverse a contribution' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let contribution;
+    await session.withTransaction(async () => {
+      contribution = await Contribution.findOne({ _id: contributionId, ...req.groupScope }).session(session);
+      if (!contribution) throw Object.assign(new Error('Contribution not found'), { status: 404 });
+      if (contribution.cancelled) throw Object.assign(new Error('Contribution is already reversed'), { status: 400 });
+      if (contribution.archived) throw Object.assign(new Error('Cannot reverse a contribution from a closed cycle'), { status: 400 });
+
+      if (contribution.fundId) {
+        await updateFundBalance(contribution.fundId, -contribution.amount, session);
+      } else {
+        await updateBankBalance(-contribution.amount, req.groupId, session);
+      }
+
+      await logTransaction({
+        userId: contribution.userId,
+        type: contribution.fundId ? 'fund_credit' : 'contribution',
+        amount: -contribution.amount,
+        referenceId: contribution._id,
+        note: `Contribution reversed: ${cancelReason}. Original amount K${contribution.amount} (${contribution.typeName}) reversed.`,
+        groupId: req.groupId
+      }, session);
+
+      contribution.cancelled = true;
+      contribution.cancelledAt = new Date();
+      contribution.cancelledBy = req.memberId;
+      contribution.cancelReason = cancelReason.trim();
+      await contribution.save({ session });
+    });
+    // See reverseSaving's comment — respond only after the commit is guaranteed.
+    res.json({ message: 'Contribution reversed successfully', contribution });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to reverse contribution', details: err.message });
+  } finally {
+    await session.endSession();
+  }
+};

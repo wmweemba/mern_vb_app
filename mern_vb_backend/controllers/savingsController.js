@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Saving = require('../models/Savings');
 const Loan = require('../models/Loans');
 const GroupMember = require('../models/GroupMember');
@@ -148,10 +149,60 @@ exports.updateSaving = async (req, res) => {
   }
 };
 
+// Reverse a wrong savings entry — keeps audit trail; reverses bank balance and
+// logs an offsetting Transaction. Mirrors paymentController.voidFine.
+exports.reverseSaving = async (req, res) => {
+  const { savingId } = req.params;
+  const { cancelReason } = req.body;
+  if (!cancelReason || !cancelReason.trim()) {
+    return res.status(400).json({ error: 'A cancel reason is required to reverse a savings entry' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let saving;
+    await session.withTransaction(async () => {
+      saving = await Saving.findOne({ _id: savingId, ...req.groupScope }).session(session);
+      if (!saving) throw Object.assign(new Error('Savings entry not found'), { status: 404 });
+      if (saving.cancelled) throw Object.assign(new Error('Savings entry is already reversed'), { status: 400 });
+      if (saving.archived) throw Object.assign(new Error('Cannot reverse a savings entry from a closed cycle'), { status: 400 });
+
+      // Only `amount` was ever added to the bank balance at creation/update time
+      // (see createSaving/updateSaving) — `fine` is descriptive-only on this record
+      // and must not be included in the reversal.
+      await updateBankBalance(-saving.amount, req.groupId, session);
+      await logTransaction({
+        userId: saving.userId,
+        type: 'saving',
+        amount: -saving.amount,
+        referenceId: saving._id,
+        note: `Savings entry reversed: ${cancelReason}. Original amount K${saving.amount} reversed.`,
+        groupId: req.groupId
+      }, session);
+
+      saving.cancelled = true;
+      saving.cancelledAt = new Date();
+      saving.cancelledBy = req.memberId;
+      saving.cancelReason = cancelReason.trim();
+      await saving.save({ session });
+    });
+    // Responding only after withTransaction resolves guarantees the commit has
+    // actually landed — res.json() called from inside the callback can reach the
+    // client before commitTransaction() finishes, letting an immediate re-fetch
+    // race the write and see stale (pre-reversal) balances.
+    res.json({ message: 'Savings entry reversed successfully', saving });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to reverse savings entry', details: err.message });
+  } finally {
+    await session.endSession();
+  }
+};
+
 exports.getDashboardStats = async (req, res) => {
   try {
     const savingsAgg = await Saving.aggregate([
-      { $match: { groupId: req.groupId, archived: { $ne: true } } },
+      { $match: { groupId: req.groupId, archived: { $ne: true }, cancelled: { $ne: true } } },
       {
         $group: {
           _id: null,

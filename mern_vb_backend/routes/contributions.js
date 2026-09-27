@@ -14,5 +14,6 @@ const allowRoles = (...roles) => (req, res, next) => {
 
 router.post('/', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer', 'loan_officer'), contributionController.recordContribution);
 router.get('/', verifyToken, resolveGroup, checkTrial, contributionController.listContributions);
+router.put('/:contributionId/reverse', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'treasurer', 'loan_officer'), contributionController.reverseContribution);
 
 module.exports = router;

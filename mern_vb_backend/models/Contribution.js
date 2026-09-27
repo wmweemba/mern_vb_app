@@ -22,6 +22,10 @@ const contributionSchema = new Schema({
   cycleNumber:        { type: Number },
   cycleEndDate:       { type: Date },
   archived:           { type: Boolean, default: false },
+  cancelled:          { type: Boolean, default: false },
+  cancelledAt:        { type: Date },
+  cancelledBy:        { type: Schema.Types.ObjectId, ref: 'GroupMember' },
+  cancelReason:       { type: String },
 }, { timestamps: true });
 
 contributionSchema.index({ groupId: 1, createdAt: -1 });

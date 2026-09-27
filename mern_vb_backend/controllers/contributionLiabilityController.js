@@ -33,6 +33,7 @@ async function buildReport(req, onlyMemberId) {
   const contributions = await Contribution.find({
     ...req.groupScope,
     archived: { $ne: true },
+    cancelled: { $ne: true },
     contributionTypeId: { $in: liabilityTypes.map(t => t._id) },
   });
 

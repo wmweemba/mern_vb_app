@@ -160,3 +160,47 @@ exports.listExpenses = async (req, res) => {
     res.status(500).json({ error: 'Failed to list fund expenses', details: err.message });
   }
 };
+
+// Reverse a wrong fund expense — keeps audit trail; credits the fund balance
+// back and logs an offsetting Transaction. Mirrors paymentController.voidFine.
+exports.reverseExpense = async (req, res) => {
+  const { id } = req.params;
+  const { cancelReason } = req.body;
+  if (!cancelReason || !cancelReason.trim()) {
+    return res.status(400).json({ error: 'A cancel reason is required to reverse a fund expense' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let expense;
+    await session.withTransaction(async () => {
+      expense = await FundExpense.findOne({ _id: id, ...req.groupScope }).session(session);
+      if (!expense) throw Object.assign(new Error('Fund expense not found'), { status: 404 });
+      if (expense.cancelled) throw Object.assign(new Error('Fund expense is already reversed'), { status: 400 });
+      if (expense.archived) throw Object.assign(new Error('Cannot reverse a fund expense from a closed cycle'), { status: 400 });
+
+      await updateFundBalance(expense.fundId, expense.amount, session);
+      await logTransaction({
+        userId: expense.beneficiaryMemberId || req.memberId,
+        type: 'fund_debit',
+        amount: -expense.amount,
+        referenceId: expense._id,
+        note: `Fund expense reversed: ${cancelReason}. Original amount K${expense.amount} (${expense.description}) reversed.`,
+        groupId: req.groupId
+      }, session);
+
+      expense.cancelled = true;
+      expense.cancelledAt = new Date();
+      expense.cancelledBy = req.memberId;
+      expense.cancelReason = cancelReason.trim();
+      await expense.save({ session });
+    });
+    // See reverseSaving's comment — respond only after the commit is guaranteed.
+    res.json({ message: 'Fund expense reversed successfully', expense });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to reverse fund expense', details: err.message });
+  } finally {
+    await session.endSession();
+  }
+};
