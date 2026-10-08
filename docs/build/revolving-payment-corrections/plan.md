@@ -7,7 +7,7 @@ Muyapekwa E Daka's 07/10/2026 payment himself (K2,420 recorded as all-principal;
 be K220 interest + K2,200 principal). No one-off data script is needed.
 
 **Repo:** /Users/williammweemba/Dev_Projects/mern_vb_app · **Branch:** build/revolving-payment-corrections · **Base:** 8a9edcc (main, 2026-10-08, re-check at approval)
-**Status:** planning: drafted 2026-10-08 in a separate (non-/build) session, **awaiting Checkpoint A**
+**Status:** building (approved 2026-10-08 20:56)
 
 > **Orchestrator note:** this plan was written outside `/build`, with the codebase and the
 > production data already read. Phase 0 will find it. Skip Phase 1's Explore pass, review the
@@ -176,7 +176,7 @@ cd mern_vb_backend && node scripts/auditBankBalance.js --all   # dev Atlas; exit
 
 | ID | Title | Model | Risk | Depends on | Owns (files) | Status |
 |---|---|---|---|---|---|---|
-| U1 | Strategy: `interest_charge` + `reversePayment` | sonnet | high | — | `models/Loans.js`, `utils/strategies/loanAccrual/revolvingMonthly.js`, `tests/strategies/revolvingMonthly.test.js` | todo |
+| U1 | Strategy: `interest_charge` + `reversePayment` | sonnet | high | — | `models/Loans.js`, `utils/strategies/loanAccrual/revolvingMonthly.js`, `tests/strategies/revolvingMonthly.test.js` | done |
 | U2 | Repayment: accept charge flag, link transactionId | sonnet | high | U1 | `controllers/paymentController.js`, `tests/paymentController.test.js` | todo |
 | U3 | Reverse-payment endpoint | sonnet | high | U1 | `controllers/loanController.js`, `routes/loans.js`, `tests/revolvingPaymentReversal.test.js` (new) | todo |
 | U4 | Consumers: dashboard + net-out tests | haiku | low | U1 | `controllers/savingsController.js`, `tests/cycleCollectionsController.test.js`, `tests/interestObligationController.test.js` | todo |
@@ -471,3 +471,6 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
 ## Log
 - 2026-10-08: plan drafted in a non-/build session after the production read (above) and
   Simon's answers. Awaiting Checkpoint A.
+- 2026-10-08 20:56 /build session start (Opus orchestrator). Phase 0 resume; base re-checked: main still 8a9edcc.
+- 2026-10-08 20:56 plan approved by William at Checkpoint A. Starting U1.
+- 2026-10-08 U1 done. Verifier: revolvingMonthly 23/23, full suite 17 suites / 134 tests. Opus diff-read: OK. Checked the reversePayment 500 negative-interest guard: a charge always equals the shortfall and is fully settled in the same call, so restored interest ≥ pre-payment interest ≥ 0. The 500 is reachable only on corrupt data, as specified. Note for U3: the full suite flakes under default parallelism (MongoMemoryServer contention in support* suites), so use `--maxWorkers=2`.
