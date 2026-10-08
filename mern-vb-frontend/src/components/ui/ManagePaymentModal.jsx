@@ -17,6 +17,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
   const [error, setError] = useState('');
   const [activeLoan, setActiveLoan] = useState(null);
   const [toInterest, setToInterest] = useState('');
+  const [chargeInterestShortfall, setChargeInterestShortfall] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -40,6 +41,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
   useEffect(() => {
     setActiveLoan(null);
     setToInterest('');
+    setChargeInterestShortfall(false);
     if (open && type === 'repayment' && username) {
       axios.get(`${API_BASE_URL}/loans/user/by-username`, { params: { username } })
         .then(res => {
@@ -54,6 +56,26 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
 
   const isRevolving = activeLoan?.accrualMode === 'revolving';
   const outstanding = isRevolving ? (activeLoan.principalBalance || 0) + (activeLoan.interestOutstanding || 0) : null;
+  const interestOutstanding = isRevolving ? (activeLoan.interestOutstanding || 0) : 0;
+
+  const round2 = n => Math.round(n * 100) / 100;
+
+  const currentPeriodLabel = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const hasAccruedThisMonth = isRevolving
+    && (activeLoan.entries || []).some(en => en.type === 'accrual' && en.periodLabel === currentPeriodLabel());
+
+  const suggestedInterest = isRevolving && activeLoan.interestRate
+    ? round2((Number(amount) || 0) * activeLoan.interestRate / (100 + activeLoan.interestRate))
+    : 0;
+
+  const showInterestSuggestion = isRevolving && !hasAccruedThisMonth && amount !== '' && Number(amount) > 0;
+
+  const requiresChargeConfirm = isRevolving && toInterest !== '' && Number(toInterest) > interestOutstanding;
+  const interestShortfall = requiresChargeConfirm ? round2(Number(toInterest) - interestOutstanding) : 0;
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -78,12 +100,16 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
         if (type === 'repayment' && isRevolving && toInterest !== '') {
           const interestPart = Number(toInterest);
           payload.allocation = { toInterest: interestPart, toPrincipal: Number(amount) - interestPart };
+          if (requiresChargeConfirm && chargeInterestShortfall) {
+            payload.chargeInterestShortfall = true;
+          }
         }
         response = await axios.post(endpoint, payload);
 
         if (type === 'repayment' && response.data.allocation) {
-          const { toInterest: paidInterest, toPrincipal: paidPrincipal } = response.data.allocation;
+          const { toInterest: paidInterest, toPrincipal: paidPrincipal, interestCharged } = response.data.allocation;
           let msg = `Loan payment recorded! Interest: K${paidInterest}, Principal: K${paidPrincipal}`;
+          if (interestCharged > 0) msg += ` — K${interestCharged} charged as in-month interest`;
           if (response.data.loanFullyPaid) msg += ' — Loan fully paid!';
           setSuccess(msg);
         } else if (type === 'repayment' && response.data.installmentsPaid) {
@@ -102,6 +128,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
         setAmount('');
         setNote('');
         setToInterest('');
+        setChargeInterestShortfall(false);
         setActiveLoan(null);
       }
     } catch (err) {
@@ -212,13 +239,42 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
                     type="number"
                     value={toInterest}
                     onChange={e => setToInterest(e.target.value)}
-                    placeholder={`Default: interest first, up to K${activeLoan.interestOutstanding || 0}`}
+                    placeholder={`Interest owed now: K${interestOutstanding}`}
                     className="w-full border border-border-default rounded-md px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
                   />
                   <p className="text-xs text-text-secondary mt-1">
                     Revolving loan — outstanding K{outstanding.toLocaleString()} (interest K{(activeLoan.interestOutstanding || 0).toLocaleString()}, principal K{(activeLoan.principalBalance || 0).toLocaleString()}).
                     {' '}Leave blank to apply the payment to interest first, then principal. The rest of the amount goes to principal.
                   </p>
+                  {showInterestSuggestion && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-text-secondary flex-1">
+                        Month-End Interest hasn't run this month. If this payment includes interest on what's
+                        being repaid, that's K{suggestedInterest} interest + K{round2((Number(amount) || 0) - suggestedInterest)} principal.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setToInterest(String(suggestedInterest))}
+                        className="shrink-0 border border-border-default text-text-primary rounded-full px-3 py-1 text-xs font-medium hover:bg-surface-page transition-colors"
+                      >
+                        Use K{suggestedInterest}
+                      </button>
+                    </div>
+                  )}
+                  {requiresChargeConfirm && (
+                    <label className="flex items-start gap-2 text-xs text-text-primary mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={chargeInterestShortfall}
+                        onChange={e => setChargeInterestShortfall(e.target.checked)}
+                        className="h-4 w-4 mt-0.5 rounded border-border-default text-brand-primary focus:ring-brand-primary"
+                      />
+                      <span>
+                        Record K{interestShortfall} as interest charged this month (Month-End will charge the
+                        remaining balance as usual)
+                      </span>
+                    </label>
+                  )}
                 </div>
               )}
               <div>
@@ -256,7 +312,7 @@ const ManagePaymentModal = ({ open, onClose, initialType = 'repayment' }) => {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (requiresChargeConfirm && !chargeInterestShortfall)}
               className="flex-1 bg-brand-primary hover:bg-brand-hover text-white rounded-full px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-60"
             >
               {submitLabel[type]}
