@@ -182,7 +182,7 @@ cd mern_vb_backend && node scripts/auditBankBalance.js --all   # dev Atlas; exit
 | U4 | Consumers: dashboard + net-out tests | haiku | low | U1 | `controllers/savingsController.js`, `tests/cycleCollectionsController.test.js`, `tests/interestObligationController.test.js` | done |
 | U5 | Payment modal: in-month interest | sonnet | low | U2 | `mern-vb-frontend/src/components/ui/ManagePaymentModal.jsx` | done |
 | U6 | Ledger: reversal display + Reverse action | sonnet | low | U3 | `mern-vb-frontend/src/pages/Loans.jsx` | done |
-| U7 | CLAUDE.md architecture notes | haiku | low | U1–U6 | `CLAUDE.md` | todo |
+| U7 | CLAUDE.md architecture notes | haiku | low | U1–U6 | `CLAUDE.md` | done |
 
 U2/U3/U4 are independent of each other after U1, and U5/U6 after their backends. If worktree
 isolation works (NS-025 says `~/Dev_Projects/.git` was deleted, so retry it), U2‖U3 and U5‖U6
@@ -497,6 +497,8 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
     - U5's "Use K…" is a compact ghost variant (text-xs) because it's an inline helper.
   - U5 logic checked: the flag is sent only when the confirm is ticked AND toInterest > interestOutstanding, and submit is disabled until then. The suggestion only appears when there's no accrual for the current local YYYY-MM.
 - 2026-10-08 23:17 Session 1 stopped at a unit boundary (past 90 min). U1–U6 done, G1 + G2 passed. Branch is local only and **not pushed**.
+- 2026-10-08 session 2 start (Opus orchestrator). Phase 0 resume: U1–U6 done, G1+G2 pass. Next: U7.
+- 2026-10-08 23:22 U7 done (haiku). Orchestrator checked the route and the strategy's reversal guard against the notes: accurate. Starting Phase 3.
 
 ## Next session (session 2 — run `/build revolving-payment-corrections` on Opus)
 1. Phase 0 resume. Run U7 (haiku): the CLAUDE.md architecture notes.
