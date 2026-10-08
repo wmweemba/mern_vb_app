@@ -10,25 +10,99 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { FaMoneyBillWave, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaInfoCircle } from 'react-icons/fa';
 
 const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white font-semibold rounded-md w-full py-3 text-sm transition-colors';
+const btnGhost = 'border border-border-default text-text-primary rounded-full px-5 py-2 text-sm hover:bg-surface-page transition-colors';
+const btnDestructive = 'bg-status-overdue-bg text-status-overdue-text rounded-full px-5 py-2 text-sm font-semibold border border-status-overdue-text/30 transition-colors disabled:opacity-60';
+const labelClass = 'block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5';
+const inputClass = 'w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
 
 const StatusBadge = ({ fullyPaid }) => fullyPaid
   ? <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-status-paid-bg text-status-paid-text">Paid</span>
   : <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-status-pending-bg text-status-pending-text">Active</span>;
 
+const ReversedBadge = () => (
+  <span className="px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-surface-page text-text-secondary border border-border-default">Reversed</span>
+);
+
 const ENTRY_LABEL = {
   disbursement: 'Disbursed',
   accrual: 'Interest accrued',
   capitalisation: 'Interest capitalised',
+  interest_charge: 'Interest charged (in-month)',
   interest_payment: 'Interest paid',
   principal_payment: 'Principal paid',
 };
 
+// A "payment" is the set of entries one applyPayment call created — its interest_charge
+// (if any), interest_payment (if any) and principal_payment (if any), sharing the exact
+// same `date` (docs/build/revolving-payment-corrections/plan.md Design decision 3).
+const PAYMENT_ENTRY_TYPES = ['interest_charge', 'interest_payment', 'principal_payment'];
+
 // Revolving loans have no installment schedule — a running ledger of entries is the
 // single source of truth (docs/plan_configurable_group_rules.md Phase 2).
-const RevolvingLedger = ({ loan }) => {
+const RevolvingLedger = ({ loan, user, onReversed }) => {
   const principalBalance = loan.principalBalance || 0;
   const interestOutstanding = loan.interestOutstanding || 0;
   const entries = [...(loan.entries || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const [reversingEntry, setReversingEntry] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [reverseLoading, setReverseLoading] = useState(false);
+  const [reverseError, setReverseError] = useState('');
+
+  const canReverse = ['admin', 'treasurer', 'loan_officer'].includes(user?.role);
+
+  // Group reversible, un-reversed payment entries by their shared `date` into sets.
+  const paymentSets = {};
+  entries.forEach(entry => {
+    if (!entry.reversalOf && Number(entry.amount) > 0 && PAYMENT_ENTRY_TYPES.includes(entry.type)) {
+      const key = entry.date;
+      if (!paymentSets[key]) paymentSets[key] = [];
+      paymentSets[key].push(entry);
+    }
+  });
+
+  const setTotalFor = (setEntries) => setEntries
+    .filter(e => e.type === 'interest_payment' || e.type === 'principal_payment')
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  const setInterestFor = (setEntries) => setEntries
+    .filter(e => e.type === 'interest_payment')
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  const setPrincipalFor = (setEntries) => setEntries
+    .filter(e => e.type === 'principal_payment')
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const shownSetKeys = new Set();
+
+  const openReverse = (entry) => {
+    setReversingEntry(entry);
+    setCancelReason('');
+    setReverseError('');
+  };
+
+  const handleReverse = async () => {
+    if (!cancelReason.trim()) {
+      setReverseError('Please provide a reason for reversing this payment');
+      return;
+    }
+    setReverseLoading(true);
+    setReverseError('');
+    try {
+      await axios.put(`${API_BASE_URL}/loans/${loan._id}/entries/${reversingEntry._id}/reverse`, { cancelReason });
+      setReversingEntry(null);
+      setCancelReason('');
+      if (onReversed) onReversed();
+      window.dispatchEvent(new Event('loanDataChanged'));
+    } catch (err) {
+      setReverseError(err.response?.data?.error || 'Failed to reverse payment');
+    } finally {
+      setReverseLoading(false);
+    }
+  };
+
+  const reversingSetEntries = reversingEntry ? (paymentSets[reversingEntry.date] || [reversingEntry]) : [];
+  const reversingTotal = setTotalFor(reversingSetEntries);
+  const reversingInterest = setInterestFor(reversingSetEntries);
+  const reversingPrincipal = setPrincipalFor(reversingSetEntries);
 
   return (
     <div>
@@ -46,18 +120,86 @@ const RevolvingLedger = ({ loan }) => {
         {entries.length === 0 && (
           <div className="px-3 py-2 text-xs text-text-secondary bg-surface-card">No entries yet</div>
         )}
-        {entries.map((entry, idx) => (
-          <div key={idx} className="flex flex-wrap justify-between px-3 py-2 border-b border-border-default last:border-b-0 text-xs items-center gap-x-3 gap-y-1 bg-surface-card">
-            <span className="font-medium text-text-primary">{ENTRY_LABEL[entry.type] || entry.type}</span>
-            {entry.periodLabel && <span className="text-text-secondary">{entry.periodLabel}</span>}
-            <span className="text-text-secondary">{new Date(entry.date).toLocaleDateString()}</span>
-            <span className="font-semibold text-text-primary">K{Number(entry.amount).toLocaleString()}</span>
-            <span className="w-full text-text-secondary">
-              Balance after — Principal: K{Number(entry.principalAfter || 0).toLocaleString()}, Interest: K{Number(entry.interestAfter || 0).toLocaleString()}
-            </span>
-          </div>
-        ))}
+        {entries.map((entry, idx) => {
+          const isReversalEntry = !!entry.reversalOf;
+          const isReversedOriginal = !!entry.reversedAt;
+          const label = isReversalEntry
+            ? `${ENTRY_LABEL[entry.type] || entry.type} — reversed`
+            : (ENTRY_LABEL[entry.type] || entry.type);
+
+          const isPaymentRow = !entry.reversalOf && Number(entry.amount) > 0 && PAYMENT_ENTRY_TYPES.includes(entry.type);
+          const setKey = entry.date;
+          const setEntries = paymentSets[setKey] || [];
+          const setAlreadyReversed = setEntries.some(e => e.reversedAt);
+          const showReverseButton = isPaymentRow && canReverse && !setAlreadyReversed && !shownSetKeys.has(setKey);
+          if (showReverseButton) shownSetKeys.add(setKey);
+
+          return (
+            <div
+              key={entry._id || idx}
+              className="flex flex-wrap justify-between px-3 py-2 border-b border-border-default last:border-b-0 text-xs items-center gap-x-3 gap-y-1 bg-surface-card"
+            >
+              <span className={`font-medium ${isReversalEntry ? 'text-text-secondary' : 'text-text-primary'} ${isReversedOriginal ? 'line-through' : ''}`}>
+                {label}
+              </span>
+              {entry.periodLabel && <span className="text-text-secondary">{entry.periodLabel}</span>}
+              <span className="text-text-secondary">{new Date(entry.date).toLocaleDateString()}</span>
+              <span className={`font-semibold ${isReversalEntry ? 'text-text-secondary' : 'text-text-primary'} ${isReversedOriginal ? 'line-through' : ''}`}>
+                K{isReversalEntry ? `−${Math.abs(Number(entry.amount)).toLocaleString()}` : Number(entry.amount).toLocaleString()}
+              </span>
+              {isReversedOriginal && <ReversedBadge />}
+              {showReverseButton && (
+                <button
+                  className="text-status-overdue-text text-xs font-medium hover:underline"
+                  onClick={() => openReverse(entry)}
+                >
+                  Reverse
+                </button>
+              )}
+              <span className="w-full text-text-secondary">
+                Balance after — Principal: K{Number(entry.principalAfter || 0).toLocaleString()}, Interest: K{Number(entry.interestAfter || 0).toLocaleString()}
+              </span>
+              {isReversedOriginal && entry.reverseReason && (
+                <span className="w-full text-text-secondary">Reason: {entry.reverseReason}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Reverse Payment Confirmation Modal (UI_SPEC.md §6.18, destructive) */}
+      {reversingEntry && (
+        <Dialog open={true} onOpenChange={() => { setReversingEntry(null); setCancelReason(''); setReverseError(''); }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Reverse this payment?</DialogTitle></DialogHeader>
+            <p className="text-sm text-text-secondary mt-2">
+              This undoes the whole payment of K{reversingTotal.toLocaleString()} recorded {new Date(reversingEntry.date).toLocaleDateString()} (interest K{reversingInterest.toLocaleString()}, principal K{reversingPrincipal.toLocaleString()}) and takes K{reversingTotal.toLocaleString()} back out of the bank balance. You can then record it again correctly.
+            </p>
+            <div className="mt-3">
+              <label className={labelClass}>Reason <span className="text-status-overdue-text">*</span></label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className={`${inputClass} min-h-[80px] resize-none`}
+                placeholder="Explain why this payment is being reversed…"
+              />
+            </div>
+            {reverseError && <p className="text-status-overdue-text text-xs mt-1">{reverseError}</p>}
+            <DialogFooter>
+              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverse}>
+                {reverseLoading ? 'Reversing…' : 'Reverse Payment'}
+              </button>
+              <button
+                className={btnGhost}
+                onClick={() => { setReversingEntry(null); setCancelReason(''); setReverseError(''); }}
+                disabled={reverseLoading}
+              >
+                Cancel
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
@@ -196,7 +338,7 @@ const Loans = () => {
                     </div>
                   )}
                   {loan.accrualMode === 'revolving' ? (
-                    <RevolvingLedger loan={loan} />
+                    <RevolvingLedger loan={loan} user={user} onReversed={fetchLoans} />
                   ) : (
                   <div>
                     <div className="flex items-center justify-between mb-2">
