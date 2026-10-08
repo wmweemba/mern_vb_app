@@ -13,7 +13,7 @@ const btnPrimary = 'bg-brand-primary hover:bg-brand-hover text-white font-semibo
 const btnGhost = 'border border-border-default text-text-primary rounded-full px-5 py-2 text-sm hover:bg-surface-page transition-colors';
 const btnDestructive = 'bg-status-overdue-bg text-status-overdue-text rounded-full px-5 py-2 text-sm font-semibold border border-status-overdue-text/30 transition-colors disabled:opacity-60';
 const labelClass = 'block text-xs font-medium uppercase tracking-wider text-text-secondary mb-1.5';
-const inputClass = 'w-full border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
+const inputClass = 'w-full border border-border-default rounded-md px-3.5 py-2.5 text-sm text-text-primary bg-surface-card focus:outline-none focus:ring-1 focus:ring-brand-primary';
 
 const StatusBadge = ({ fullyPaid }) => fullyPaid
   ? <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-status-paid-bg text-status-paid-text">Paid</span>
@@ -180,21 +180,21 @@ const RevolvingLedger = ({ loan, user, onReversed }) => {
               <textarea
                 value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
-                className={`${inputClass} min-h-[80px] resize-none`}
+                className={`${inputClass} min-h-20 resize-none`}
                 placeholder="Explain why this payment is being reversed…"
               />
             </div>
             {reverseError && <p className="text-status-overdue-text text-xs mt-1">{reverseError}</p>}
             <DialogFooter>
-              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverse}>
-                {reverseLoading ? 'Reversing…' : 'Reverse Payment'}
-              </button>
               <button
                 className={btnGhost}
                 onClick={() => { setReversingEntry(null); setCancelReason(''); setReverseError(''); }}
                 disabled={reverseLoading}
               >
                 Cancel
+              </button>
+              <button className={btnDestructive} disabled={reverseLoading} onClick={handleReverse}>
+                {reverseLoading ? 'Reversing…' : 'Reverse Payment'}
               </button>
             </DialogFooter>
           </DialogContent>

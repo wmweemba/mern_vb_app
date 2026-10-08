@@ -180,8 +180,8 @@ cd mern_vb_backend && node scripts/auditBankBalance.js --all   # dev Atlas; exit
 | U2 | Repayment: accept charge flag, link transactionId | sonnet | high | U1 | `controllers/paymentController.js`, `tests/paymentController.test.js` | done |
 | U3 | Reverse-payment endpoint | sonnet | high | U1 | `controllers/loanController.js`, `routes/loans.js`, `tests/revolvingPaymentReversal.test.js` (new) | done |
 | U4 | Consumers: dashboard + net-out tests | haiku | low | U1 | `controllers/savingsController.js`, `tests/cycleCollectionsController.test.js`, `tests/interestObligationController.test.js` | done |
-| U5 | Payment modal: in-month interest | sonnet | low | U2 | `mern-vb-frontend/src/components/ui/ManagePaymentModal.jsx` | todo |
-| U6 | Ledger: reversal display + Reverse action | sonnet | low | U3 | `mern-vb-frontend/src/pages/Loans.jsx` | todo |
+| U5 | Payment modal: in-month interest | sonnet | low | U2 | `mern-vb-frontend/src/components/ui/ManagePaymentModal.jsx` | done |
+| U6 | Ledger: reversal display + Reverse action | sonnet | low | U3 | `mern-vb-frontend/src/pages/Loans.jsx` | done |
 | U7 | CLAUDE.md architecture notes | haiku | low | U1–U6 | `CLAUDE.md` | todo |
 
 U2/U3/U4 are independent of each other after U1, and U5/U6 after their backends. If worktree
@@ -416,7 +416,7 @@ All backend paths below are relative to `mern_vb_backend/`.
 | Gate | After | Opus reads | Note |
 |---|---|---|---|
 | G1 | U1–U4 | `revolvingMonthly.js` full; `git diff` of `paymentController.js` and `loanController.js` (U1–U3 are each `risk: high`, so already diff-read per unit, so G1 checks how they fit together); run `pnpm test` + `node scripts/auditBankBalance.js --all` on dev Atlas | Check: one `date` per applyPayment call; ±10 s matcher can't pick a reversal Transaction (amount is negative, so it can't); res.json after withTransaction; no consumer counts `reversedAt` entries twice. **PASS 2026-10-08.** |
-| G2 | U5–U6 | Both frontend diffs against UI_SPEC §6.7, §6.8, §6.14, §6.18 | Re-read the spec sections against the diff (CLAUDE.md mandates this) |
+| G2 | U5–U6 | Both frontend diffs against UI_SPEC §6.7, §6.8, §6.14, §6.18 | Re-read the spec sections against the diff (CLAUDE.md mandates this). **PASS 2026-10-08 with 3 orchestrator fixes.** |
 
 ## E2E flows
 
@@ -483,3 +483,16 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
   - `res.json` is sent after `withTransaction` resolves in reverseRevolvingPayment.
   - Consumers: `interest_charge` isn't counted as cash anywhere. auditBankBalance `totalPaidOnLoan` sums only interest_payment/principal_payment, and the negated entries net out (U4 tests prove this for cycleCollections and interestObligation). The dashboard counts accrual + interest_charge. `reversedAt`-stamped originals plus negated entries net to zero, with no double count.
   - Full suite 18 suites / 148 tests. `auditBankBalance.js --all` on dev Atlas: all 6 groups K0.00 diff, exit 0. William's Group is now K0, so the old ~K18,177 drift has been reset.
+- 2026-10-08 23:17 U5 + U6 done. They ran in parallel worktrees, which worked this time (the repo root is correct), and were cherry-picked as 148fa82 (U6) and 14c1541 (U5). The worktrees have been removed.
+  - Verifier: build 0, test 12/12.
+  - **Acceptance deviation:** the plan's "`pnpm lint` exits 0" can't be met. The repo baseline already has 147 problems / 142 errors in about 10 unrelated files. I applied it as "no new lint errors in owned files" instead. The only error is the pre-existing Loans.jsx:232 `err` unused (also present at base 4c815b7).
+- 2026-10-08 23:17 G2 gate (Opus): PASS. I read both diffs against UI_SPEC §6.7/6.8/6.14/6.18.
+  - Orchestrator fixes to Loans.jsx:
+    - §6.18 button order is now Cancel then Reverse.
+    - The reason input uses §6.8 rounded-md (was rounded-xl, copied from Savings.jsx).
+    - min-h-[80px] became min-h-20.
+  - Accepted and flagged, not fixed:
+    - btnGhost/btnDestructive constants copied verbatim from Savings.jsx use a 1px ghost border and a destructive border at /30 opacity, slightly off §6.7. This is an existing pattern across the file; fixing it belongs to a separate sweep.
+    - The "Reversed" badge uses neutral tokens because §6.14 defines no reversed status colour.
+    - U5's "Use K…" is a compact ghost variant (text-xs) because it's an inline helper.
+  - U5 logic checked: the flag is sent only when the confirm is ticked AND toInterest > interestOutstanding, and submit is disabled until then. The suggestion only appears when there's no accrual for the current local YYYY-MM.
