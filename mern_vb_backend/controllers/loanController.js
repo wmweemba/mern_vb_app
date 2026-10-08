@@ -67,10 +67,111 @@ exports.reverseInstallmentPayment = async (req, res) => {
   }
 };
 
+// Reverse a wrongly recorded payment on a revolving loan (docs/build/revolving-payment-corrections).
+// Appends negated ledger entries (via strategy.reversePayment), reverses the bank balance,
+// and logs an offsetting Transaction. Never touches the scheduled-loan reverse path above.
+exports.reverseRevolvingPayment = async (req, res) => {
+  const { loanId, entryId } = req.params;
+  const { cancelReason } = req.body;
+  const allowedRoles = ['admin', 'loan_officer', 'treasurer'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
+  }
+  if (typeof cancelReason !== 'string' || !cancelReason.trim()) {
+    return res.status(400).json({ error: 'A cancel reason is required to reverse a payment' });
+  }
+  const reason = cancelReason.trim();
+
+  const session = await mongoose.startSession();
+
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const loan = await Loan.findOne({ _id: loanId, ...req.groupScope }).session(session);
+      if (!loan) {
+        throw Object.assign(new Error('Loan not found'), { status: 404 });
+      }
+      if (loan.accrualMode !== 'revolving') {
+        throw Object.assign(new Error('This endpoint only reverses revolving-loan payments'), { status: 400 });
+      }
+      if (loan.archived) {
+        throw Object.assign(new Error('Cannot reverse a payment on an archived loan'), { status: 400 });
+      }
+
+      const strategy = resolveLoanAccrualStrategyForLoan(loan);
+      const r = strategy.reversePayment(loan, entryId, { reason, reversedBy: req.memberId });
+
+      // Resolve the original Transaction: by r.transactionId if the entries carry one,
+      // else a ±10s match on referenceId/type/amount (legacy, unlinked entries).
+      let originalTx;
+      if (r.transactionId) {
+        originalTx = await Transaction.findOne({ _id: r.transactionId, ...req.groupScope }).session(session);
+        if (!originalTx) {
+          throw Object.assign(new Error('Original transaction for this payment could not be found'), { status: 409 });
+        }
+      } else {
+        const windowStart = new Date(r.setDate.getTime() - 10000);
+        const windowEnd = new Date(r.setDate.getTime() + 10000);
+        const candidates = await Transaction.find({
+          ...req.groupScope,
+          referenceId: loan._id,
+          type: 'loan_payment',
+          amount: r.totalPaid,
+          createdAt: { $gte: windowStart, $lte: windowEnd },
+        }).session(session);
+        if (candidates.length !== 1) {
+          throw Object.assign(
+            new Error(`Could not uniquely identify the original transaction for this payment (found ${candidates.length})`),
+            { status: 409 }
+          );
+        }
+        originalTx = candidates[0];
+      }
+
+      await updateBankBalance(-r.totalPaid, req.groupId, session);
+
+      const offsettingTx = await logTransaction({
+        userId: loan.userId,
+        type: 'loan_payment',
+        amount: -r.totalPaid,
+        referenceId: loan._id,
+        groupId: req.groupId,
+        note: `Payment reversed: ${reason}. Original K${r.totalPaid} (interest K${r.toInterest}, principal K${r.toPrincipal}) of ${originalTx.createdAt.toISOString().slice(0, 10)} reversed.`,
+      }, session);
+
+      // Link this call's freshly appended reversal entries to the offsetting Transaction.
+      // reversePayment() doesn't set transactionId on the entries it pushes, and this is
+      // the only write to the loan in this request, so every reversalOf entry still
+      // missing a transactionId was just created by the strategy.reversePayment() call above.
+      loan.entries.forEach((entry) => {
+        if (entry.reversalOf && !entry.transactionId) {
+          entry.transactionId = offsettingTx._id;
+        }
+      });
+
+      if (loan.fullyPaid) {
+        loan.fullyPaid = false;
+      }
+
+      await loan.save({ session });
+
+      result = { message: 'Payment reversed successfully', loan, reversed: r };
+    });
+
+    res.json(result);
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Failed to reverse payment', details: err.message });
+  } finally {
+    await session.endSession();
+  }
+};
+
 const Loan = require('../models/Loans');
 const GroupMember = require('../models/GroupMember');
 const Savings = require('../models/Savings');
-const { resolveLoanAccrualStrategy, resolveLoanAccrualKey } = require('../utils/strategies/loanAccrual');
+const Transaction = require('../models/Transaction');
+const { resolveLoanAccrualStrategy, resolveLoanAccrualKey, resolveLoanAccrualStrategyForLoan } = require('../utils/strategies/loanAccrual');
 const { logTransaction } = require('./transactionController');
 const { updateBankBalance } = require('./bankBalanceController');
 const { getSettings } = require('./groupSettingsController');

@@ -178,7 +178,7 @@ cd mern_vb_backend && node scripts/auditBankBalance.js --all   # dev Atlas; exit
 |---|---|---|---|---|---|---|
 | U1 | Strategy: `interest_charge` + `reversePayment` | sonnet | high | — | `models/Loans.js`, `utils/strategies/loanAccrual/revolvingMonthly.js`, `tests/strategies/revolvingMonthly.test.js` | done |
 | U2 | Repayment: accept charge flag, link transactionId | sonnet | high | U1 | `controllers/paymentController.js`, `tests/paymentController.test.js` | done |
-| U3 | Reverse-payment endpoint | sonnet | high | U1 | `controllers/loanController.js`, `routes/loans.js`, `tests/revolvingPaymentReversal.test.js` (new) | todo |
+| U3 | Reverse-payment endpoint | sonnet | high | U1 | `controllers/loanController.js`, `routes/loans.js`, `tests/revolvingPaymentReversal.test.js` (new) | done |
 | U4 | Consumers: dashboard + net-out tests | haiku | low | U1 | `controllers/savingsController.js`, `tests/cycleCollectionsController.test.js`, `tests/interestObligationController.test.js` | todo |
 | U5 | Payment modal: in-month interest | sonnet | low | U2 | `mern-vb-frontend/src/components/ui/ManagePaymentModal.jsx` | todo |
 | U6 | Ledger: reversal display + Reverse action | sonnet | low | U3 | `mern-vb-frontend/src/pages/Loans.jsx` | todo |
@@ -475,3 +475,4 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
 - 2026-10-08 20:56 plan approved by William at Checkpoint A. Starting U1.
 - 2026-10-08 U1 done. Verifier: revolvingMonthly 23/23, full suite 17 suites / 134 tests. Opus diff-read: OK. Checked the reversePayment 500 negative-interest guard: a charge always equals the shortfall and is fully settled in the same call, so restored interest ≥ pre-payment interest ≥ 0. The 500 is reachable only on corrupt data, as specified. Note for U3: the full suite flakes under default parallelism (MongoMemoryServer contention in support* suites), so use `--maxWorkers=2`.
 - 2026-10-08 21:43 U2 done. Verifier: paymentController 9/9, full suite 17 suites / 136 tests. Opus diff-read: OK (explicit ctx.date; transactionId linked by exact date match; single save; respond-after-commit kept). U2 and U3 ran sequentially, not in parallel: U3 acceptance case 1 posts a repayment with the charge flag, so it depends on U2.
+- 2026-10-08 21:52 U3 done. Verifier: revolvingPaymentReversal 8/8, full suite 18 suites / 144 tests (jest --maxWorkers=2; pnpm test doesn't forward that flag, so use npx jest). Opus diff-read: OK. Orchestrator one-line fixes: cancelReason typeof-string guard (a non-string reason threw outside the try); original Transaction date in the reversal note formatted YYYY-MM-DD instead of Date.toString(). Re-ran 8/8.
