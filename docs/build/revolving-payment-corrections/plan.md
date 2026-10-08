@@ -499,12 +499,24 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
 - 2026-10-08 23:17 Session 1 stopped at a unit boundary (past 90 min). U1–U6 done, G1 + G2 passed. Branch is local only and **not pushed**.
 - 2026-10-08 session 2 start (Opus orchestrator). Phase 0 resume: U1–U6 done, G1+G2 pass. Next: U7.
 - 2026-10-08 23:22 U7 done (haiku). Orchestrator checked the route and the strategy's reversal guard against the notes: accurate. Starting Phase 3.
+- 2026-10-08 23:25 Phase 3: Clerk key re-checked (sk_test_/development). Local stack up (health: transactionsAvailable true). e2e-tester (sonnet) and reviewer (opus) dispatched in parallel.
+- 2026-10-08 Reviewer (opus): no P0, no P1. Muya path traced end-to-end OK (legacy matcher finds the single Transaction 35 ms away). 40/40 targeted tests. P2s (not fixed, William's call):
+  1. Month-End guard is per-loan; Month-End skips fullyPaid loans, so reversing a payment that fully paid off a loan, done after a later Month-End, leaves that month un-accrued (re-running Month-End fixes it; nothing warns). revolvingMonthly.js:255
+  2. Reversal can reopen a paid-off loan while the member has a newer open revolving loan: two open loans, and the top-up `findOne` is unsorted. loanController.js:152 / ~368
+  3. Two same-amount legacy payments within 10 s: both 409 forever (fails safe). loanController.js:122
+  4. Malformed loanId gives 500 CastError instead of 404. loanController.js:90
+  5. Modal suggestion ignores existing interestOutstanding (UX wording only). ManagePaymentModal.jsx:75
 
-## Next session (session 2 — run `/build revolving-payment-corrections` on Opus)
-1. Phase 0 resume. Run U7 (haiku): the CLAUDE.md architecture notes.
-2. Phase 3:
-   - e2e-tester (sonnet) runs E2E flows 1–4 above against the local stack and dev Atlas. Re-check that the Clerk key is `sk_test_`/development before creating the throwaway user, then clean up with `--delete` + `cleanupOrphanedRecords.js`.
-   - reviewer (**opus**, because U1–U3 are risk:high) on `git diff main..build/revolving-payment-corrections`.
-   - `/ship --preflight`.
-3. Phase 4: report, then ask the push question for this branch only. Merging to `main` (= production deploy) is a separate question.
-4. Deadline reminder: live before Simon runs October Month-End (~25/10). The Rollout steps above happen in a later session, on Sonnet.
+- 2026-10-08 E2E (sonnet, 375px, local stack + dev Atlas): flows 1–3 PASS with exact expected text/values (screenshots in `e2e/`). Flow 3 Month-End preview +K200 then guard error shown. Flow 4 not run live: covered by the backend 403 test. Bank-balance check: the reversal + re-entry netted to zero. The plan's "pre-step-1 + K2,420" baseline is ambiguous (it ignores the disbursements), but the trace is consistent. No member direct-add UI (invite only), so the admin was the borrower. Noticed out of scope: `GET /api/cycle/current` 404s for a freshly created group. Cleanup: throwaway user + group + 17 docs deleted; cleanupOrphanedRecords dry run found none.
+- 2026-10-08 /ship --preflight:
+  - `/sec` isn't an invocable skill in this session, so I did a manual equivalent: no secrets in the diff (only `sk_test_` mentioned in docs), no .env staged, no new console.log.
+  - pa check on changed files: the new queries are single-document, group-scoped, with no loops.
+  - Final verification loop: backend 18/148 pass, frontend 6/12 pass, `auditBankBalance.js --all` on dev Atlas: 6 groups, K0.00 diff.
+  - Preflight is NOT the full gate.
+- 2026-10-08 Phase 4: build complete, branch local, not pushed. Awaiting William's push decision.
+
+## Next session (Rollout — Sonnet, new session)
+1. If not yet pushed: push `build/revolving-payment-corrections` only when William says yes. Merging to `main` (= production deploy, Auto Deploy on) is a separate question.
+2. Optional before merge, William's call: fix reviewer P2 #2 (reversal reopening a paid-off loan while a newer open loan exists: 409 guard + sort the top-up findOne) and P2 #4 (malformed loanId gives 404). Both are small, and neither blocks Muya's fix.
+3. Then follow §Rollout steps 2–6 (health check, production group audit, Simon's instructions, re-audit, ticket reply, `/brain log`).
+4. Deadline: live before Simon's October Month-End (~25/10).
