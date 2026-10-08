@@ -496,3 +496,13 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
     - The "Reversed" badge uses neutral tokens because §6.14 defines no reversed status colour.
     - U5's "Use K…" is a compact ghost variant (text-xs) because it's an inline helper.
   - U5 logic checked: the flag is sent only when the confirm is ticked AND toInterest > interestOutstanding, and submit is disabled until then. The suggestion only appears when there's no accrual for the current local YYYY-MM.
+- 2026-10-08 23:17 Session 1 stopped at a unit boundary (past 90 min). U1–U6 done, G1 + G2 passed. Branch is local only and **not pushed**.
+
+## Next session (session 2 — run `/build revolving-payment-corrections` on Opus)
+1. Phase 0 resume. Run U7 (haiku): the CLAUDE.md architecture notes.
+2. Phase 3:
+   - e2e-tester (sonnet) runs E2E flows 1–4 above against the local stack and dev Atlas. Re-check that the Clerk key is `sk_test_`/development before creating the throwaway user, then clean up with `--delete` + `cleanupOrphanedRecords.js`.
+   - reviewer (**opus**, because U1–U3 are risk:high) on `git diff main..build/revolving-payment-corrections`.
+   - `/ship --preflight`.
+3. Phase 4: report, then ask the push question for this branch only. Merging to `main` (= production deploy) is a separate question.
+4. Deadline reminder: live before Simon runs October Month-End (~25/10). The Rollout steps above happen in a later session, on Sonnet.
