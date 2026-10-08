@@ -415,7 +415,7 @@ All backend paths below are relative to `mern_vb_backend/`.
 
 | Gate | After | Opus reads | Note |
 |---|---|---|---|
-| G1 | U1–U4 | `revolvingMonthly.js` full; `git diff` of `paymentController.js` and `loanController.js` (U1–U3 are each `risk: high`, so already diff-read per unit, so G1 checks how they fit together); run `pnpm test` + `node scripts/auditBankBalance.js --all` on dev Atlas | Check: one `date` per applyPayment call; ±10 s matcher can't pick a reversal Transaction (amount is negative, so it can't); res.json after withTransaction; no consumer counts `reversedAt` entries twice |
+| G1 | U1–U4 | `revolvingMonthly.js` full; `git diff` of `paymentController.js` and `loanController.js` (U1–U3 are each `risk: high`, so already diff-read per unit, so G1 checks how they fit together); run `pnpm test` + `node scripts/auditBankBalance.js --all` on dev Atlas | Check: one `date` per applyPayment call; ±10 s matcher can't pick a reversal Transaction (amount is negative, so it can't); res.json after withTransaction; no consumer counts `reversedAt` entries twice. **PASS 2026-10-08.** |
 | G2 | U5–U6 | Both frontend diffs against UI_SPEC §6.7, §6.8, §6.14, §6.18 | Re-read the spec sections against the diff (CLAUDE.md mandates this) |
 
 ## E2E flows
@@ -477,3 +477,9 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
 - 2026-10-08 21:43 U2 done. Verifier: paymentController 9/9, full suite 17 suites / 136 tests. Opus diff-read: OK (explicit ctx.date; transactionId linked by exact date match; single save; respond-after-commit kept). U2 and U3 ran sequentially, not in parallel: U3 acceptance case 1 posts a repayment with the charge flag, so it depends on U2.
 - 2026-10-08 21:52 U3 done. Verifier: revolvingPaymentReversal 8/8, full suite 18 suites / 144 tests (jest --maxWorkers=2; pnpm test doesn't forward that flag, so use npx jest). Opus diff-read: OK. Orchestrator one-line fixes: cancelReason typeof-string guard (a non-string reason threw outside the try); original Transaction date in the reversal note formatted YYYY-MM-DD instead of Date.toString(). Re-ran 8/8.
 - 2026-10-08 21:57 U4 done. Verifier: 25 targeted, full 18 suites / 148 tests.
+- 2026-10-08 G1 gate (Opus): PASS. `git diff 676f153..8c66a27`: U1–U3 were each diff-read at commit, and this gate checked how they fit together.
+  - One `date` per applyPayment call: the controller passes an explicit `ctx.date`, and transactionId linking matches on it.
+  - The ±10 s legacy matcher filters `amount: r.totalPaid` (positive), so it can never select a negative reversal Transaction.
+  - `res.json` is sent after `withTransaction` resolves in reverseRevolvingPayment.
+  - Consumers: `interest_charge` isn't counted as cash anywhere. auditBankBalance `totalPaidOnLoan` sums only interest_payment/principal_payment, and the negated entries net out (U4 tests prove this for cycleCollections and interestObligation). The dashboard counts accrual + interest_charge. `reversedAt`-stamped originals plus negated entries net to zero, with no double count.
+  - Full suite 18 suites / 148 tests. `auditBankBalance.js --all` on dev Atlas: all 6 groups K0.00 diff, exit 0. William's Group is now K0, so the old ~K18,177 drift has been reset.
