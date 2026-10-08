@@ -514,9 +514,10 @@ Sign in at `/sign-in` with the printed email/password; OTP **424242**. **Clean u
   - Final verification loop: backend 18/148 pass, frontend 6/12 pass, `auditBankBalance.js --all` on dev Atlas: 6 groups, K0.00 diff.
   - Preflight is NOT the full gate.
 - 2026-10-08 Phase 4: build complete, branch local, not pushed. Awaiting William's push decision.
+- 2026-10-08 William approved the push. `build/revolving-payment-corrections` is pushed to origin. main is untouched.
 
 ## Next session (Rollout — Sonnet, new session)
-1. If not yet pushed: push `build/revolving-payment-corrections` only when William says yes. Merging to `main` (= production deploy, Auto Deploy on) is a separate question.
+1. The branch is pushed (2026-10-08). Merging to `main` (= production deploy, Auto Deploy on) is a separate question.
 2. Optional before merge, William's call: fix reviewer P2 #2 (reversal reopening a paid-off loan while a newer open loan exists: 409 guard + sort the top-up findOne) and P2 #4 (malformed loanId gives 404). Both are small, and neither blocks Muya's fix.
 3. Then follow §Rollout steps 2–6 (health check, production group audit, Simon's instructions, re-audit, ticket reply, `/brain log`).
 4. Deadline: live before Simon's October Month-End (~25/10).
