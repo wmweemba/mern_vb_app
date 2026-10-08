@@ -8,7 +8,7 @@ const Loan = require('../models/Loans');
 const mongoose = require('mongoose');
 
 exports.repayment = async (req, res) => {
-  const { username, amount, note, loanId, allocation } = req.body;
+  const { username, amount, note, loanId, allocation, chargeInterestShortfall } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -47,9 +47,14 @@ exports.repayment = async (req, res) => {
 
     if (loan.accrualMode === 'revolving') {
       const strategy = resolveLoanAccrualStrategyForLoan(loan);
+      const paymentDate = new Date();
       let result;
       try {
-        result = strategy.applyPayment(loan, paymentAmount, allocation || {}, { recordedBy: req.memberId });
+        result = strategy.applyPayment(loan, paymentAmount, allocation || {}, {
+          recordedBy: req.memberId,
+          date: paymentDate,
+          chargeInterestShortfall: chargeInterestShortfall === true,
+        });
       } catch (err) {
         await session.abortTransaction();
         return res.status(err.status || 400).json({ error: err.message });
@@ -57,23 +62,37 @@ exports.repayment = async (req, res) => {
 
       if (result.fullyPaid) loan.fullyPaid = true;
 
-      await loan.save({ session });
       await updateBankBalance(paymentAmount, req.groupId, session);
-      await logTransaction({
+      const defaultNote = result.interestCharged > 0
+        ? `Payment — in-month interest charged K${result.interestCharged}; interest K${result.toInterest}, principal K${result.toPrincipal}`
+        : `Payment — interest K${result.toInterest}, principal K${result.toPrincipal}`;
+      const tx = await logTransaction({
         userId,
         type: 'loan_payment',
         amount: paymentAmount,
-        note: note || `Payment — interest K${result.toInterest}, principal K${result.toPrincipal}`,
+        note: note || defaultNote,
         referenceId: loan._id,
         groupId: req.groupId
       }, session);
+
+      loan.entries.forEach(entry => {
+        if (entry.date && entry.date.getTime() === paymentDate.getTime()) {
+          entry.transactionId = tx._id;
+        }
+      });
+
+      await loan.save({ session });
 
       await session.commitTransaction();
 
       return res.json({
         message: 'Loan payment recorded successfully',
         paymentAmount,
-        allocation: { toInterest: result.toInterest, toPrincipal: result.toPrincipal },
+        allocation: {
+          toInterest: result.toInterest,
+          toPrincipal: result.toPrincipal,
+          interestCharged: result.interestCharged,
+        },
         loanFullyPaid: result.fullyPaid,
         loan
       });

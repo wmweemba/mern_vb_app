@@ -126,6 +126,21 @@ async function seedLoan(overrides = {}) {
   });
 }
 
+async function seedRevolvingLoan(overrides = {}) {
+  return Loan().create({
+    userId: ADMIN_ID, groupId: GROUP_A,
+    amount: 4200, durationMonths: 1,
+    interestRate: 10, interestMethod: 'reducing',
+    accrualMode: 'revolving',
+    principalBalance: 4200,
+    interestOutstanding: 0,
+    entries: [],
+    fullyPaid: false, archived: false,
+    installments: [],
+    ...overrides,
+  });
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('paymentController.repayment — auto-fine on partial payment', () => {
@@ -283,6 +298,75 @@ describe('paymentController.repayment — auto-fine on partial payment', () => {
     expect(fines).toHaveLength(1);
     expect(fines[0].installmentMonth).toBe(2); // fine on month 2, not month 1
     expect(fines[0].amount).toBe(500);
+  });
+
+});
+
+describe('paymentController.repayment — revolving loan in-month interest charge + transactionId linking', () => {
+
+  test('8. in-month interest charge with flag → 200, links transactionId on all three entries, BankBalance +2420', async () => {
+    await seedBase(500);
+    const loan = await seedRevolvingLoan();
+
+    const res = await request(app)
+      .post('/api/payments/repayment')
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({
+        username: 'Alice Banda',
+        amount: 2420,
+        loanId: loan._id,
+        allocation: { toInterest: 220, toPrincipal: 2200 },
+        chargeInterestShortfall: true,
+      });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.allocation.interestCharged).toBe(220);
+
+    const updated = await Loan().findById(loan._id);
+    expect(updated.principalBalance).toBe(2000);
+    expect(updated.interestOutstanding).toBe(0);
+
+    const tx = await Transaction().find({ groupId: GROUP_A, type: 'loan_payment' });
+    expect(tx).toHaveLength(1);
+    expect(tx[0].amount).toBe(2420);
+    expect(tx[0].note).toBe('Payment — in-month interest charged K220; interest K220, principal K2200');
+
+    const newEntries = updated.entries.filter(e =>
+      ['interest_charge', 'interest_payment', 'principal_payment'].includes(e.type)
+    );
+    expect(newEntries).toHaveLength(3);
+    newEntries.forEach(e => {
+      expect(e.transactionId.toString()).toBe(tx[0]._id.toString());
+    });
+
+    const bb = await BankBalance().findOne({ groupId: GROUP_A });
+    expect(bb.balance).toBe(2420);
+  });
+
+  test('9. same payment without the flag → 400, no BankBalance change, no Transaction', async () => {
+    await seedBase(500);
+    const loan = await seedRevolvingLoan();
+
+    const res = await request(app)
+      .post('/api/payments/repayment')
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({
+        username: 'Alice Banda',
+        amount: 2420,
+        loanId: loan._id,
+        allocation: { toInterest: 220, toPrincipal: 2200 },
+      });
+
+    expect(res.statusCode).toBe(400);
+
+    const updated = await Loan().findById(loan._id);
+    expect(updated.principalBalance).toBe(4200);
+
+    const bb = await BankBalance().findOne({ groupId: GROUP_A });
+    expect(bb.balance).toBe(0);
+
+    const tx = await Transaction().find({ groupId: GROUP_A });
+    expect(tx).toHaveLength(0);
   });
 
 });
