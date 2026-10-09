@@ -95,18 +95,24 @@ function accrue(loan, ctx = {}) {
 // case), but callers should always pass an explicit allocation when the member
 // specified one; a fixed waterfall would silently misrecord any member who directs
 // otherwise.
+//
+// In-month interest (docs/build/revolving-payment-corrections/plan.md): Month-End
+// accrual only charges interest on the principal outstanding when it runs, so money
+// borrowed and repaid within the same month (before that month's accrual) escapes
+// interest entirely unless the treasurer opts in here. When the requested
+// toInterest exceeds what's currently outstanding AND ctx.chargeInterestShortfall
+// === true, the shortfall is raised onto interestOutstanding via a new
+// 'interest_charge' entry before the payment itself is applied — this is never
+// automatic, the caller must explicitly opt in. Without the flag, the allocation is
+// refused exactly as before.
 function applyPayment(loan, paymentAmount, allocation = {}, ctx = {}) {
+  // One date for every entry this call may push (charge + interest_payment +
+  // principal_payment) — callers and consumers treat "same date" as "same payment".
+  const date = ctx.date || new Date();
+
   const amount = round2(paymentAmount);
   const principalBalance = loan.principalBalance || 0;
   const interestOutstanding = loan.interestOutstanding || 0;
-  const totalOutstanding = round2(principalBalance + interestOutstanding);
-
-  if (amount > totalOutstanding + EPSILON) {
-    throw Object.assign(
-      new Error(`Payment of K${amount} exceeds outstanding balance of K${totalOutstanding}`),
-      { status: 400 }
-    );
-  }
 
   let toInterest = allocation.toInterest !== undefined ? round2(allocation.toInterest) : undefined;
   let toPrincipal = allocation.toPrincipal !== undefined ? round2(allocation.toPrincipal) : undefined;
@@ -125,12 +131,38 @@ function applyPayment(loan, paymentAmount, allocation = {}, ctx = {}) {
     }
   }
 
+  let interestCharged = 0;
+  let effectiveInterestOutstanding = interestOutstanding;
+
   if (toInterest > interestOutstanding + EPSILON) {
+    if (ctx.chargeInterestShortfall === true) {
+      interestCharged = round2(toInterest - interestOutstanding);
+      effectiveInterestOutstanding = round2(interestOutstanding + interestCharged);
+    } else {
+      throw Object.assign(
+        new Error(
+          `Cannot allocate K${toInterest} to interest — only K${interestOutstanding} is outstanding`
+          + ' — confirm an in-month interest charge to record interest before Month-End'
+        ),
+        { status: 400 }
+      );
+    }
+  }
+
+  // The outstanding-balance check runs after any in-month charge has been folded in,
+  // so a payment covering newly-charged interest (not yet reflected in
+  // interestOutstanding before this call) is correctly allowed. It still runs before
+  // the per-component principal check below, so a bulk overpayment reports the
+  // general "exceeds outstanding balance" error rather than a confusing
+  // principal-only one.
+  const totalOutstanding = round2(principalBalance + effectiveInterestOutstanding);
+  if (amount > totalOutstanding + EPSILON) {
     throw Object.assign(
-      new Error(`Cannot allocate K${toInterest} to interest — only K${interestOutstanding} is outstanding`),
+      new Error(`Payment of K${amount} exceeds outstanding balance of K${totalOutstanding}`),
       { status: 400 }
     );
   }
+
   if (toPrincipal > principalBalance + EPSILON) {
     throw Object.assign(
       new Error(`Cannot allocate K${toPrincipal} to principal — only K${principalBalance} is outstanding`),
@@ -138,10 +170,21 @@ function applyPayment(loan, paymentAmount, allocation = {}, ctx = {}) {
     );
   }
 
-  loan.interestOutstanding = round2(interestOutstanding - toInterest);
+  if (interestCharged > 0) {
+    loan.entries.push({
+      date,
+      type: 'interest_charge',
+      amount: interestCharged,
+      principalAfter: principalBalance,
+      interestAfter: effectiveInterestOutstanding,
+      transactionId: ctx.transactionId,
+      recordedBy: ctx.recordedBy,
+    });
+  }
+
+  loan.interestOutstanding = round2(effectiveInterestOutstanding - toInterest);
   loan.principalBalance = round2(principalBalance - toPrincipal);
 
-  const date = ctx.date || new Date();
   if (toInterest > 0) {
     loan.entries.push({
       date,
@@ -168,7 +211,109 @@ function applyPayment(loan, paymentAmount, allocation = {}, ctx = {}) {
   return {
     toInterest,
     toPrincipal,
+    interestCharged,
     fullyPaid: loan.principalBalance <= EPSILON && loan.interestOutstanding <= EPSILON,
+  };
+}
+
+// Reverses one previously-recorded payment "set" — every entry an applyPayment call
+// pushed, identified by sharing the same date (the "same date = one payment"
+// invariant applyPayment maintains). Reversal never deletes or edits the original
+// entries; it appends negated entries (reversalOf linking back) and stamps the
+// originals with reversedAt/reversedBy/reverseReason. Pure: the caller owns
+// persistence, BankBalance and Transaction logging.
+//
+// entryId may be any one entry in the set (interest_charge / interest_payment /
+// principal_payment, amount > 0, not already a reversal and not already reversed) —
+// reversing any one reverses the whole set it belongs to.
+function reversePayment(loan, entryId, ctx = {}) {
+  const REVERSIBLE_TYPES = ['interest_charge', 'interest_payment', 'principal_payment'];
+
+  const entry = (loan.entries || []).find((e) => String(e._id) === String(entryId));
+  if (
+    !entry
+    || !REVERSIBLE_TYPES.includes(entry.type)
+    || !(entry.amount > 0)
+    || entry.reversalOf
+  ) {
+    throw Object.assign(new Error('No reversible payment entry found for that id'), { status: 400 });
+  }
+
+  const setDate = entry.date;
+  const setTime = setDate.getTime();
+  const set = loan.entries.filter((e) => (
+    REVERSIBLE_TYPES.includes(e.type)
+    && e.amount > 0
+    && !e.reversalOf
+    && e.date.getTime() === setTime
+  ));
+
+  if (set.some((e) => e.reversedAt)) {
+    throw Object.assign(new Error('This payment has already been reversed'), { status: 400 });
+  }
+
+  const laterAccrualOrCapitalisation = (loan.entries || []).some((e) => (
+    (e.type === 'accrual' || e.type === 'capitalisation')
+    && e.date.getTime() > setTime
+  ));
+  if (laterAccrualOrCapitalisation) {
+    throw Object.assign(
+      new Error('Month-End Interest has run since this payment; it can no longer be reversed'),
+      { status: 400 }
+    );
+  }
+
+  const sumByType = (type) => round2(
+    set.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0)
+  );
+  const toPrincipal = sumByType('principal_payment');
+  const toInterest = sumByType('interest_payment');
+  const interestCharged = sumByType('interest_charge');
+
+  const restoredPrincipal = round2((loan.principalBalance || 0) + toPrincipal);
+  const restoredInterest = round2((loan.interestOutstanding || 0) + toInterest - interestCharged);
+
+  if (restoredInterest < -EPSILON) {
+    throw Object.assign(
+      new Error('Reversal would drive interestOutstanding negative — data corruption suspected'),
+      { status: 500 }
+    );
+  }
+
+  loan.principalBalance = restoredPrincipal;
+  loan.interestOutstanding = Math.max(0, restoredInterest);
+
+  const reversalDate = ctx.date || new Date();
+  let transactionId = null;
+  for (const e of set) {
+    if (e.transactionId) {
+      transactionId = e.transactionId;
+      break;
+    }
+  }
+
+  for (const e of set) {
+    loan.entries.push({
+      date: reversalDate,
+      type: e.type,
+      amount: -e.amount,
+      principalAfter: loan.principalBalance,
+      interestAfter: loan.interestOutstanding,
+      reversalOf: e._id,
+      recordedBy: ctx.reversedBy,
+    });
+    e.reversedAt = reversalDate;
+    e.reversedBy = ctx.reversedBy;
+    e.reverseReason = ctx.reason;
+  }
+
+  return {
+    toInterest,
+    toPrincipal,
+    interestCharged,
+    totalPaid: round2(toInterest + toPrincipal),
+    setDate,
+    transactionId,
   };
 }
 
@@ -181,5 +326,6 @@ module.exports = {
   onDisburse,
   accrue,
   applyPayment,
+  reversePayment,
   outstanding,
 };

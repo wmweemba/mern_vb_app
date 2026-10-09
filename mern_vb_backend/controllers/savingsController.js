@@ -229,11 +229,13 @@ exports.getDashboardStats = async (req, res) => {
       // paid status, so this is total interest charged, not total interest collected.
       // Revolving loans have no installments — the equivalent is each period's
       // 'accrual' entry (utils/strategies/loanAccrual/revolvingMonthly.js), which is
-      // likewise charged whether or not it's later paid.
+      // likewise charged whether or not it's later paid. In-month interest charges
+      // (recorded at payment time, before Month-End runs) are also included; their
+      // negated reversal entries net out automatically.
       if (loan.accrualMode === 'revolving') {
         if (Array.isArray(loan.entries)) {
           totalInterestLoans += loan.entries
-            .filter(e => e.type === 'accrual')
+            .filter(e => e.type === 'accrual' || e.type === 'interest_charge')
             .reduce((sum, e) => sum + (e.amount || 0), 0);
         }
       } else if (Array.isArray(loan.installments)) {

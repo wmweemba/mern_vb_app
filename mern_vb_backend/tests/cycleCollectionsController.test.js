@@ -50,6 +50,32 @@ describe('summarizeLoans — scheduled loans', () => {
     ];
     expect(summarizeLoans(loans)).toEqual({ monthlyInterest: 490, loanRepayment: 400 });
   });
+
+  test('reversal entries (negative amount with reversalOf) net to zero with originals', () => {
+    const paymentEntryId1 = '507f1f77bcf86cd799439011';
+    const paymentEntryId2 = '507f1f77bcf86cd799439012';
+    const loans = [{
+      accrualMode: 'revolving',
+      entries: [
+        { _id: paymentEntryId1, type: 'interest_payment', amount: 220 },
+        { _id: paymentEntryId2, type: 'principal_payment', amount: 2200 },
+        { type: 'interest_payment', amount: -220, reversalOf: paymentEntryId1 },
+        { type: 'principal_payment', amount: -2200, reversalOf: paymentEntryId2 },
+      ],
+    }];
+    expect(summarizeLoans(loans)).toEqual({ monthlyInterest: 0, loanRepayment: 0 });
+  });
+
+  test('sanity: non-reversed interest_payment and principal_payment entries sum correctly', () => {
+    const loans = [{
+      accrualMode: 'revolving',
+      entries: [
+        { type: 'interest_payment', amount: 220 },
+        { type: 'principal_payment', amount: 2200 },
+      ],
+    }];
+    expect(summarizeLoans(loans)).toEqual({ monthlyInterest: 220, loanRepayment: 2200 });
+  });
 });
 
 // Total arithmetic (mirrors buildSummary's reduction, without the DB round-trip —

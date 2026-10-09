@@ -24,6 +24,7 @@ router.get('/', verifyToken, resolveGroup, checkTrial, loanController.getAllLoan
 router.put('/repay', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.repayInstallment);
 router.put('/:loanId', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.updateLoan);
 router.put('/:loanId/installments/:month/reverse', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.reverseInstallmentPayment);
+router.put('/:loanId/entries/:entryId/reverse', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer', 'treasurer'), loanController.reverseRevolvingPayment);
 router.delete('/:loanId', verifyToken, resolveGroup, checkTrial, allowRoles('admin', 'loan_officer'), loanController.deleteLoan);
 
 module.exports = router;

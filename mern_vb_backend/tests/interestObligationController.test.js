@@ -19,6 +19,28 @@ describe('interestPaidOnLoan — revolving loans', () => {
     const loan = { accrualMode: 'revolving', entries: [{ type: 'disbursement', amount: 1000 }] };
     expect(interestPaidOnLoan(loan)).toBe(0);
   });
+
+  test('reversal entries (negative amount with reversalOf) net to zero with originals', () => {
+    const paymentEntryId = '507f1f77bcf86cd799439011';
+    const loan = {
+      accrualMode: 'revolving',
+      entries: [
+        { _id: paymentEntryId, type: 'interest_payment', amount: 220 },
+        { type: 'interest_payment', amount: -220, reversalOf: paymentEntryId },
+      ],
+    };
+    expect(interestPaidOnLoan(loan)).toBe(0);
+  });
+
+  test('sanity: non-reversed interest_payment entries sum correctly', () => {
+    const loan = {
+      accrualMode: 'revolving',
+      entries: [
+        { type: 'interest_payment', amount: 220 },
+      ],
+    };
+    expect(interestPaidOnLoan(loan)).toBe(220);
+  });
 });
 
 describe('interestPaidOnLoan — scheduled loans', () => {
