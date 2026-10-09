@@ -18,6 +18,10 @@
  *  6. Member role → 403.
  *  7. Loan in another group → 404.
  *  8. Reversing a payment that made the loan fullyPaid → fullyPaid reset to false.
+ *  9. Paid-off loan while the member has a newer open revolving loan → 409, nothing changed.
+ * 10. Paid-off loan whose member has only closed/archived other loans → still reversible.
+ * 11. Malformed loanId → 404 (was a 500 CastError).
+ * 12. createLoan top-up posts to the member's newest open revolving loan.
  */
 
 jest.mock('@clerk/express', () => ({
@@ -373,5 +377,138 @@ describe('Revolving payment reversal', () => {
     const updated = await Loan().findById(loan._id);
     expect(updated.fullyPaid).toBe(false);
     expect(updated.principalBalance).toBe(2200);
+  });
+
+  test('9. paid-off loan while the member has a newer open loan → 409, nothing changed', async () => {
+    await seedBase();
+    const paymentDate = new Date('2026-10-07T10:54:41.578Z');
+    const paidOff = await Loan().create({
+      userId: MUYA, groupId: GROUP_A,
+      amount: 2200, durationMonths: 1, interestRate: 10, interestMethod: 'reducing',
+      accrualMode: 'revolving', principalBalance: 0, interestOutstanding: 0,
+      fullyPaid: true, archived: false, installments: [],
+      createdAt: new Date('2026-10-03T07:31:00.470Z'),
+      entries: [
+        { date: new Date('2026-10-03T07:31:00.470Z'), type: 'disbursement', amount: 2200, principalAfter: 2200, interestAfter: 0 },
+        { date: paymentDate, type: 'principal_payment', amount: 2200, principalAfter: 0, interestAfter: 0 },
+      ],
+    });
+    await Loan().create({
+      userId: MUYA, groupId: GROUP_A,
+      amount: 1000, durationMonths: 1, interestRate: 10, interestMethod: 'reducing',
+      accrualMode: 'revolving', principalBalance: 1000, interestOutstanding: 0,
+      fullyPaid: false, archived: false, installments: [],
+      createdAt: new Date('2026-10-08T09:00:00.000Z'),
+      entries: [
+        { date: new Date('2026-10-08T09:00:00.000Z'), type: 'disbursement', amount: 1000, principalAfter: 1000, interestAfter: 0 },
+      ],
+    });
+    await Transaction().create({
+      userId: MUYA, groupId: GROUP_A, type: 'loan_payment', amount: 2200,
+      referenceId: paidOff._id, note: 'Payment — interest K0, principal K2200',
+      createdAt: new Date('2026-10-07T10:54:41.600Z'),
+    });
+    const txCountBefore = await Transaction().countDocuments({});
+
+    const res = await request(app)
+      .put(`/api/loans/${paidOff._id}/entries/${paidOff.entries[1]._id}/reverse`)
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({ cancelReason: 'Recorded in error' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toMatch(/newer open loan/);
+
+    const unchanged = await Loan().findById(paidOff._id);
+    expect(unchanged.fullyPaid).toBe(true);
+    expect(unchanged.principalBalance).toBe(0);
+    expect(unchanged.entries[1].reversedAt).toBeFalsy();
+    expect(unchanged.entries).toHaveLength(2);
+    expect((await BankBalance().findOne({ groupId: GROUP_A })).balance).toBe(10000);
+    expect(await Transaction().countDocuments({})).toBe(txCountBefore);
+  });
+
+  test('10. paid-off loan with no other open loan is still reversible (guard is narrow)', async () => {
+    // Same as test 8, plus a closed (fullyPaid) and an archived loan for the member —
+    // neither is "open", so neither should block.
+    await seedBase();
+    const loan = await Loan().create({
+      userId: MUYA, groupId: GROUP_A,
+      amount: 2200, durationMonths: 1, interestRate: 10, interestMethod: 'reducing',
+      accrualMode: 'revolving', principalBalance: 0, interestOutstanding: 0,
+      fullyPaid: true, archived: false, installments: [],
+      entries: [
+        { date: new Date('2026-10-03T07:31:00.470Z'), type: 'disbursement', amount: 2200, principalAfter: 2200, interestAfter: 0 },
+        { date: new Date('2026-10-07T10:54:41.578Z'), type: 'principal_payment', amount: 2200, principalAfter: 0, interestAfter: 0 },
+      ],
+    });
+    const closedLoanBase = {
+      userId: MUYA, groupId: GROUP_A,
+      amount: 500, durationMonths: 1, interestRate: 10, interestMethod: 'reducing',
+      accrualMode: 'revolving', interestOutstanding: 0, installments: [], entries: [],
+    };
+    await Loan().create({ ...closedLoanBase, principalBalance: 0, fullyPaid: true, archived: false });
+    await Loan().create({ ...closedLoanBase, principalBalance: 500, fullyPaid: false, archived: true });
+    await Transaction().create({
+      userId: MUYA, groupId: GROUP_A, type: 'loan_payment', amount: 2200,
+      referenceId: loan._id, note: 'Payment — interest K0, principal K2200',
+      createdAt: new Date('2026-10-07T10:54:41.600Z'),
+    });
+
+    const res = await request(app)
+      .put(`/api/loans/${loan._id}/entries/${loan.entries[1]._id}/reverse`)
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({ cancelReason: 'Recorded in error' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.loan.fullyPaid).toBe(false);
+  });
+
+  test('11. malformed loanId → 404, not a 500 CastError', async () => {
+    await seedBase();
+    const res = await request(app)
+      .put('/api/loans/not-an-object-id/entries/6ac624f15a6d213606539aea/reverse')
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({ cancelReason: 'Recorded in error' });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body.error).toBe('Loan not found');
+    expect(JSON.stringify(res.body)).not.toMatch(/Cast to ObjectId/);
+  });
+});
+
+describe('Revolving top-up target', () => {
+  test('12. with two open revolving loans (legacy state), a top-up posts to the newest', async () => {
+    await seedBase();
+    await GroupSettings().updateOne(
+      { groupId: GROUP_A },
+      { $set: { 'policies.loanAccrual': 'revolving_monthly', 'policies.loanLimit': 'none' } }
+    );
+    const openLoanBase = {
+      userId: MUYA, groupId: GROUP_A,
+      durationMonths: 1, interestRate: 10, interestMethod: 'reducing',
+      accrualMode: 'revolving', interestOutstanding: 0,
+      fullyPaid: false, archived: false, installments: [],
+    };
+    // Inserted oldest-first, so an unsorted findOne would return the older loan.
+    const older = await Loan().create({
+      ...openLoanBase, amount: 1000, principalBalance: 1000,
+      createdAt: new Date('2026-09-01T09:00:00.000Z'),
+      entries: [{ date: new Date('2026-09-01T09:00:00.000Z'), type: 'disbursement', amount: 1000, principalAfter: 1000, interestAfter: 0 }],
+    });
+    const newer = await Loan().create({
+      ...openLoanBase, amount: 3000, principalBalance: 3000,
+      createdAt: new Date('2026-10-01T09:00:00.000Z'),
+      entries: [{ date: new Date('2026-10-01T09:00:00.000Z'), type: 'disbursement', amount: 3000, principalAfter: 3000, interestAfter: 0 }],
+    });
+
+    const res = await request(app)
+      .post('/api/loans')
+      .set('Authorization', 'Bearer valid-admin-token')
+      .send({ username: 'Muyapekwa E Daka', amount: 500 });
+
+    expect([200, 201]).toContain(res.statusCode);
+    expect((await Loan().findById(newer._id)).principalBalance).toBe(3500);
+    expect((await Loan().findById(older._id)).principalBalance).toBe(1000);
+    expect(await Loan().countDocuments({ userId: MUYA })).toBe(2);
   });
 });

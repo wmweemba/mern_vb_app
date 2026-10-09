@@ -81,6 +81,9 @@ exports.reverseRevolvingPayment = async (req, res) => {
     return res.status(400).json({ error: 'A cancel reason is required to reverse a payment' });
   }
   const reason = cancelReason.trim();
+  if (!mongoose.isValidObjectId(loanId)) {
+    return res.status(404).json({ error: 'Loan not found' });
+  }
 
   const session = await mongoose.startSession();
 
@@ -96,6 +99,25 @@ exports.reverseRevolvingPayment = async (req, res) => {
       }
       if (loan.archived) {
         throw Object.assign(new Error('Cannot reverse a payment on an archived loan'), { status: 400 });
+      }
+      // Reversing reopens a paid-off loan. If the member has since been given a newer
+      // open revolving loan, that would leave them with two — and top-ups/repayments
+      // would no longer know which one to post to.
+      if (loan.fullyPaid) {
+        const otherOpenLoan = await Loan.exists({
+          ...req.groupScope,
+          userId: loan.userId,
+          accrualMode: 'revolving',
+          fullyPaid: false,
+          archived: { $ne: true },
+          _id: { $ne: loan._id },
+        }).session(session);
+        if (otherOpenLoan) {
+          throw Object.assign(
+            new Error('This member has a newer open loan. Reversing this payment would reopen the paid-off loan alongside it, so it cannot be reversed here.'),
+            { status: 409 }
+          );
+        }
       }
 
       const strategy = resolveLoanAccrualStrategyForLoan(loan);
@@ -366,7 +388,7 @@ exports.createLoan = async (req, res) => {
       // the same member — mirrors the workbook's "New Loan total" column.
       let loan = await Loan.findOne({
         userId, ...req.groupScope, accrualMode: 'revolving', fullyPaid: false, archived: { $ne: true }
-      });
+      }).sort({ createdAt: -1 });
       const isTopUp = !!loan;
 
       if (isTopUp) {
