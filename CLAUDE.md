@@ -841,6 +841,8 @@ Added 2026-10-08 (support ticket: Simon Peter's group recorded a K2,420 revolvin
 
 8. **Top-ups (new loans via `createLoan`) still have no `transactionId` link — a follow-up.** `loanController.createLoan`'s disbursement-via-`onDisburse` path was written before reversal support existed; linking it is out of scope for this fix but should be done before the next payment-reversal change, or the matching heuristic will grow more fragile.
 
+9. **A member must never have two open revolving loans — reversal refuses to create that state (added 2026-10-09).** Reversing a payment that paid a loan off sets it back to `fullyPaid: false`. If the member has since been given a newer open revolving loan (`createLoan` opens a fresh one when none is open), `reverseRevolvingPayment` returns `409` instead of reopening the old loan beside it. Two open loans would make top-ups and repayments ambiguous about which loan to post to. As a backstop for any legacy data already in that state, `createLoan`'s top-up lookup sorts by `createdAt: -1`, so it posts to the newest. A malformed `loanId` on the reverse route returns `404` (not a 500 CastError).
+
 ---
 
 *Last updated: 2026-10-08 — Revolving Payment Corrections (in-month interest charge + payment reversal) added*
