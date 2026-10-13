@@ -60,7 +60,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U3 | `extendGroupSubscription` + activate refactor | sonnet | high | — | `utils/subscription.js`, `controllers/adminBillingController.js`, `tests/adminBilling.test.js` | done |
 | U4 | Resolver + notifications | sonnet | high | U1 U2 U3 | `utils/subscriptionCollection.js`, `utils/notifyBilling.js`, `tests/subscriptionCollection.test.js` | done |
 | U5 | Initiate route | sonnet | high | U4 | `controllers/subscriptionPaymentController.js`, `routes/subscriptionPaymentRoutes.js`, `server.js`, `tests/subscriptionPaymentInitiate.test.js` | done |
-| U6 | Attempt / latest / history routes | sonnet | high | U5 | same controller + routes files, `tests/subscriptionPaymentRead.test.js` | todo |
+| U6 | Attempt / latest / history routes | sonnet | high | U5 | same controller + routes files, `tests/subscriptionPaymentRead.test.js` | done |
 | U7 | Lipila webhook route | sonnet | high | U4 | `routes/webhookRoutes.js`, `controllers/lipilaWebhookController.js`, `tests/lipilaWebhook.test.js` | todo |
 | U8 | Dev webhook simulator script | sonnet | high | U7 | `scripts/devSimulateLipilaWebhook.js` | todo |
 | U9 | Admin payments endpoint + pending-payments script | sonnet | low | U1 | `controllers/adminBillingController.js` (new handler only), `routes/admin.js`, `scripts/listPendingSubscriptionPayments.js`, `tests/adminBilling.test.js` (append) | todo |
@@ -289,3 +289,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - **G1 (after U1–U3):** Opus read the activate diff and `utils/subscription.js` line by line: same arithmetic as before, now inside a transaction; malformed groupId still a CastError → 500 as before (pre-existing). Lipila signature code matches the spike scheme. Step 3d (manual activate/extend/mark-unpaid/trial edit in the dev UI as super admin) is deferred to Phase 3 E2E flow 7. PASS.
 - U4 done after one Opus-requested fix-up: group_missing now notifies William (was silent); post-commit notifications detached so a hung Telegram/Resend can't hang the webhook or poll. 213 tests pass. Note for U5–U8: Mongoose timestamps strip createdAt from $set — backdate test rows via Model.collection.updateOne.
 - U5 done: 231 tests pass. Opus read the controller: post-commit attempt.save() writes only modified paths, so it can't clobber a concurrent webhook success.
+- U6 done: 249 tests pass. /latest returns attempt:null without querying when the kill switch is off.

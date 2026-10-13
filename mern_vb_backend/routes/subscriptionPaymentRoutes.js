@@ -8,5 +8,8 @@ const controller = require('../controllers/subscriptionPaymentController');
 // expired-trial or lapsed-paid group must still be able to pay. requireRole
 // takes an ARRAY, it is not variadic (middleware/auth.js).
 router.post('/initiate', verifyToken, resolveGroup, requireRole(['admin', 'treasurer']), controller.initiate);
+router.get('/attempts/:attemptId', verifyToken, resolveGroup, requireRole(['admin', 'treasurer']), controller.getAttempt);
+router.get('/latest', verifyToken, resolveGroup, requireRole(['admin', 'treasurer']), controller.getLatest);
+router.get('/history', verifyToken, resolveGroup, requireRole(['admin', 'treasurer']), controller.getHistory);
 
 module.exports = router;

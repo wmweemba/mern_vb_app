@@ -8,11 +8,36 @@ const SubscriptionPayment = require('../models/SubscriptionPayment');
 const PLANS = require('../config/plans');
 const { normalizeZambianMsisdn, maskMsisdn } = require('../utils/msisdn');
 const { initiateCollection, classifyFailureReason } = require('../utils/lipilaClient');
+const { reconcileAttempt } = require('../utils/subscriptionCollection');
 
 const ATTEMPT_RESUME_WINDOW_MS = 90 * 1000;
 const THROTTLE_WINDOW_MS = 60 * 60 * 1000;
 const MAX_ATTEMPTS_PER_GROUP_PER_HOUR = 5;
 const MAX_ATTEMPTS_PER_MSISDN_PER_HOUR = 3;
+
+// Step 4b/4c's shared reconcile throttle: a pending attempt is only re-checked
+// against Lipila if it's old enough that a webhook should already have
+// arrived, and not so recently checked that we'd hammer the provider on every
+// poll tick.
+const RECONCILE_MIN_AGE_MS = 20 * 1000;
+const RECONCILE_THROTTLE_MS = 15 * 1000;
+const LATEST_WINDOW_MS = 24 * 60 * 60 * 1000;
+const LATEST_PENDING_RESUME_WINDOW_MS = 10 * 60 * 1000;
+const HISTORY_MAX = 24;
+
+function shouldReconcile(attempt) {
+  if (!attempt || attempt.status !== 'pending') return false;
+  const ageMs = Date.now() - attempt.createdAt.getTime();
+  if (ageMs <= RECONCILE_MIN_AGE_MS) return false;
+  if (!attempt.lastCheckedAt) return true;
+  return Date.now() - attempt.lastCheckedAt.getTime() > RECONCILE_THROTTLE_MS;
+}
+
+// Never surfaced to the browser: raw failureReason/msisdn/rawResponse stay
+// server-side. failureKind is the only user-facing signal of why it failed.
+function toFailureKind(attempt) {
+  return attempt.status === 'failed' ? classifyFailureReason(attempt.failureReason) : null;
+}
 
 // Thrown to abort the transaction with a specific HTTP status/body — caught
 // outside withTransaction and turned into the response. Never a transient
@@ -223,5 +248,137 @@ exports.initiate = async (req, res) => {
   } catch (err) {
     console.error('Lipila initiate failed', err.message);
     return res.status(500).json({ error: 'Failed to initiate payment', details: err.message });
+  }
+};
+
+/**
+ * GET /api/billing/lipila/attempts/:attemptId
+ * See docs/plan_lipila_subscription_collection.md Step 4b.
+ */
+exports.getAttempt = async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    let attempt = await SubscriptionPayment.findOne({ _id: attemptId, groupId: req.groupId });
+    if (!attempt) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (shouldReconcile(attempt)) {
+      try {
+        const fresh = await reconcileAttempt(attempt._id);
+        if (fresh) attempt = fresh;
+      } catch (err) {
+        // A reconcile failure must never 500 the poll — the client keeps
+        // polling against the attempt as it last stood.
+        console.error('Lipila attempt reconcile failed', err.message);
+      }
+    }
+
+    return res.status(200).json({
+      data: {
+        status: attempt.status,
+        amount: attempt.amount,
+        currency: attempt.currency,
+        plan: attempt.plan,
+        failureKind: toFailureKind(attempt),
+        paidUntil: attempt.paidUntilAfter || null,
+      },
+    });
+  } catch (err) {
+    console.error('Lipila getAttempt failed', err.message);
+    return res.status(500).json({ error: 'Failed to load attempt', details: err.message });
+  }
+};
+
+/**
+ * GET /api/billing/lipila/latest
+ * See docs/plan_lipila_subscription_collection.md Step 4c.
+ */
+exports.getLatest = async (req, res) => {
+  try {
+    const enabled = process.env.LIPILA_ENABLED === 'true';
+    if (!enabled) {
+      // Kept simple per the brief: disabled means no reconcile and no attempt
+      // handed to the UI at all.
+      return res.status(200).json({ data: { enabled: false, attempt: null } });
+    }
+
+    let attempt = await SubscriptionPayment.findOne({
+      groupId: req.groupId,
+      createdAt: { $gte: new Date(Date.now() - LATEST_WINDOW_MS) },
+    }).sort({ createdAt: -1 });
+
+    if (!attempt) {
+      return res.status(200).json({ data: { enabled: true, attempt: null } });
+    }
+
+    if (shouldReconcile(attempt)) {
+      try {
+        const fresh = await reconcileAttempt(attempt._id);
+        if (fresh) attempt = fresh;
+      } catch (err) {
+        console.error('Lipila latest reconcile failed', err.message);
+      }
+    }
+
+    const isResumableSuccess = attempt.status === 'success';
+    const isResumablePending =
+      attempt.status === 'pending' && Date.now() - attempt.createdAt.getTime() < LATEST_PENDING_RESUME_WINDOW_MS;
+
+    if (!isResumableSuccess && !isResumablePending) {
+      return res.status(200).json({ data: { enabled: true, attempt: null } });
+    }
+
+    return res.status(200).json({
+      data: {
+        enabled: true,
+        attempt: {
+          attemptId: attempt._id,
+          status: attempt.status,
+          amount: attempt.amount,
+          currency: attempt.currency,
+          plan: attempt.plan,
+          maskedMsisdn: maskMsisdn(attempt.msisdn),
+          failureKind: toFailureKind(attempt),
+          paidUntil: attempt.paidUntilAfter || null,
+          createdAt: attempt.createdAt,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Lipila getLatest failed', err.message);
+    return res.status(500).json({ error: 'Failed to load latest attempt', details: err.message });
+  }
+};
+
+/**
+ * GET /api/billing/lipila/history
+ * See docs/plan_lipila_subscription_collection.md Step 4d.
+ */
+exports.getHistory = async (req, res) => {
+  try {
+    const attempts = await SubscriptionPayment.find({ groupId: req.groupId, status: 'success' })
+      .sort({ completedAt: -1 })
+      .limit(HISTORY_MAX);
+
+    return res.status(200).json({
+      data: attempts.map((attempt) => ({
+        date: attempt.completedAt,
+        plan: attempt.plan,
+        amount: attempt.amount,
+        currency: attempt.currency,
+        maskedMsisdn: maskMsisdn(attempt.msisdn),
+        providerExternalId: attempt.providerExternalId,
+        initiatedByName: attempt.initiatedByName,
+        paidUntilAfter: attempt.paidUntilAfter,
+      })),
+    });
+  } catch (err) {
+    console.error('Lipila getHistory failed', err.message);
+    return res.status(500).json({ error: 'Failed to load payment history', details: err.message });
   }
 };
