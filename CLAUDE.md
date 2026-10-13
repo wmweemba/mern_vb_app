@@ -8,7 +8,7 @@
 **App name:** Chama360 (formerly Village Banking App, repo still named `mern_vb_app`)
 **What it does:** Village banking group management — savings, loans, fines, reports, cycle management
 **Who uses it:** Group treasurers, loan officers, admins, members in Zambia
-**Current version:** 3.18.2
+**Current version:** 3.19.0
 **Sprint context:** 30-day commercial launch sprint, April 1–30 2026. Target: 2 paying groups at ZMW 150–250/month.
 
 ---
@@ -417,6 +417,12 @@ In order:
 MONGODB_URI=your_mongodb_connection_string
 PORT=5000
 JWT_SECRET=your_jwt_secret
+LIPILA_ENABLED=
+LIPILA_BASE_URL=
+LIPILA_API_KEY=
+LIPILA_WEBHOOK_SECRET=
+LIPILA_CALLBACK_URL=
+LIPILA_TEST_AMOUNT=
 ```
 
 ### Frontend `.env` (mern-vb-frontend/.env)
@@ -618,6 +624,13 @@ If anything is not clean, state what failed and fix it first.
 | Contribution type config | `mern_vb_backend/controllers/contributionTypeController.js` |
 | Backfill existing groups | `mern_vb_backend/scripts/seedContributionDefaults.js` |
 | Backdated entry the treasurer's book had but the app didn't | `mern_vb_backend/scripts/recordBackdatedContribution.js` (dry-run default) |
+| Lipila client (mobile money) | `mern_vb_backend/utils/lipilaClient.js` |
+| Subscription collection resolver | `mern_vb_backend/utils/subscriptionCollection.js` |
+| Group subscription activation | `mern_vb_backend/utils/subscription.js` |
+| Lipila payment routes | `mern_vb_backend/routes/subscriptionPaymentRoutes.js` |
+| Lipila webhook handler | `mern_vb_backend/controllers/lipilaWebhookController.js` |
+| Dev webhook simulator | `mern_vb_backend/scripts/devSimulateLipilaWebhook.js` |
+| Stuck payment check | `mern_vb_backend/scripts/listPendingSubscriptionPayments.js` |
 
 ---
 
@@ -845,5 +858,31 @@ Added 2026-10-08 (support ticket: Simon Peter's group recorded a K2,420 revolvin
 
 ---
 
-*Last updated: 2026-10-08 — Revolving Payment Corrections (in-month interest charge + payment reversal) added*
+## Automated Subscription Collection (Lipila) — Architecture Notes
+
+Added 2026-10-13 (mobile money subscription renewal via Lipila PIN prompt, ships dark behind `LIPILA_ENABLED`). Key decisions recorded here to prevent regression:
+
+1. **`SubscriptionPayment` model is never swept on group delete.** The schema carries `retainOnGroupDelete: true`, which excludes it from `scripts/utils/groupScopedModels.js` — payment records hold proof of real money and MNO references, and must outlive their group as an audit trail. `Group.lastPaymentAttemptAt` is written to serialize concurrent initiation attempts.
+
+2. **`extendGroupSubscription` in `utils/subscription.js` is the single path for both manual super-admin activation AND automated activation via the webhook.** Always called inside a transaction. Manual `activate` (the super-admin Platform Admin path) and automated webhook resolution both route through it, keeping the arithmetic identical. Manual control is the fallback of record — super admins can still extend a group by hand at any time.
+
+3. **The webhook `POST /api/webhooks/lipila/subscriptions` is the source of truth; polling via `GET /attempts/:id` and `/latest` is the fallback.** One idempotent `resolveAttempt(attemptId, result)` is called by both. The webhook does NOT check `LIPILA_ENABLED` — money that arrives always activates, even with the kill switch off. It uses `express.raw({ type: () => true })` for Standard Webhooks signature verification. Rejects unsigned requests with `401`, and returns `500` (not swallowed `200`) on any resolver error so Lipila retries — a previous port returned `200` on every error, losing failed webhooks forever.
+
+4. **Money that arrived always activates, even on an amount mismatch or late success.** A late success (payment succeeds after the attempt was marked `failed`) still extends the group and flags a warning. An amount mismatch still activates and flags a warning. Only `success` status is terminal; a `pending` attempt older than 30 minutes fails with `not_found_at_provider`, but a late Successful webhook can still activate it at any time.
+
+5. **Plan-too-small guard before any PIN prompt.** A group with more active members than a plan's `memberLimit` gets `409 PLAN_TOO_SMALL` immediately. Groups with > 40 members see "Contact us to subscribe" instead of Pay on the `/upgrade` UI, and William handles them manually via the super-admin path.
+
+6. **No `checkTrial` on billing routes.** An expired group must be able to pay. Every group-facing route uses `verifyToken`, `resolveGroup`, `requireRole(['admin', 'treasurer'])`.
+
+7. **Kill switch `LIPILA_ENABLED=true` controls visibility and the initiate endpoint.** When unset, initiate returns `503 UNAVAILABLE`, the pay card is hidden, and the manual form is shown as the only option. The webhook route does NOT check the kill switch — pending webhooks still resolve and activate groups with `LIPILA_ENABLED` off. A double guard on test amount: it applies **only when both** `NODE_ENV !== 'production'` **and** `LIPILA_BASE_URL` contains `lipila.dev` (sandbox).
+
+8. **Notifications are fire-and-forget, never inside `withTransaction()`.** Admin notices (Telegram + Resend) and receipt emails are sent after the transaction commits, detached via `Promise.allSettled`. A hung notification can never hang the webhook or polling response. MSISDNs are masked as `•••123` everywhere outside the `SubscriptionPayment` document itself.
+
+9. **Manual super-admin control (activate, extend, mark-unpaid, trial-expiry edit) is unchanged and remains the fallback of record.** The only changes to existing manual paths are the Step 3 refactor (wrapping `activate` in a transaction, behaviour-identical) and the additive read-only payments list in the Platform Admin Billing tab.
+
+10. **The App Subscription `GroupFund` is never touched by Lipila.** Money enters via mobile phone, not from the pot. If a treasurer reimburses from the pot, they record a `FundExpense` by hand as today.
+
+---
+
+*Last updated: 2026-10-13 — Automated Subscription Collection (Lipila) added*
 *Next review: April 7 (Week 1 checkpoint)*

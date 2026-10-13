@@ -6,7 +6,7 @@ fields the super-admin manual path uses. Manual super-admin control stays fully 
 remains the fallback of record. The feature ships dark (`LIPILA_ENABLED` unset).
 
 **Repo:** /Users/williammweemba/Dev_Projects/mern_vb_app · **Branch:** build/lipila-subscription-collection · **Base:** 9e78b37 (main, 2026-10-13)
-**Status:** building (approved 2026-10-13)
+**Status:** verifying (all units done 2026-10-13)
 **Source plan (authoritative for every detail):** `docs/plan_lipila_subscription_collection.md`
 This build covers its Steps 1–5, 7a, 7b (simulated rows), 8, 9, 10. **Not in this build:**
 Step 0a/0b/0c and Step 6 and matrix rows 18–19 (William, real money), Step 11 (push/merge/deploy,
@@ -68,7 +68,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U11 | Upgrade page: Lipila pay card | sonnet | high | U6 U10 | `src/features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx` | done |
 | U12 | Upgrade page: plan guards, role messaging, payment history | sonnet | low | U11 | `src/features/billing/PaymentHistory.jsx`, `pages/UpgradePage.jsx` | done |
 | U13 | Admin Billing tab payments list | sonnet | low | U9 | `pages/admin/AdminGroupDetail.jsx` (BillingTab only) | done |
-| U14 | Docs, runbook, version | haiku | low | all | `CLAUDE.md`, `CHANGELOG.md`, `package.json` (root version), `docs/plan_lipila_subscription_collection.md` (findings/status only) | todo |
+| U14 | Docs, runbook, version | haiku | low | all | `CLAUDE.md`, `CHANGELOG.md`, `package.json` (root version), `docs/plan_lipila_subscription_collection.md` (findings/status only) | done |
 
 Backend paths are relative to `mern_vb_backend/`, frontend paths to `mern-vb-frontend/src/`
 unless written with `src/`. U1, U2 and U3 have no shared files and no dependency, so they are
@@ -300,3 +300,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - U12 done: 30 FE tests, build ok. Deviation recorded for William: plan cards disabled by member count apply to the manual request path too (shared selection; source 8a.2 literally); >40 groups now see Contact us instead of the manual request form. No production group affected today (Step 0d). History hidden while it has no rows.
 - U13 done: 33 FE tests, build ok, AdminGroupDetail diff purely additive (list remounts via key on isPaid/paidUntil after activate/mark-unpaid).
 - **G3 (after U10–U13):** Opus read LipilaPayCard (fixed the poll-restart bug in U11), the UpgradePage diff (plan-card block rewritten only to add a disabled branch; markup otherwise identical; the `#2D7A2D` check icon hex is pre-existing), AdminGroupDetail (5 additive lines). No new hex/console.log in new frontend files. UI_SPEC sections cited by each unit: §6.7, §6.8, §6.10, §6.14, §11.1. PASS. Not yet seen in a real browser — Phase 3 E2E.
+- U14 done: CLAUDE.md section + env + quick ref, CHANGELOG 3.19.0 with runbook, version 3.19.0, source plan findings/matrix filled. All 14 units done 09:08.

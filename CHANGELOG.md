@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.19.0] - 2026-10-13
+
+### Added
+- **Automated mobile money subscription renewal (Lipila).** An admin or treasurer on `/upgrade` enters a number, gets a mobile money PIN prompt, approves it, and the group's subscription is activated within seconds. The feature ships dark (`LIPILA_ENABLED` unset). Nexus absorbs the 2.5% Lipila fee; groups pay list price (Starter K200, Standard K300). Webhook is the source of truth (Standard Webhooks signature verification, `express.raw` on the route), polling is the fallback; one idempotent `resolveAttempt()` handles both. Plan-too-small guard: groups > 40 members see "Contact us" instead of Pay. Payment history on `/upgrade` (admin/treasurer only) and a read-only list in Platform Admin. Manual super-admin control (activate/extend/mark-unpaid/trial-expiry edit) unchanged. **Verified:** 265 backend + 33 frontend tests pass; 11 simulated webhook rows + 9 Jest-only concurrent cases; manual regression paths (activate/extend/mark-unpaid) unchanged.
+  - **Runbook — weekly stuck-payment check:** pending attempts (> 15 min) and failed-with-not-found-at-provider rows show that a PIN was entered but the money may still land. Run `docker exec <backend-container> node scripts/listPendingSubscriptionPayments.js` (see CLAUDE.md for container name discovery). For each row, check the Lipila dashboard (`dashboard.lipila.io`); if it shows Successful, use **Activate / Extend** in Platform Admin. Refunds are done by hand from the Lipila dashboard.
+- **Renewal banner and lapsed-paid wording fix.** `TrialBanner.jsx` now branches on `isPaid` and `paidUntil`: admin/treasurer within 7 days see "Your subscription ends on {date}. Renew now" → `/upgrade`; lapsed-paid admin/treasurer see "Your subscription ended on {date}. Your data is safe and readable, but saving new records is disabled. Renew now" (was wrongly saying "free trial"); members on a lapsed group see "Ask your admin or treasurer" with no button. Never shown to super admins or for `paidUntil` null or year ≥ 2099. `/me` adds `paidUntil` and `planKey`.
+- **Upgrade page plan limits and role messaging.** Plan cards are disabled when the group has > the plan's `memberLimit`; groups > 40 members see "Contact us to subscribe" (WhatsApp link) instead of the manual request form. A no-expiry group (`isPaid: true, paidUntil: null`) shows no Pay UI. Non-admin/non-treasurer members see "Ask your group admin or treasurer to renew the subscription" with no Pay button.
+- **Payment history on `/upgrade`.** Successful attempts from the last 24h, newest first, max 24: date, plan, amount, currency, masked MSISDN, MNO ref, paid-by name.
+- **Platform Admin Billing tab payments list.** Every `SubscriptionPayment` attempt, all statuses: date, plan, amount, status, failure reason (raw text, admin only), masked MSISDN, MNO ref, test-amount and mismatch/late/notFound badges, labelled "Paid automatically (Lipila)". Activate/Extend and Mark Unpaid buttons unchanged.
+- **Transactional activation for all paths.** Manual `activate` route now wraps `extendGroupSubscription` in a `session.withTransaction()` so concurrent webhook + admin activate can't lose an update.
+
+### Changed
+- **`GroupSettings` is now always the single read of financial rules, never re-derived inline.** (This was already true; Lipila build confirmed it.)
+
 ## [Unreleased] — Corrections
 
 ### Added
