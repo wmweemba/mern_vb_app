@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -202,10 +202,24 @@ function SubscribeForm({ plan, onBack, onConfirmed }) {
 }
 
 export default function UpgradePage() {
-  const { user: member } = useAuth();
+  const { user: member, authLoading } = useAuth();
+  // F2 fix-up (point 5): while Clerk/the auth store hasn't resolved the
+  // member/role yet, show nothing rather than guessing — in particular,
+  // never show the non-admin "Ask your admin" sentence before we actually
+  // know the role. Only the explicit loading flag blanks the page: if /me
+  // failed (member stays null) the plans and the manual request form must
+  // still render, as they did before Lipila — just without any role message.
+  const loadingAuth = Boolean(authLoading);
+
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   const [plans, setPlans] = useState([]);
+  // Step 8a.1 (F2 fix-up) — /latest is fetched once here, on page mount, and
+  // handed down to LipilaPayCard instead of the card fetching it itself.
+  const [latestAttempt, setLatestAttempt] = useState(null);
+  const [latestChecked, setLatestChecked] = useState(false);
+  const [lipilaEnabled, setLipilaEnabled] = useState(false);
+  const autoSelectedRef = useRef(false);
 
   const groupName = member?.groupName || 'My Group';
   const role = member?.role;
@@ -238,6 +252,50 @@ export default function UpgradePage() {
       .catch(() => {});
   }, []);
 
+  // Step 8a.1 — GET /billing/lipila/latest once the role is known, for
+  // admin/treasurer only (other roles, and no-expiry groups, never call it —
+  // there's nothing for them to resume or pay).
+  useEffect(() => {
+    if (loadingAuth) return;
+    if (!canPayDirectly || noExpiryGroup) {
+      setLatestChecked(true);
+      return;
+    }
+    let cancelled = false;
+    axios
+      .get(`${API_BASE_URL}/billing/lipila/latest`)
+      .then(res => {
+        if (cancelled) return;
+        const data = res.data?.data;
+        setLipilaEnabled(Boolean(data?.enabled));
+        setLatestAttempt(data?.attempt || null);
+      })
+      .catch(() => {
+        if (!cancelled) setLipilaEnabled(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLatestChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingAuth, canPayDirectly, noExpiryGroup]);
+
+  // Pre-select the plan a resumable pending attempt belongs to, once, so the
+  // page shows the right plan without requiring a click (Step 8a.1).
+  useEffect(() => {
+    if (autoSelectedRef.current) return;
+    if (!latestChecked || !latestAttempt || latestAttempt.status !== 'pending') return;
+    if (!plans.length) return;
+    const match = plans.find(p => p.id === latestAttempt.plan);
+    if (!match) return;
+    autoSelectedRef.current = true;
+    setSelectedPlan(match);
+  }, [latestChecked, latestAttempt, plans]);
+
+  if (loadingAuth) return null;
+
   if (confirmed && selectedPlan) {
     return (
       <div className="px-4 md:px-8 py-6 max-w-2xl mx-auto">
@@ -247,16 +305,33 @@ export default function UpgradePage() {
   }
 
   if (selectedPlan) {
+    // F2 fix-up (point 2): the resumed attempt only seeds THIS card when its
+    // own plan matches the plan currently selected — if the admin picked a
+    // different plan than the one that was resumed (e.g. after a success, or
+    // by backing out and choosing another), this card must render idle for
+    // that newly chosen plan rather than showing someone else's wording.
+    const resumedForSelected =
+      latestAttempt && latestAttempt.status === 'pending' && latestAttempt.plan === selectedPlan.id
+        ? latestAttempt
+        : null;
     return (
       <div className="px-4 md:px-8 py-6 max-w-2xl mx-auto">
         {/* U11: additive "Pay now with mobile money" card. The plan key passed
             here is selectedPlan.id, which already matches the API's plan keys
             ('starter' | 'standard') 1:1 — PLAN_META above is keyed the same
             way, so no separate mapping was needed.
-            U12: never rendered for a no-expiry group (LipilaPayCard itself
-            already skips non-admin/treasurer roles and the /latest call for
-            them). */}
-        {!noExpiryGroup && <LipilaPayCard plan={selectedPlan.id} />}
+            U12: never rendered for a no-expiry group.
+            F2: never rendered for a non-admin/treasurer role, and waits for
+            latestChecked so it doesn't flash idle before snapping to the
+            resumed state. */}
+        {canPayDirectly && !noExpiryGroup && latestChecked && (
+          <LipilaPayCard
+            plan={selectedPlan.id}
+            enabled={lipilaEnabled}
+            checkedLatest={latestChecked}
+            resumedAttempt={resumedForSelected}
+          />
+        )}
         <p className="text-xs text-text-secondary text-center mb-4">
           Paid another way? Use the details below.
         </p>
@@ -285,9 +360,21 @@ export default function UpgradePage() {
         Start with a 30-day paid subscription. Cancel anytime.
       </p>
 
+      {/* F2 fix-up (point 2): a recent success (within the backend's 24 h
+          resume window) is shown here, above the still-selectable plan
+          cards — it must never block paying again / switching plans. */}
+      {canPayDirectly && !noExpiryGroup && latestChecked && latestAttempt?.status === 'success' && (
+        <LipilaPayCard
+          plan={latestAttempt.plan}
+          enabled={lipilaEnabled}
+          checkedLatest={latestChecked}
+          resumedAttempt={latestAttempt}
+        />
+      )}
+
       {/* Step 8a.1 — role-appropriate messaging for anyone who can't renew
           themselves. The manual flow below stays available to every role. */}
-      {!canPayDirectly && (
+      {member != null && !canPayDirectly && (
         <p className="text-sm text-text-secondary bg-surface-card border border-border-default rounded-xl px-4 py-3 mb-6">
           Ask your group admin or treasurer to renew the subscription.
         </p>

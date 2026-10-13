@@ -69,22 +69,32 @@ const secondaryButtonClass = 'w-full border border-border-default text-text-prim
  * passed down from UpgradePage's own selectedPlan.id — see that file for how it
  * is wired (PLAN_META's keys already match the API's plan keys 1:1, so no
  * mapping was needed there).
+ *
+ * F2 fix-up: `/billing/lipila/latest` is no longer fetched by this card —
+ * UpgradePage fetches it once on page mount and hands the result down as
+ * `enabled`/`checkedLatest`/`resumedAttempt`, so the card never re-fetches it
+ * (Step 8a.1). When `resumedAttempt` is a resumable pending or recent success,
+ * this card seeds its state from it and always renders that attempt's OWN
+ * `plan`/`amount`/`maskedMsisdn` fields, never the `plan` prop — UpgradePage
+ * only passes a `resumedAttempt` that already matches the card it's wiring up,
+ * but this card never trusts `plan` for wording regardless, as a backstop.
  */
-export default function LipilaPayCard({ plan }) {
+export default function LipilaPayCard({ plan, enabled, checkedLatest, resumedAttempt }) {
   const { user: member, refreshMembership } = useAuth();
   const navigate = useNavigate();
-  const role = member?.role;
-  const eligible = role === 'admin' || role === 'treasurer';
 
-  const [checkedLatest, setCheckedLatest] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const resumable =
+    resumedAttempt && (resumedAttempt.status === 'pending' || resumedAttempt.status === 'success')
+      ? resumedAttempt
+      : null;
+
   // idle | pending | success | failed | timeout
-  const [status, setStatus] = useState('idle');
-  const [attemptId, setAttemptId] = useState(null);
-  const [amount, setAmount] = useState(null);
-  const [maskedMsisdn, setMaskedMsisdn] = useState(null);
-  const [resultPlan, setResultPlan] = useState(null);
-  const [paidUntil, setPaidUntil] = useState(null);
+  const [status, setStatus] = useState(resumable ? resumable.status : 'idle');
+  const [attemptId, setAttemptId] = useState(resumable?.attemptId || null);
+  const [amount, setAmount] = useState(resumable?.amount ?? null);
+  const [maskedMsisdn, setMaskedMsisdn] = useState(resumable?.maskedMsisdn || null);
+  const [resultPlan, setResultPlan] = useState(resumable?.plan || null);
+  const [paidUntil, setPaidUntil] = useState(resumable?.paidUntil || null);
   const [failureKind, setFailureKind] = useState(null);
   const [msisdn, setMsisdn] = useState(member?.phone || '');
   const [loading, setLoading] = useState(false);
@@ -95,84 +105,91 @@ export default function LipilaPayCard({ plan }) {
   const refreshRef = useRef(refreshMembership);
   refreshRef.current = refreshMembership;
 
-  // Step 8a.1 — resume from /latest on mount. Only called for admin/treasurer;
-  // other roles never hit this endpoint (U12 owns their messaging).
-  useEffect(() => {
-    if (!eligible) {
-      setCheckedLatest(true);
-      return;
-    }
-    let cancelled = false;
-    axios
-      .get(`${API_BASE_URL}/billing/lipila/latest`)
-      .then(res => {
-        if (cancelled) return;
-        const data = res.data?.data;
-        if (!data?.enabled) {
-          setEnabled(false);
-          return;
-        }
-        setEnabled(true);
-        const attempt = data.attempt;
-        if (attempt?.status === 'pending') {
-          setAttemptId(attempt.attemptId);
-          setAmount(attempt.amount);
-          setMaskedMsisdn(attempt.maskedMsisdn);
-          setResultPlan(attempt.plan);
-          setStatus('pending');
-        } else if (attempt?.status === 'success') {
-          setAmount(attempt.amount);
-          setResultPlan(attempt.plan);
-          setPaidUntil(attempt.paidUntil);
-          setStatus('success');
-          refreshMembership?.();
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setEnabled(false);
-      })
-      .finally(() => {
-        if (!cancelled) setCheckedLatest(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligible]);
+  // Read via a ref inside the poll effect below (which is keyed only on
+  // attemptId) so a status change alone never restarts/re-triggers it.
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
-  // Step 8a.4/8a.7/8a.10 — poll setup AND cleanup in one effect, keyed on the
-  // attempt id, no didInit ref (React 19 dev double-invocation gotcha).
+  // A resumed success (e.g. the banner atop the plan list) refreshes
+  // membership too, same as a poll-discovered success — but only once.
+  const resumedSuccessHandledRef = useRef(false);
   useEffect(() => {
-    if (status !== 'pending' || !attemptId) return;
-    const startedAt = Date.now();
-    const timer = setInterval(async () => {
-      if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
-        clearInterval(timer);
-        setStatus('timeout');
-        return;
-      }
+    if (resumable?.status === 'success' && !resumedSuccessHandledRef.current) {
+      resumedSuccessHandledRef.current = true;
+      refreshRef.current?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Step 8a.4/8a.7/8a.10 (F2 fix-up) — one effect for poll setup AND cleanup,
+  // keyed only on attemptId, no didInit ref (React 19 dev double-invocation
+  // gotcha). A chained setTimeout (not setInterval) schedules the next 3 s
+  // poll only after the current request settles, so a slow response from
+  // Lipila can never overlap with a second one. The 150 s overall limit is a
+  // separate one-shot timer, independent of the poll cadence, so it still
+  // fires even while a poll request is stuck in flight. The `cancelled` flag
+  // (set by `stop()`, which cleanup also calls) stops any stale in-flight
+  // response — including one still outstanding when Try again fires — from
+  // updating state after this effect has moved on.
+  useEffect(() => {
+    if (!attemptId || statusRef.current !== 'pending') return;
+    let cancelled = false;
+    let pollTimer = null;
+
+    function schedulePoll() {
+      pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+    }
+
+    function stop() {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      clearTimeout(overallTimer);
+    }
+
+    async function poll() {
+      if (cancelled) return;
       try {
         const res = await axios.get(`${API_BASE_URL}/billing/lipila/attempts/${attemptId}`);
+        if (cancelled) return;
         const data = res.data?.data;
-        if (!data) return;
+        if (!data) {
+          schedulePoll();
+          return;
+        }
         if (data.amount != null) setAmount(data.amount);
         if (data.plan) setResultPlan(data.plan);
         if (data.status === 'success') {
-          clearInterval(timer);
+          stop();
           setPaidUntil(data.paidUntil);
           setStatus('success');
           refreshRef.current?.();
-        } else if (data.status === 'failed') {
-          clearInterval(timer);
+          return;
+        }
+        if (data.status === 'failed') {
+          stop();
           setFailureKind(data.failureKind);
           setStatus('failed');
+          return;
         }
+        schedulePoll();
       } catch {
         // transient network hiccup — keep polling, bounded by the timeout above
+        if (!cancelled) schedulePoll();
       }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [attemptId, status]);
+    }
+
+    const overallTimer = setTimeout(() => {
+      if (cancelled) return;
+      stop();
+      setStatus('timeout');
+    }, POLL_TIMEOUT_MS);
+
+    schedulePoll();
+
+    return () => {
+      stop();
+    };
+  }, [attemptId]);
 
   async function handlePay() {
     if (!plan || loading) return;
@@ -206,13 +223,16 @@ export default function LipilaPayCard({ plan }) {
   }
 
   function handleTryAgain() {
+    // Clear attemptId first (F2 fix-up): this is what triggers the poll
+    // effect's cleanup, cancelling any in-flight request, before the status
+    // flips back to idle — so a stale response can never land afterwards.
+    setAttemptId(null);
     setStatus('idle');
     setFailureKind(null);
-    setAttemptId(null);
     setError('');
   }
 
-  if (!eligible || !checkedLatest || !enabled) return null;
+  if (!checkedLatest || !enabled) return null;
 
   if (status === 'success') {
     const dateLabel = paidUntil ? dayjs(paidUntil).format('D MMM YYYY') : '';
