@@ -43,6 +43,7 @@ beforeAll(async () => {
   app.get('/api/admin/billing/plans', billing.listPlans);
   app.post('/api/admin/groups/:groupId/billing/activate', stubSuperAdmin, billing.activate);
   app.post('/api/admin/groups/:groupId/billing/mark-unpaid', stubSuperAdmin, billing.markUnpaid);
+  app.get('/api/admin/groups/:groupId/billing/payments', stubSuperAdmin, billing.listPayments);
 });
 
 afterAll(async () => {
@@ -237,5 +238,110 @@ describe('extendGroupSubscription (direct)', () => {
       session.endSession();
     }
     expect(result).toBeNull();
+  });
+});
+
+// U9 — GET /api/admin/groups/:groupId/billing/payments (listPayments)
+describe('adminBillingController.listPayments', () => {
+  const SubscriptionPaymentModel = () => require('../models/SubscriptionPayment');
+
+  async function makePayment(groupId, overrides = {}) {
+    return SubscriptionPaymentModel().create({
+      groupId,
+      initiatedByMemberId: new mongoose.Types.ObjectId(),
+      initiatedByName: 'Jane Treasurer',
+      plan: 'starter',
+      amount: 150,
+      currency: 'ZMW',
+      msisdn: '260975551234',
+      reference: `ref-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      status: 'pending',
+      ...overrides,
+    });
+  }
+
+  test('super admin gets every attempt, newest first, masked MSISDN, includes pending/failed/success, no raw msisdn or rawResponse', async () => {
+    const group = await makeGroup();
+    const p1 = await makePayment(group._id, {
+      status: 'success', completedAt: new Date(), reference: 'ref-1', providerExternalId: 'MNO-1', paidUntilAfter: new Date(),
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    const p2 = await makePayment(group._id, {
+      status: 'failed', failureReason: 'Insufficient balance', reference: 'ref-2',
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    const p3 = await makePayment(group._id, { status: 'pending', reference: 'ref-3' });
+
+    const res = await request(app).get(`/api/admin/groups/${group._id}/billing/payments`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(3);
+
+    // newest first by createdAt
+    expect(res.body.data[0].id).toBe(String(p3._id));
+    expect(res.body.data[1].id).toBe(String(p2._id));
+    expect(res.body.data[2].id).toBe(String(p1._id));
+
+    for (const row of res.body.data) {
+      expect(row.msisdn).toBeUndefined();
+      expect(row.rawResponse).toBeUndefined();
+      expect(row.maskedMsisdn).toBe('•••234');
+    }
+
+    const statuses = res.body.data.map((r) => r.status);
+    expect(statuses).toEqual(expect.arrayContaining(['pending', 'failed', 'success']));
+
+    const successRow = res.body.data.find((r) => r.status === 'success');
+    expect(successRow.providerExternalId).toBe('MNO-1');
+    expect(successRow.paidUntilAfter).toBeTruthy();
+
+    const failedRow = res.body.data.find((r) => r.status === 'failed');
+    expect(failedRow.failureReason).toBe('Insufficient balance');
+  });
+
+  test('malformed groupId -> 404, never a CastError 500', async () => {
+    const res = await request(app).get('/api/admin/groups/not-a-valid-id/billing/payments');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Group not found');
+  });
+
+  test('a group with no attempts yet -> 200 with an empty list', async () => {
+    const group = await makeGroup();
+    const res = await request(app).get(`/api/admin/groups/${group._id}/billing/payments`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  test('works for a group id with no matching document at all (e.g. a since-removed group) — still 200, empty list, not 404', async () => {
+    const fakeId = new mongoose.Types.ObjectId();
+    const res = await request(app).get(`/api/admin/groups/${fakeId}/billing/payments`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+// This test harness (like the rest of this file) stubs super-admin auth at
+// the Express app level so it can exercise adminBillingController in
+// isolation from Clerk — it never mounts the real middleware chain, so it
+// cannot itself produce a 403 for a non-super-admin caller. Instead this
+// confirms, by reading the real route file, that the new route is placed
+// behind the exact same guard as every other admin route (`router.use`
+// applies to every route registered after it, including this one):
+describe('listPayments route placement (routes/admin.js)', () => {
+  test('GET .../billing/payments is registered after router.use(verifyToken, requireSuperAdmin)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(path.join(__dirname, '../routes/admin.js'), 'utf8');
+
+    const guardLineIndex = src.indexOf('router.use(verifyToken, requireSuperAdmin)');
+    const routeLineIndex = src.indexOf("router.get('/groups/:groupId/billing/payments', billing.listPayments)");
+
+    expect(guardLineIndex).toBeGreaterThan(-1);
+    expect(routeLineIndex).toBeGreaterThan(-1);
+    // the route is declared textually after the guard middleware is wired in,
+    // so Express applies requireSuperAdmin to it before billing.listPayments
+    // ever runs — same inheritance as /billing/activate and /billing/mark-unpaid
+    // immediately above it.
+    expect(routeLineIndex).toBeGreaterThan(guardLineIndex);
   });
 });
