@@ -33,6 +33,11 @@ app.use('/api/group-templates', require('./routes/groupTemplates'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/invites', require('./routes/invites'));
 app.use('/api/billing', require('./routes/billingRoutes'));
+// More specific than '/api/billing' above, but mount order doesn't actually
+// matter here: billingRoutes only declares '/plans' and '/request' with no
+// catch-all, so Express falls through to this router for any unmatched
+// '/api/billing/*' path regardless of which is registered first.
+app.use('/api/billing/lipila', require('./routes/subscriptionPaymentRoutes'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/contribution-types', require('./routes/contributionTypes'));
