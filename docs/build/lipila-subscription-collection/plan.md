@@ -61,7 +61,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U4 | Resolver + notifications | sonnet | high | U1 U2 U3 | `utils/subscriptionCollection.js`, `utils/notifyBilling.js`, `tests/subscriptionCollection.test.js` | done |
 | U5 | Initiate route | sonnet | high | U4 | `controllers/subscriptionPaymentController.js`, `routes/subscriptionPaymentRoutes.js`, `server.js`, `tests/subscriptionPaymentInitiate.test.js` | done |
 | U6 | Attempt / latest / history routes | sonnet | high | U5 | same controller + routes files, `tests/subscriptionPaymentRead.test.js` | done |
-| U7 | Lipila webhook route | sonnet | high | U4 | `routes/webhookRoutes.js`, `controllers/lipilaWebhookController.js`, `tests/lipilaWebhook.test.js` | todo |
+| U7 | Lipila webhook route | sonnet | high | U4 | `routes/webhookRoutes.js`, `controllers/lipilaWebhookController.js`, `tests/lipilaWebhook.test.js` | done |
 | U8 | Dev webhook simulator script | sonnet | high | U7 | `scripts/devSimulateLipilaWebhook.js` | todo |
 | U9 | Admin payments endpoint + pending-payments script | sonnet | low | U1 | `controllers/adminBillingController.js` (new handler only), `routes/admin.js`, `scripts/listPendingSubscriptionPayments.js`, `tests/adminBilling.test.js` (append) | todo |
 | U10 | `/me` fields + renewal banner | sonnet | low | — | `controllers/authController.js`, `components/TrialBanner.jsx`, frontend auth store if it maps `/me` fields, `src/__tests__/TrialBanner.test.jsx` | todo |
@@ -290,3 +290,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - U4 done after one Opus-requested fix-up: group_missing now notifies William (was silent); post-commit notifications detached so a hung Telegram/Resend can't hang the webhook or poll. 213 tests pass. Note for U5–U8: Mongoose timestamps strip createdAt from $set — backdate test rows via Model.collection.updateOne.
 - U5 done: 231 tests pass. Opus read the controller: post-commit attempt.save() writes only modified paths, so it can't clobber a concurrent webhook success.
 - U6 done: 249 tests pass. /latest returns attempt:null without querying when the kill switch is off.
+- U7 done: 260 tests pass. Opus one-line fix: signed body `null` no longer 500s (would have looped Lipila retries).
