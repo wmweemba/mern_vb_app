@@ -70,7 +70,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U13 | Admin Billing tab payments list | sonnet | low | U9 | `pages/admin/AdminGroupDetail.jsx` (BillingTab only) | done |
 | F1 | Fix-ups: backend (review P1/P2) | sonnet | high | U14 | `controllers/subscriptionPaymentController.js`, `utils/notifyBilling.js`, `scripts/listPendingSubscriptionPayments.js` (+ reconcile mode), `CHANGELOG.md` runbook + verification wording, tests | todo |
 | F2 | Fix-ups: frontend (review P2) | sonnet | high | U14 | `features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx`, tests | todo |
-| F3 | Lapsed-paid gate (decision pending William) | sonnet | high | F1 | `middleware/checkTrial.js` and/or `components/TrialBanner.jsx` copy, tests | blocked |
+| F3 | Lapsed-paid gate: enforce read-only (William chose (a)) | sonnet | high | F1 | `middleware/checkTrial.js`, `/me` trialActive in `controllers/authController.js`, tests | todo |
 | U14 | Docs, runbook, version | haiku | low | all | `CLAUDE.md`, `CHANGELOG.md`, `package.json` (root version), `docs/plan_lipila_subscription_collection.md` (findings/status only) | done |
 
 Backend paths are relative to `mern_vb_backend/`, frontend paths to `mern-vb-frontend/src/`
@@ -310,6 +310,8 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
   - P2 → F1: initiate's post-commit save after a `failed` outcome writes `status` unconditionally (could overwrite a webhook success after a slow 4xx) → `updateOne({_id, status:'pending'})`; ambiguous/pending branches likewise conditional. Resend returns `{error}` instead of throwing → log it. CHANGELOG overstates the manual regression as verified.
   - P2 → F2: `/latest` only runs once a plan card is clicked (source 8a.1 says on mount) → hoist to page mount; resumed attempt ignores the selected plan; success within 24 h blocks a D6 plan switch for 24 h; `setInterval(async)` overlaps polls when Lipila is slow → chained setTimeout with in-flight guard; in-flight poll can override Try again → cancelled/attemptId guard.
 - 09:15 session 1 stopped at the unit boundary (~80 min) for William's F3 decision. E2E, `/ship --preflight` not yet run.
+
+- 2026-10-13 William chose (a): a lapsed paid group (isPaid, paidUntil < now) goes read-only like an expired trial; it must NOT fall through to trialExpiresAt. F3 unblocked.
 
 ## Next session
 Model: Opus as orchestrator (`/build docs/plan_lipila_subscription_collection.md` resumes here). Remaining, in order:
