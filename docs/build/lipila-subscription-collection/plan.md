@@ -56,7 +56,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | ID | Title | Model | Risk | Depends on | Owns (files) | Status |
 |---|---|---|---|---|---|---|
 | U1 | Model + cleanup-script opt-out | sonnet | high | — | `models/SubscriptionPayment.js`, `models/Group.js`, `scripts/utils/groupScopedModels.js`, `tests/groupScopedModels.test.js` | done |
-| U2 | MSISDN + Lipila client port | sonnet | high | — | `utils/msisdn.js`, `utils/lipilaClient.js`, `tests/msisdn.test.js`, `tests/lipilaClient.test.js`, `.env.example` | todo |
+| U2 | MSISDN + Lipila client port | sonnet | high | — | `utils/msisdn.js`, `utils/lipilaClient.js`, `tests/msisdn.test.js`, `tests/lipilaClient.test.js`, `.env.example` | done |
 | U3 | `extendGroupSubscription` + activate refactor | sonnet | high | — | `utils/subscription.js`, `controllers/adminBillingController.js`, `tests/adminBilling.test.js` | todo |
 | U4 | Resolver + notifications | sonnet | high | U1 U2 U3 | `utils/subscriptionCollection.js`, `utils/notifyBilling.js`, `tests/subscriptionCollection.test.js` | todo |
 | U5 | Initiate route | sonnet | high | U4 | `controllers/subscriptionPaymentController.js`, `routes/subscriptionPaymentRoutes.js`, `server.js`, `tests/subscriptionPaymentInitiate.test.js` | todo |
@@ -284,3 +284,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
   reviewed and logged but don't wait for William. Build-session start time logged below.
 - 2026-10-13 07:58 build session 1 start (U1)
 - U1 done: all 3 cleanup scripts confirmed to use groupScopedModels() only. 153 tests pass.
+- U2 done: BazaBooks client ported, no deviations from §3. 184 tests pass.
