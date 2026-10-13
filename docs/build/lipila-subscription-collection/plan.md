@@ -62,7 +62,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U5 | Initiate route | sonnet | high | U4 | `controllers/subscriptionPaymentController.js`, `routes/subscriptionPaymentRoutes.js`, `server.js`, `tests/subscriptionPaymentInitiate.test.js` | done |
 | U6 | Attempt / latest / history routes | sonnet | high | U5 | same controller + routes files, `tests/subscriptionPaymentRead.test.js` | done |
 | U7 | Lipila webhook route | sonnet | high | U4 | `routes/webhookRoutes.js`, `controllers/lipilaWebhookController.js`, `tests/lipilaWebhook.test.js` | done |
-| U8 | Dev webhook simulator script | sonnet | high | U7 | `scripts/devSimulateLipilaWebhook.js` | todo |
+| U8 | Dev webhook simulator script | sonnet | high | U7 | `scripts/devSimulateLipilaWebhook.js` | done |
 | U9 | Admin payments endpoint + pending-payments script | sonnet | low | U1 | `controllers/adminBillingController.js` (new handler only), `routes/admin.js`, `scripts/listPendingSubscriptionPayments.js`, `tests/adminBilling.test.js` (append) | todo |
 | U10 | `/me` fields + renewal banner | sonnet | low | — | `controllers/authController.js`, `components/TrialBanner.jsx`, frontend auth store if it maps `/me` fields, `src/__tests__/TrialBanner.test.jsx` | todo |
 | U11 | Upgrade page: Lipila pay card | sonnet | high | U6 U10 | `src/features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx` | todo |
@@ -291,3 +291,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - U5 done: 231 tests pass. Opus read the controller: post-commit attempt.save() writes only modified paths, so it can't clobber a concurrent webhook success.
 - U6 done: 249 tests pass. /latest returns attempt:null without querying when the kill switch is off.
 - U7 done: 260 tests pass. Opus one-line fix: signed body `null` no longer 500s (would have looped Lipila retries).
+- U8 done: all 4 refusal checks exit non-zero before any connect. In the prod container guard (b) blocks it even if NODE_ENV is unset there (URI host is the Coolify Mongo container).
