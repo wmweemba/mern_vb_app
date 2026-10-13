@@ -10,7 +10,7 @@
  *  2. Activate on a paid-up group (paidUntil in 10 days) -> extends from the OLD expiry.
  *  3. customPaidUntil path sets exactly that date.
  *  4. Invalid plan -> 400, group unchanged.
- *  5. markUnpaid behaviour unchanged.
+ *  5. markUnpaid: isPaid false, paidUntil null, and the trial ended now (read-only).
  *  6. Unknown groupId -> 404.
  *  7. extendGroupSubscription directly, for a lapsed group (paidUntil in the past) ->
  *     extends from now, not from the stale past date.
@@ -167,7 +167,7 @@ describe('adminBillingController.activate', () => {
   });
 });
 
-describe('adminBillingController.markUnpaid (unchanged)', () => {
+describe('adminBillingController.markUnpaid', () => {
   test('sets isPaid false and paidUntil null, logs one audit row', async () => {
     const group = await makeGroup({ isPaid: true, paidUntil: new Date(), plan: 'starter' });
 
@@ -184,6 +184,30 @@ describe('adminBillingController.markUnpaid (unchanged)', () => {
 
     const logs = await AdminAuditLog().find({ action: 'billing.mark_unpaid', groupId: group._id });
     expect(logs.length).toBe(1);
+  });
+
+  test('ends the 2099 trial set by activation, so checkTrial makes the group read-only', async () => {
+    const group = await makeGroup({ isPaid: true, paidUntil: new Date(Date.now() + 10 * 864e5), plan: 'starter', trialExpiresAt: new Date('2099-12-31') });
+
+    const res = await request(app).post(`/api/admin/groups/${group._id}/billing/mark-unpaid`).send({});
+    expect(res.status).toBe(200);
+
+    const updated = await Group().findById(group._id);
+    expect(updated.trialExpiresAt.getTime()).toBeLessThanOrEqual(Date.now());
+
+    const { checkTrial } = require('../middleware/checkTrial');
+    const run = (method) => new Promise((resolve) => {
+      const req = { method, groupId: group._id, isSuperAdmin: false };
+      const res = { status: (code) => ({ json: (body) => resolve({ code, body }) }) };
+      checkTrial(req, res, () => resolve({ code: 'next' }));
+    });
+    expect((await run('GET')).code).toBe('next');
+    const write = await run('POST');
+    expect(write.code).toBe(403);
+    expect(write.body.error).toBe('trial_expired');
+
+    const log = await AdminAuditLog().findOne({ action: 'billing.mark_unpaid', groupId: group._id });
+    expect(new Date(log.metadata.before.trialExpiresAt).getFullYear()).toBe(2099);
   });
 
   test('unknown groupId -> 404', async () => {

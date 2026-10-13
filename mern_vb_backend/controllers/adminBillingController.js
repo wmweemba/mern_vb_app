@@ -81,14 +81,19 @@ exports.listPayments = async (req, res) => {
 exports.markUnpaid = async (req, res) => {
   const group = await Group.findById(req.params.groupId);
   if (!group) return res.status(404).json({ error: 'Group not found' });
-  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil };
+  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil, trialExpiresAt: group.trialExpiresAt };
   group.isPaid = false;
   group.paidUntil = null;
+  // Activation sets trialExpiresAt to 2099, so without this a group marked
+  // unpaid kept full write access through checkTrial's trial branch. Ending
+  // the trial now makes it read-only (William, 2026-10-13). A super admin can
+  // still grant free access afterwards with the trial-expiry edit.
+  group.trialExpiresAt = new Date();
   await group.save();
 
   await logAdminAction({
     req, action: 'billing.mark_unpaid', targetType: 'billing', targetId: group._id, groupId: group._id,
-    metadata: { before },
+    metadata: { before, after: { isPaid: false, paidUntil: null, trialExpiresAt: group.trialExpiresAt } },
   });
   res.json(group);
 };
