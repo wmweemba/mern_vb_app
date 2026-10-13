@@ -400,4 +400,73 @@ describe('notifyBilling (actual implementation)', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  // F1: resend.emails.send() resolves { data, error } on an API-level error —
+  // it does not throw. This must be checked explicitly or a failed send goes
+  // unnoticed. Uses its own isolated module registry so it can mock 'resend'
+  // to resolve (not reject), unlike the rejecting mock used by the rest of
+  // this describe block.
+  describe('resend resolves { error } instead of throwing', () => {
+    let isolatedNotifyBilling;
+
+    beforeEach(() => {
+      jest.resetModules();
+      jest.doMock('resend', () => ({
+        Resend: jest.fn().mockImplementation(() => ({
+          emails: { send: jest.fn().mockResolvedValue({ data: null, error: { message: 'x' } }) },
+        })),
+      }));
+      // requireActual (not require) because '../utils/notifyBilling' is
+      // automocked at the top of this file — a plain require() after
+      // resetModules would still resolve to that automock (returns undefined).
+      isolatedNotifyBilling = jest.requireActual('../utils/notifyBilling');
+    });
+
+    afterEach(() => {
+      jest.dontMock('resend');
+      jest.resetModules();
+    });
+
+    test('notifyAdminSubscriptionCollected logs the resend error, does not throw', async () => {
+      await expect(
+        isolatedNotifyBilling.notifyAdminSubscriptionCollected({
+          groupName: 'ZZZ_TEST Group',
+          payerName: 'Jane',
+          plan: 'Starter',
+          amount: 200,
+          currency: 'ZMW',
+          paidUntil: new Date(),
+          providerExternalId: 'MNO-1',
+          maskedMsisdn: '•••234',
+          isTestAmount: false,
+          warnings: [],
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('notifyAdminSubscriptionCollected resend error'),
+        'x',
+      );
+    });
+
+    test('sendPaymentReceipt logs the resend error, does not throw', async () => {
+      await expect(
+        isolatedNotifyBilling.sendPaymentReceipt({
+          to: 'jane@example.com',
+          groupName: 'ZZZ_TEST Group',
+          plan: 'Starter',
+          amount: 200,
+          currency: 'ZMW',
+          date: new Date(),
+          providerExternalId: 'MNO-1',
+          paidUntil: new Date(),
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('sendPaymentReceipt resend error'),
+        'x',
+      );
+    });
+  });
 });

@@ -4,9 +4,19 @@
  * Uses MongoMemoryReplSet because resolveAttempt() runs inside a Mongo
  * transaction. Mirrors the harness in tests/subscriptionCollection.test.js.
  * notifyBilling is mocked so no network calls happen during activation.
+ *
+ * utils/lipilaClient is partially mocked: checkCollectionStatus is a jest.fn()
+ * (F1's webhook confirm-with-provider safeguard — the webhook secret is
+ * merchant-wide, so a `Successful` webhook must be confirmed against Lipila
+ * with this wallet's own API key before it's allowed to activate anything).
+ * verifyWebhookSignature/mapLipilaStatus stay the real implementation.
  */
 
 jest.mock('../utils/notifyBilling');
+jest.mock('../utils/lipilaClient', () => {
+  const actual = jest.requireActual('../utils/lipilaClient');
+  return { ...actual, checkCollectionStatus: jest.fn() };
+});
 
 jest.setTimeout(120000);
 
@@ -15,6 +25,8 @@ const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
+
+const { checkCollectionStatus } = require('../utils/lipilaClient');
 
 let mongoServer;
 let app;
@@ -54,6 +66,13 @@ beforeAll(async () => {
 afterAll(async () => {
   await mongoose.disconnect();
   await mongoServer.stop();
+});
+
+beforeEach(() => {
+  // Default: the provider confirms whatever the webhook claims. Individual
+  // tests override this to simulate a confirm mismatch.
+  checkCollectionStatus.mockReset();
+  checkCollectionStatus.mockResolvedValue({ status: 'success', amount: 200, currency: 'ZMW', externalId: 'MNO-REF-1', identifier: 'LPLXC-1' });
 });
 
 afterEach(async () => {
@@ -216,7 +235,7 @@ describe('POST /api/webhooks/lipila/subscriptions', () => {
     expect(Math.abs(updatedGroup.paidUntil.getTime() - expected.getTime())).toBeLessThan(10000);
   });
 
-  test('valid Failed -> attempt failed, group unchanged', async () => {
+  test('valid Failed -> attempt failed, group unchanged, no confirm call needed', async () => {
     const { group, attempt } = await makeAttempt();
     const body = JSON.stringify(collectionPayload(attempt, { status: 'Failed', message: 'Incorrect pin has been entered.', externalId: '' }));
 
@@ -229,6 +248,96 @@ describe('POST /api/webhooks/lipila/subscriptions', () => {
 
     const updatedGroup = await Group().findById(group._id);
     expect(updatedGroup.isPaid).toBe(false);
+    expect(checkCollectionStatus).not.toHaveBeenCalled();
+  });
+
+  describe('webhook confirm-with-provider safeguard (F1 — webhook secret is merchant-wide)', () => {
+    test('Successful webhook confirmed success by checkCollectionStatus -> activated', async () => {
+      const { group, attempt } = await makeAttempt();
+      checkCollectionStatus.mockResolvedValue({ status: 'success', amount: 200, currency: 'ZMW', externalId: 'MNO-REF-1', identifier: 'LPLXC-1' });
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      const res = await sendWebhook({ body });
+
+      expect(res.status).toBe(200);
+      expect(checkCollectionStatus).toHaveBeenCalledWith({ reference: attempt.reference });
+      const updatedAttempt = await SubscriptionPayment().findById(attempt._id);
+      expect(updatedAttempt.status).toBe('success');
+      const updatedGroup = await Group().findById(group._id);
+      expect(updatedGroup.isPaid).toBe(true);
+    });
+
+    test('Successful webhook but confirm returns pending -> NOT activated, attempt stays pending, 503 so Lipila retries', async () => {
+      const { group, attempt } = await makeAttempt();
+      checkCollectionStatus.mockResolvedValue({ status: 'pending', raw: null });
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      const res = await sendWebhook({ body });
+
+      expect(res.status).toBe(503);
+      const updatedAttempt = await SubscriptionPayment().findById(attempt._id);
+      expect(updatedAttempt.status).toBe('pending');
+      expect(updatedAttempt.lastCheckedAt).not.toBeNull();
+      const updatedGroup = await Group().findById(group._id);
+      expect(updatedGroup.isPaid).toBe(false);
+    });
+
+    test('Successful webhook but confirm returns unknown -> NOT activated, attempt stays pending, 503 so Lipila retries', async () => {
+      const { group, attempt } = await makeAttempt();
+      checkCollectionStatus.mockResolvedValue({ status: 'unknown', raw: null });
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      const res = await sendWebhook({ body });
+
+      expect(res.status).toBe(503);
+      const updatedAttempt = await SubscriptionPayment().findById(attempt._id);
+      expect(updatedAttempt.status).toBe('pending');
+      const updatedGroup = await Group().findById(group._id);
+      expect(updatedGroup.isPaid).toBe(false);
+    });
+
+    test('duplicate Successful webhook delivered 3 times, each confirmed -> group extended exactly once', async () => {
+      const { group, attempt } = await makeAttempt();
+      checkCollectionStatus.mockResolvedValue({ status: 'success', amount: 200, currency: 'ZMW', externalId: 'MNO-REF-1', identifier: 'LPLXC-1' });
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      await sendWebhook({ body, id: 'msg_dup_confirm' });
+      await sendWebhook({ body, id: 'msg_dup_confirm' });
+      await sendWebhook({ body, id: 'msg_dup_confirm' });
+
+      const updatedGroup = await Group().findById(group._id);
+      const expected = new Date();
+      expected.setMonth(expected.getMonth() + 1);
+      expect(Math.abs(updatedGroup.paidUntil.getTime() - expected.getTime())).toBeLessThan(10000);
+    });
+
+    test('forged-but-validly-signed Successful webhook whose confirm returns failed -> attempt failed, no extension', async () => {
+      const { group, attempt } = await makeAttempt();
+      checkCollectionStatus.mockResolvedValue({ status: 'failed', message: 'Not found at provider', raw: null });
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      const res = await sendWebhook({ body });
+
+      expect(res.status).toBe(200);
+      const updatedAttempt = await SubscriptionPayment().findById(attempt._id);
+      expect(updatedAttempt.status).toBe('failed');
+      const updatedGroup = await Group().findById(group._id);
+      expect(updatedGroup.isPaid).toBe(false);
+    });
+
+    test('checkCollectionStatus throwing -> 500, Lipila can retry', async () => {
+      const { attempt } = await makeAttempt();
+      checkCollectionStatus.mockRejectedValue(new Error('network boom'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const body = JSON.stringify(collectionPayload(attempt));
+
+      const res = await sendWebhook({ body });
+
+      expect(res.status).toBe(500);
+      const updatedAttempt = await SubscriptionPayment().findById(attempt._id);
+      expect(updatedAttempt.status).toBe('pending');
+      consoleErrorSpy.mockRestore();
+    });
   });
 
   test('content-type text/plain is still verified correctly (raw body Buffer)', async () => {

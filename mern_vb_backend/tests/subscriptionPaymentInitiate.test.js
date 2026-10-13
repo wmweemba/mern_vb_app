@@ -354,6 +354,32 @@ describe('POST /api/billing/lipila/initiate', () => {
     expect(attempt.failureReason).toBe('timeout');
   });
 
+  test('F1: resolver sets success between Lipila returning failed and the post-commit update -> attempt stays success, response not 502', async () => {
+    const group = await makeGroup();
+    setAuth({ groupId: group._id });
+
+    // Simulate a concurrent webhook resolving the attempt to success while
+    // Lipila's own HTTP call is still in flight — then Lipila itself reports
+    // a (now-stale) 'failed' outcome back to initiate.
+    initiateCollection.mockImplementation(async ({ reference }) => {
+      await SubscriptionPayment().findOneAndUpdate(
+        { reference },
+        { $set: { status: 'success', paidUntilAfter: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } },
+      );
+      return { outcome: 'failed', reason: 'Incorrect pin has been entered.' };
+    });
+
+    const res = await request(app).post('/api/billing/lipila/initiate').send({ plan: 'starter', msisdn: VALID_MSISDN });
+
+    expect(res.status).not.toBe(502);
+    expect(res.body.data.status).toBe('success');
+
+    const attempt = await SubscriptionPayment().findOne({ groupId: group._id });
+    expect(attempt.status).toBe('success');
+    // The conditional updateOne must not have overwritten the resolver's success.
+    expect(attempt.failureReason).toBeFalsy();
+  });
+
   test('expired-trial group can still initiate (no checkTrial)', async () => {
     const group = await makeGroup({
       isPaid: false,

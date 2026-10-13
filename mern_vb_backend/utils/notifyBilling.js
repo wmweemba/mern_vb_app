@@ -78,6 +78,13 @@ async function notifyAdminSubscriptionCollected({
         to: adminEmail,
         subject: `${title} — ${groupName || 'Unknown group'}`,
         html: text.replace(/\n/g, '<br>'),
+      }).then((result) => {
+        // resend.emails.send resolves { data, error } — it does NOT throw on
+        // an API-level error, so a bad response would otherwise be silently
+        // swallowed here.
+        if (result && result.error) {
+          console.error('[notifyBilling] notifyAdminSubscriptionCollected resend error:', result.error.message || result.error);
+        }
       }),
     );
   }
@@ -102,7 +109,7 @@ async function sendPaymentReceipt({ to, groupName, plan, amount, currency, date,
     const resend = new Resend(process.env.RESEND_API_KEY);
     const dateStr = date ? new Date(date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     const paidUntilStr = paidUntil ? new Date(paidUntil).toISOString().split('T')[0] : 'n/a';
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Chama360 <noreply@mynexusgroup.com>',
       to,
       subject: `Chama360 payment received — ${groupName || 'your group'}`,
@@ -115,6 +122,12 @@ async function sendPaymentReceipt({ to, groupName, plan, amount, currency, date,
         `<b>Paid until:</b> ${paidUntilStr}</p>` +
         `<p>Keep this as your receipt.</p>`,
     });
+    // resend.emails.send resolves { data, error } rather than throwing on an
+    // API-level error — check it explicitly or a failed receipt send goes
+    // unnoticed.
+    if (result && result.error) {
+      console.error('[notifyBilling] sendPaymentReceipt resend error:', result.error.message || result.error);
+    }
   } catch (err) {
     console.error('[notifyBilling] sendPaymentReceipt failed:', err.message);
   }

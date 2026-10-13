@@ -214,11 +214,46 @@ exports.initiate = async (req, res) => {
       email: payerEmail,
     });
 
+    // Post-commit writes below use conditional updateOne({..., status: 'pending'})
+    // rather than attempt.save(), because a concurrent webhook can resolve this
+    // same attempt (to success, or to failed) while we're still waiting on
+    // Lipila's HTTP response. An unconditional save() would clobber whatever
+    // the resolver already wrote.
     if (lipilaResult.outcome === 'failed') {
-      attempt.status = 'failed';
-      attempt.failureReason = lipilaResult.reason;
-      attempt.completedAt = new Date();
-      await attempt.save();
+      const updateResult = await SubscriptionPayment.updateOne(
+        { _id: attempt._id, status: 'pending' },
+        { $set: { status: 'failed', failureReason: lipilaResult.reason, completedAt: new Date() } },
+      );
+
+      if (updateResult.matchedCount === 0) {
+        // A webhook already resolved this attempt before our failed outcome
+        // landed — respond per the attempt's actual (already-resolved) status
+        // rather than overwriting it or lying with a 502.
+        const resolved = await SubscriptionPayment.findById(attempt._id);
+        if (resolved && resolved.status === 'success') {
+          return res.status(201).json({
+            data: {
+              attemptId: resolved._id,
+              status: 'success',
+              amount: resolved.amount,
+              currency: resolved.currency,
+              maskedMsisdn: maskMsisdn(resolved.msisdn),
+              resumed: false,
+            },
+          });
+        }
+        return res.status(201).json({
+          data: {
+            attemptId: attempt._id,
+            status: resolved ? resolved.status : 'failed',
+            amount: attempt.amount,
+            currency: attempt.currency,
+            maskedMsisdn: maskMsisdn(attempt.msisdn),
+            resumed: false,
+          },
+        });
+      }
+
       return res.status(502).json({
         error: 'COLLECTION_REJECTED',
         data: { attemptId: attempt._id, failureKind: classifyFailureReason(lipilaResult.reason) },
@@ -226,14 +261,18 @@ exports.initiate = async (req, res) => {
     }
 
     if (lipilaResult.outcome === 'pending') {
-      attempt.providerIdentifier = lipilaResult.raw?.identifier;
-      attempt.rawResponse = lipilaResult.raw;
+      await SubscriptionPayment.updateOne(
+        { _id: attempt._id, status: 'pending' },
+        { $set: { providerIdentifier: lipilaResult.raw?.identifier, rawResponse: lipilaResult.raw } },
+      );
     } else {
       // ambiguous — stays pending; reason stored for diagnosis only, never
       // surfaced to the browser.
-      attempt.failureReason = lipilaResult.reason;
+      await SubscriptionPayment.updateOne(
+        { _id: attempt._id, status: 'pending' },
+        { $set: { failureReason: lipilaResult.reason } },
+      );
     }
-    await attempt.save();
 
     return res.status(201).json({
       data: {
