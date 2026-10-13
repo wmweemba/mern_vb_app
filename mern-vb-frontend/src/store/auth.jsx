@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../lib/utils';
+import { friendlyTrialExpiredBody } from '../lib/trialErrors';
 
 const AppContext = createContext();
 
@@ -44,6 +45,7 @@ export const AuthProvider = ({ children }) => {
       error => {
         if (error?.response?.status === 403 && error?.response?.data?.error === 'trial_expired') {
           setTrialActive(false);
+          error.response.data = friendlyTrialExpiredBody(error.response.data);
         }
         return Promise.reject(error);
       }
