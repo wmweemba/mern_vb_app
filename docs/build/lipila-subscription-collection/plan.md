@@ -68,6 +68,9 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U11 | Upgrade page: Lipila pay card | sonnet | high | U6 U10 | `src/features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx` | done |
 | U12 | Upgrade page: plan guards, role messaging, payment history | sonnet | low | U11 | `src/features/billing/PaymentHistory.jsx`, `pages/UpgradePage.jsx` | done |
 | U13 | Admin Billing tab payments list | sonnet | low | U9 | `pages/admin/AdminGroupDetail.jsx` (BillingTab only) | done |
+| F1 | Fix-ups: backend (review P1/P2) | sonnet | high | U14 | `controllers/subscriptionPaymentController.js`, `utils/notifyBilling.js`, `scripts/listPendingSubscriptionPayments.js` (+ reconcile mode), `CHANGELOG.md` runbook + verification wording, tests | todo |
+| F2 | Fix-ups: frontend (review P2) | sonnet | high | U14 | `features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx`, tests | todo |
+| F3 | Lapsed-paid gate (decision pending William) | sonnet | high | F1 | `middleware/checkTrial.js` and/or `components/TrialBanner.jsx` copy, tests | blocked |
 | U14 | Docs, runbook, version | haiku | low | all | `CLAUDE.md`, `CHANGELOG.md`, `package.json` (root version), `docs/plan_lipila_subscription_collection.md` (findings/status only) | done |
 
 Backend paths are relative to `mern_vb_backend/`, frontend paths to `mern-vb-frontend/src/`
@@ -301,3 +304,17 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - U13 done: 33 FE tests, build ok, AdminGroupDetail diff purely additive (list remounts via key on isPaid/paidUntil after activate/mark-unpaid).
 - **G3 (after U10–U13):** Opus read LipilaPayCard (fixed the poll-restart bug in U11), the UpgradePage diff (plan-card block rewritten only to add a disabled branch; markup otherwise identical; the `#2D7A2D` check icon hex is pre-existing), AdminGroupDetail (5 additive lines). No new hex/console.log in new frontend files. UI_SPEC sections cited by each unit: §6.7, §6.8, §6.10, §6.14, §11.1. PASS. Not yet seen in a real browser — Phase 3 E2E.
 - U14 done: CLAUDE.md section + env + quick ref, CHANGELOG 3.19.0 with runbook, version 3.19.0, source plan findings/matrix filled. All 14 units done 09:08.
+- **Phase 3 reviewer (opus), 09:15:** no P0. Findings → fix-up units:
+  - P1 → F1: runbook says "Activate/Extend by hand" for a stuck paid attempt, which leaves it pending, so a later `/latest` reconcile or a webhook retry extends a second time. Fix: `listPendingSubscriptionPayments.js --reconcile <attemptId>` calls `reconcileAttempt` (Lipila check-status, read-only, no money moves); runbook says reconcile first, manual Activate only if Lipila has no record.
+  - **P1 → F3, blocked on William (Opus-verified):** `checkTrial.js:25-31` lets a lapsed `isPaid` group fall through to the trial check, and every activation sets `trialExpiresAt` 2099, so **a paid group never goes read-only when `paidUntil` passes**. Pre-existing (not caused by this build), contradicts source §4.1, and makes the new lapsed banner copy false. Grocery Savings Group's `paidUntil` is 2026-11-01.
+  - P2 → F1: initiate's post-commit save after a `failed` outcome writes `status` unconditionally (could overwrite a webhook success after a slow 4xx) → `updateOne({_id, status:'pending'})`; ambiguous/pending branches likewise conditional. Resend returns `{error}` instead of throwing → log it. CHANGELOG overstates the manual regression as verified.
+  - P2 → F2: `/latest` only runs once a plan card is clicked (source 8a.1 says on mount) → hoist to page mount; resumed attempt ignores the selected plan; success within 24 h blocks a D6 plan switch for 24 h; `setInterval(async)` overlaps polls when Lipila is slow → chained setTimeout with in-flight guard; in-flight poll can override Try again → cancelled/attemptId guard.
+- 09:15 session 1 stopped at the unit boundary (~80 min) for William's F3 decision. E2E, `/ship --preflight` not yet run.
+
+## Next session
+Model: Opus as orchestrator (`/build docs/plan_lipila_subscription_collection.md` resumes here). Remaining, in order:
+1. F1, F2 (sonnet, high risk: Opus reads diffs). F3 per William's answer.
+2. Phase 3 E2E (`e2e-tester`, sonnet) per §E2E flows. Check the local Clerk key mode first (memory: project_local_clerk_key_mismatch). Needs a local backend with `LIPILA_ENABLED=true` and a throwaway `LIPILA_WEBHOOK_SECRET` (G2 used a temporary `.claude/launch.json` entry that generated it at launch; recreate it, never commit it). Includes source Step 3d (manual super-admin regression, flow 7).
+3. `/ship --preflight`, then the Phase 4 report and push question (`build/lipila-subscription-collection` only; merge to `main` is a separate question).
+4. Cleanup in Atlas dev: group `ZZZ_TEST Lipila Sim` (6acdd2dda5fff792134ff130), its GroupMember and its simulated SubscriptionPayment rows (delete by groupId; dev-only, no real money).
+5. William, outside the build: Step 0a items still open (webhook secret merchant-wide vs per-wallet, settlement account, NODE_ENV in Coolify); Step 6 (real K1 sandbox payment) and matrix rows 18–19 need `LIPILA_*` sandbox values in `mern_vb_backend/.env` and a tunnel.
