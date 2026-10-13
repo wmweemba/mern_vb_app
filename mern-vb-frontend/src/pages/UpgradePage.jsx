@@ -6,6 +6,7 @@ import { ArrowLeft, Check, CheckCircle2 } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
+import LipilaPayCard from '../features/billing/LipilaPayCard';
 
 const PLAN_META = {
   starter: {
@@ -231,6 +232,14 @@ export default function UpgradePage() {
   if (selectedPlan) {
     return (
       <div className="px-4 md:px-8 py-6 max-w-2xl mx-auto">
+        {/* U11: additive "Pay now with mobile money" card. The plan key passed
+            here is selectedPlan.id, which already matches the API's plan keys
+            ('starter' | 'standard') 1:1 — PLAN_META above is keyed the same
+            way, so no separate mapping was needed. */}
+        <LipilaPayCard plan={selectedPlan.id} />
+        <p className="text-xs text-text-secondary text-center mb-4">
+          Paid another way? Use the details below.
+        </p>
         <SubscribeForm
           plan={selectedPlan}
           onBack={() => setSelectedPlan(null)}
