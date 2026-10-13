@@ -1,6 +1,8 @@
+const mongoose = require('mongoose');
 const Group = require('../models/Group');
 const { logAdminAction } = require('../utils/auditLog');
 const PLANS = require('../config/plans');
+const { extendGroupSubscription } = require('../utils/subscription');
 
 // GET /api/admin/billing/plans
 exports.listPlans = (req, res) => res.json(PLANS);
@@ -12,34 +14,26 @@ exports.activate = async (req, res) => {
   if (!customPaidUntil && (!durationMonths || durationMonths < 1)) {
     return res.status(400).json({ error: 'durationMonths must be >= 1 unless customPaidUntil is provided' });
   }
-
-  const group = await Group.findById(req.params.groupId);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
-
-  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil, trialExpiresAt: group.trialExpiresAt };
-
-  let newPaidUntil;
-  if (customPaidUntil) {
-    newPaidUntil = new Date(customPaidUntil);
-    if (Number.isNaN(newPaidUntil.getTime())) return res.status(400).json({ error: 'Invalid customPaidUntil' });
-  } else {
-    const now = new Date();
-    const base = (group.paidUntil && group.paidUntil > now) ? new Date(group.paidUntil) : new Date(now);
-    base.setMonth(base.getMonth() + durationMonths);
-    newPaidUntil = base;
+  if (customPaidUntil && Number.isNaN(new Date(customPaidUntil).getTime())) {
+    return res.status(400).json({ error: 'Invalid customPaidUntil' });
   }
 
-  group.isPaid = true;
-  group.paidUntil = newPaidUntil;
-  group.plan = plan;
-  group.trialExpiresAt = new Date('2099-12-31');
-  await group.save();
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      result = await extendGroupSubscription(session, { groupId: req.params.groupId, plan, durationMonths, customPaidUntil });
+    });
+  } finally {
+    session.endSession();
+  }
+  if (!result) return res.status(404).json({ error: 'Group not found' });
 
   await logAdminAction({
-    req, action: 'billing.activate', targetType: 'billing', targetId: group._id, groupId: group._id,
-    metadata: { plan, durationMonths, customPaidUntil, before, after: { isPaid: group.isPaid, paidUntil: group.paidUntil } },
+    req, action: 'billing.activate', targetType: 'billing', targetId: result.group._id, groupId: result.group._id,
+    metadata: { plan, durationMonths, customPaidUntil, before: result.before, after: { isPaid: true, paidUntil: result.paidUntil } },
   });
-  res.json({ group, plan, paidUntil: newPaidUntil });
+  res.json({ group: result.group, plan, paidUntil: result.paidUntil });
 };
 
 // POST /api/admin/groups/:groupId/billing/mark-unpaid

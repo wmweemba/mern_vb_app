@@ -57,7 +57,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 |---|---|---|---|---|---|---|
 | U1 | Model + cleanup-script opt-out | sonnet | high | — | `models/SubscriptionPayment.js`, `models/Group.js`, `scripts/utils/groupScopedModels.js`, `tests/groupScopedModels.test.js` | done |
 | U2 | MSISDN + Lipila client port | sonnet | high | — | `utils/msisdn.js`, `utils/lipilaClient.js`, `tests/msisdn.test.js`, `tests/lipilaClient.test.js`, `.env.example` | done |
-| U3 | `extendGroupSubscription` + activate refactor | sonnet | high | — | `utils/subscription.js`, `controllers/adminBillingController.js`, `tests/adminBilling.test.js` | todo |
+| U3 | `extendGroupSubscription` + activate refactor | sonnet | high | — | `utils/subscription.js`, `controllers/adminBillingController.js`, `tests/adminBilling.test.js` | done |
 | U4 | Resolver + notifications | sonnet | high | U1 U2 U3 | `utils/subscriptionCollection.js`, `utils/notifyBilling.js`, `tests/subscriptionCollection.test.js` | todo |
 | U5 | Initiate route | sonnet | high | U4 | `controllers/subscriptionPaymentController.js`, `routes/subscriptionPaymentRoutes.js`, `server.js`, `tests/subscriptionPaymentInitiate.test.js` | todo |
 | U6 | Attempt / latest / history routes | sonnet | high | U5 | same controller + routes files, `tests/subscriptionPaymentRead.test.js` | todo |
@@ -285,3 +285,5 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - 2026-10-13 07:58 build session 1 start (U1)
 - U1 done: all 3 cleanup scripts confirmed to use groupScopedModels() only. 153 tests pass.
 - U2 done: BazaBooks client ported, no deviations from §3. 184 tests pass.
+- U3 done: 194 tests pass. Accepted deviations: audit `before` gains `plan` (from source §4.3's exact code, additive); invalid customPaidUntil + missing group now 400 not 404 (NaN check moved before the transaction, as Step 3b specifies). Response body, error strings, markUnpaid unchanged.
+- **G1 (after U1–U3):** Opus read the activate diff and `utils/subscription.js` line by line: same arithmetic as before, now inside a transaction; malformed groupId still a CastError → 500 as before (pre-existing). Lipila signature code matches the spike scheme. Step 3d (manual activate/extend/mark-unpaid/trial edit in the dev UI as super admin) is deferred to Phase 3 E2E flow 7. PASS.
