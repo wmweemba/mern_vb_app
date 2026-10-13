@@ -312,6 +312,9 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - 09:15 session 1 stopped at the unit boundary (~80 min) for William's F3 decision. E2E, `/ship --preflight` not yet run.
 
 - 2026-10-13 William chose (a): a lapsed paid group (isPaid, paidUntil < now) goes read-only like an expired trial; it must NOT fall through to trialExpiresAt. F3 unblocked.
+- 2026-10-13 ~10:05 **Source Step 6 PASSED: real K1 sandbox collection** (wallet 4154, tunnel to local backend, Atlas dev, group `ZZZ_TEST Lipila Sandbox` 6acde332db0939aa5831068a). William asked Claude to tap Pay (overriding design rule 9 for this sandbox test) and approved the PIN on his phone. Attempt success in 16 s via the **webhook** (lastCheckedAt empty, real Lipila signature verified with the merchant-wide secret), amount 1 / isTestAmount, MNO ref present, no mismatch, group isPaid/starter/paidUntil +1 mo/trial 2099, UI showed "Payment received… until 13 Nov 2026". Env notes: local Mac clock was 6.3 s behind → every Clerk token 401'd (Clerk tolerates 5 s); William resynced it. While /me is loading/failing, /upgrade shows the non-admin "Ask your admin" message → added to F2. Sandbox key/secret copied by Claude from the spike .env into the gitignored backend .env at William's request, never printed.
+- William: webhook secret is merchant-wide (shared with BazaBooks). Opus added to F1: before activating on a webhook `Successful`, confirm via `checkCollectionStatus` with the wallet API key (forged webhooks with a leaked shared secret then can't activate); if the confirm call is unknown/fails, leave pending for the poll/reconcile path.
+- F2 also: wait for the user to load before choosing the non-admin message on /upgrade.
 
 ## Next session
 Model: Opus as orchestrator (`/build docs/plan_lipila_subscription_collection.md` resumes here). Remaining, in order:
