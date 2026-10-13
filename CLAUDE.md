@@ -890,6 +890,10 @@ Added 2026-10-13 (mobile money subscription renewal via Lipila PIN prompt, ships
 
 14. **Verified live 2026-10-13 against the Lipila sandbox (wallet 4154):** a real K1 collection activated a group via the webhook in 16 s, and a wrong PIN was marked failed via the webhook with no group change. The lost-webhook case was only partly observed (the PIN prompt never arrived); the poll fallback ran correctly against a `Pending` result.
 
+15. **A lapsed paid group is read-only (`middleware/checkTrial.js`, decided by William 2026-10-13).** `isPaid && paidUntil <= now` → GETs pass, writes get `403 { error: 'trial_expired', code: 'subscription_lapsed' }`, and `/me` returns `trialActive: false` (`computeTrialActive` in `authController.js`). Before this, a lapsed group fell through to `trialExpiresAt`, which every activation sets to 2099, so a paid group never lost write access. Billing routes are not behind `checkTrial`, so a lapsed group can still renew. **Still open (William's call):** `markUnpaid` sets `isPaid: false` but leaves `trialExpiresAt` at 2099, so a group marked unpaid keeps full access through the trial branch.
+
+16. **The dev simulator's `Successful` webhooks now get 503.** Since note 11, a success is confirmed with Lipila's check-status, and the sandbox has never heard of a simulated reference, so it answers unknown. `--status Failed`, bad-signature, replay, unknown-reference and Disbursement cases still behave as before. To simulate an activation locally, the confirm step would need mocking; the real-sandbox path is the reliable test.
+
 ---
 
 *Last updated: 2026-10-13 — Automated Subscription Collection (Lipila) added*
