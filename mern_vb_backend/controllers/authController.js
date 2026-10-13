@@ -46,6 +46,8 @@ exports.me = async (req, res) => {
       trialExpiresAt: group?.trialExpiresAt,
       isPaid: group?.isPaid || false,
       plan: limitStatus?.plan.name || null,
+      paidUntil: group?.paidUntil || null,
+      planKey: group?.plan || null,
       memberCount: limitStatus?.activeCount ?? null,
       memberLimit: limitStatus?.plan.memberLimit ?? null,
     });
