@@ -369,7 +369,18 @@ exports.getLatest = async (req, res) => {
       attempt.status === 'pending' && Date.now() - attempt.createdAt.getTime() < LATEST_PENDING_RESUME_WINDOW_MS;
 
     if (!isResumableSuccess && !isResumablePending) {
-      return res.status(200).json({ data: { enabled: true, attempt: null } });
+      // The newest attempt isn't actionable (e.g. a failed retry after a
+      // real payment). Fall back to the most recent success in the window so
+      // the page still confirms the payment that did land.
+      const recentSuccess = await SubscriptionPayment.findOne({
+        groupId: req.groupId,
+        status: 'success',
+        createdAt: { $gte: new Date(Date.now() - LATEST_WINDOW_MS) },
+      }).sort({ createdAt: -1 });
+      if (!recentSuccess) {
+        return res.status(200).json({ data: { enabled: true, attempt: null } });
+      }
+      attempt = recentSuccess;
     }
 
     return res.status(200).json({

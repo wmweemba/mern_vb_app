@@ -278,6 +278,27 @@ describe('GET /api/billing/lipila/latest', () => {
     expect(res.body.data.attempt).toBeNull();
   });
 
+  test('a failed retry after a success still returns the success', async () => {
+    const group = await makeGroup();
+    const success = await makeAttempt(group._id, {
+      status: 'success',
+      createdAt: new Date(Date.now() - 60 * 60 * 1000),
+      completedAt: new Date(Date.now() - 60 * 60 * 1000),
+      paidUntilAfter: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    await makeAttempt(group._id, {
+      status: 'failed',
+      failureReason: 'Incorrect pin has been entered.',
+      createdAt: new Date(Date.now() - 5 * 60 * 1000),
+      completedAt: new Date(Date.now() - 5 * 60 * 1000),
+    });
+    setAuth({ groupId: group._id });
+    const res = await request(app).get('/api/billing/lipila/latest');
+    expect(res.status).toBe(200);
+    expect(res.body.data.attempt.attemptId).toBe(String(success._id));
+    expect(res.body.data.attempt.status).toBe('success');
+  });
+
   test('anything older than 24h is hidden', async () => {
     const group = await makeGroup();
     await makeAttempt(group._id, {
