@@ -7,6 +7,12 @@ import { useUser } from '@clerk/clerk-react';
 import { API_BASE_URL } from '../lib/utils';
 import { useAuth } from '../store/auth';
 import LipilaPayCard from '../features/billing/LipilaPayCard';
+import PaymentHistory from '../features/billing/PaymentHistory';
+
+// Reused by both the manual-payment confirmation screen and the >40-member
+// "contact us" message below — one source for the WhatsApp number.
+const WHATSAPP_CONTACT_URL = 'https://wa.me/260979645911';
+const WHATSAPP_CONTACT_NUMBER = '0979645911';
 
 const PLAN_META = {
   starter: {
@@ -80,8 +86,8 @@ function ConfirmationScreen({ plan, groupName }) {
         <div className="border-t border-border-default pt-3">
           <p className="text-xs text-text-secondary">
             <span className="font-medium text-text-primary">WhatsApp:</span>{' '}
-            <a href="https://wa.me/260979645911" target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">
-              0979645911
+            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">
+              {WHATSAPP_CONTACT_NUMBER}
             </a>
           </p>
         </div>
@@ -202,6 +208,17 @@ export default function UpgradePage() {
   const [plans, setPlans] = useState([]);
 
   const groupName = member?.groupName || 'My Group';
+  const role = member?.role;
+  // Step 8a.1 — only admin/treasurer get the Lipila pay card and payment
+  // history; every other role sees the "ask your admin" sentence instead.
+  // The manual SubscribeForm/ConfirmationScreen flow below stays open to
+  // every role, unchanged.
+  const canPayDirectly = role === 'admin' || role === 'treasurer';
+  const memberCount = member?.memberCount ?? null;
+  const overCapacity = memberCount != null && memberCount > 40;
+  // Step 8a.2 — a no-expiry group (isPaid with no paidUntil) gets no Pay UI
+  // at all; the manual flow is the only path for them.
+  const noExpiryGroup = Boolean(member?.isPaid && !member?.paidUntil);
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/billing/plans`)
@@ -235,8 +252,11 @@ export default function UpgradePage() {
         {/* U11: additive "Pay now with mobile money" card. The plan key passed
             here is selectedPlan.id, which already matches the API's plan keys
             ('starter' | 'standard') 1:1 — PLAN_META above is keyed the same
-            way, so no separate mapping was needed. */}
-        <LipilaPayCard plan={selectedPlan.id} />
+            way, so no separate mapping was needed.
+            U12: never rendered for a no-expiry group (LipilaPayCard itself
+            already skips non-admin/treasurer roles and the /latest call for
+            them). */}
+        {!noExpiryGroup && <LipilaPayCard plan={selectedPlan.id} />}
         <p className="text-xs text-text-secondary text-center mb-4">
           Paid another way? Use the details below.
         </p>
@@ -265,53 +285,99 @@ export default function UpgradePage() {
         Start with a 30-day paid subscription. Cancel anytime.
       </p>
 
+      {/* Step 8a.1 — role-appropriate messaging for anyone who can't renew
+          themselves. The manual flow below stays available to every role. */}
+      {!canPayDirectly && (
+        <p className="text-sm text-text-secondary bg-surface-card border border-border-default rounded-xl px-4 py-3 mb-6">
+          Ask your group admin or treasurer to renew the subscription.
+        </p>
+      )}
+
+      {/* Step 8a.2 — a group bigger than every plan can't subscribe to any
+          of them; point everyone at WhatsApp instead. */}
+      {overCapacity && (
+        <p className="text-sm text-text-secondary bg-surface-card border border-border-default rounded-xl px-4 py-3 mb-6">
+          Your group has {memberCount} members, more than our largest plan covers.{' '}
+          <a
+            href={WHATSAPP_CONTACT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-primary underline font-medium"
+          >
+            Contact us to subscribe
+          </a>
+          .
+        </p>
+      )}
+
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {plans.map(plan => (
-          <div
-            key={plan.id}
-            className={`relative bg-surface-card rounded-xl p-6 flex flex-col ${
-              plan.recommended
-                ? 'border-2 border-brand-primary'
-                : 'border border-border-default'
-            }`}
-          >
-            {plan.recommended && (
-              <div className="absolute -top-3 right-4">
-                <span className="bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
-                  Recommended
-                </span>
-              </div>
-            )}
-
-            <h2 className="text-lg font-bold text-text-primary">{plan.name}</h2>
-            <p className="text-3xl font-bold text-text-primary mt-1">
-              ZMW {plan.price}
-              <span className="text-sm font-normal text-text-secondary"> / month</span>
-            </p>
-
-            <ul className="mt-5 space-y-2.5 flex-1">
-              {plan.features.map(feat => (
-                <li key={feat} className="flex items-start gap-2">
-                  <Check size={16} className="text-[#2D7A2D] mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-text-primary">{feat}</span>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={() => setSelectedPlan(plan)}
-              className={`mt-6 w-full text-sm font-semibold rounded-full py-2.5 transition-colors ${
+        {plans.map(plan => {
+          // Step 8a.2 — a plan too small for the group's current member
+          // count is disabled, not selectable. memberCount comes from /me
+          // (set on the auth store's `user`); memberLimit comes from the
+          // same GET /billing/plans response the cards render from.
+          const tooSmall = memberCount != null && plan.memberLimit < memberCount;
+          const disabled = tooSmall || overCapacity;
+          return (
+            <div
+              key={plan.id}
+              className={`relative bg-surface-card rounded-xl p-6 flex flex-col ${
                 plan.recommended
-                  ? 'bg-brand-primary hover:bg-brand-hover text-white'
-                  : 'bg-surface-card border border-border-default text-text-primary hover:bg-surface-page'
-              }`}
+                  ? 'border-2 border-brand-primary'
+                  : 'border border-border-default'
+              } ${disabled ? 'opacity-60' : ''}`}
             >
-              Subscribe
-            </button>
-          </div>
-        ))}
+              {plan.recommended && (
+                <div className="absolute -top-3 right-4">
+                  <span className="bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
+                    Recommended
+                  </span>
+                </div>
+              )}
+
+              <h2 className="text-lg font-bold text-text-primary">{plan.name}</h2>
+              <p className="text-3xl font-bold text-text-primary mt-1">
+                ZMW {plan.price}
+                <span className="text-sm font-normal text-text-secondary"> / month</span>
+              </p>
+
+              <ul className="mt-5 space-y-2.5 flex-1">
+                {plan.features.map(feat => (
+                  <li key={feat} className="flex items-start gap-2">
+                    <Check size={16} className="text-[#2D7A2D] mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-text-primary">{feat}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {tooSmall && (
+                <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2 mt-4">
+                  Your group has {memberCount} members. {plan.name} covers up to {plan.memberLimit}.
+                </p>
+              )}
+
+              <button
+                onClick={() => !disabled && setSelectedPlan(plan)}
+                disabled={disabled}
+                className={`mt-6 w-full text-sm font-semibold rounded-full py-2.5 transition-colors ${
+                  disabled
+                    ? 'bg-surface-page border border-border-default text-text-muted cursor-not-allowed'
+                    : plan.recommended
+                    ? 'bg-brand-primary hover:bg-brand-hover text-white'
+                    : 'bg-surface-card border border-border-default text-text-primary hover:bg-surface-page'
+                }`}
+              >
+                Subscribe
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Step 8a.9 — admin/treasurer-only payment history, hides itself
+          while there are no rows (feature dark or never used). */}
+      {canPayDirectly && <PaymentHistory />}
     </div>
   );
 }
