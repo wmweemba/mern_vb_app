@@ -67,7 +67,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 | U10 | `/me` fields + renewal banner | sonnet | low | — | `controllers/authController.js`, `components/TrialBanner.jsx`, frontend auth store if it maps `/me` fields, `src/__tests__/TrialBanner.test.jsx` | done |
 | U11 | Upgrade page: Lipila pay card | sonnet | high | U6 U10 | `src/features/billing/LipilaPayCard.jsx`, `pages/UpgradePage.jsx` | done |
 | U12 | Upgrade page: plan guards, role messaging, payment history | sonnet | low | U11 | `src/features/billing/PaymentHistory.jsx`, `pages/UpgradePage.jsx` | done |
-| U13 | Admin Billing tab payments list | sonnet | low | U9 | `pages/admin/AdminGroupDetail.jsx` (BillingTab only) | todo |
+| U13 | Admin Billing tab payments list | sonnet | low | U9 | `pages/admin/AdminGroupDetail.jsx` (BillingTab only) | done |
 | U14 | Docs, runbook, version | haiku | low | all | `CLAUDE.md`, `CHANGELOG.md`, `package.json` (root version), `docs/plan_lipila_subscription_collection.md` (findings/status only) | todo |
 
 Backend paths are relative to `mern_vb_backend/`, frontend paths to `mern-vb-frontend/src/`
@@ -298,3 +298,4 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - U10 done: TrialBanner (rendered once in AppShell) carries the branches; banner moved onto UI_SPEC §6.10/§6.14 tokens. Upcoming-renewal state hidden for non-admin roles (no action for them). Test file is .test.js (jest testMatch has no .jsx). 265 BE / 19 FE tests pass, build ok.
 - U11 done: 25 FE tests, build ok. Opus fix: poll effect depended on non-memoised refreshMembership (new identity each AuthProvider render) → would restart polling and reset the 150 s timeout; now read via a ref. Accepted deviation: initiate-time 429 shown inline in idle state.
 - U12 done: 30 FE tests, build ok. Deviation recorded for William: plan cards disabled by member count apply to the manual request path too (shared selection; source 8a.2 literally); >40 groups now see Contact us instead of the manual request form. No production group affected today (Step 0d). History hidden while it has no rows.
+- U13 done: 33 FE tests, build ok, AdminGroupDetail diff purely additive (list remounts via key on isPaid/paidUntil after activate/mark-unpaid).
