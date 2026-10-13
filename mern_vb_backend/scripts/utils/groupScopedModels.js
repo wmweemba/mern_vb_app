@@ -15,6 +15,14 @@
  *
  * `Group` itself is deliberately excluded — it is keyed by `_id`, not `groupId`,
  * and callers delete it separately after clearing everything that references it.
+ *
+ * A model can opt out entirely by setting schema option `retainOnGroupDelete: true`
+ * even though it carries a `groupId`. `SubscriptionPayment` is the first case: its
+ * rows are proof of real money and MNO references (Lipila) and must outlive the
+ * group they were paid for — sweeping them on group deletion would destroy a
+ * financial record, not just app data. Same precedent as BazaBooks. Do not add a
+ * second opt-out mechanism (e.g. a hardcoded exclusion list here) — the schema
+ * option is the single source of truth a new model declares for itself.
  */
 const fs = require('fs');
 const path = require('path');
@@ -35,6 +43,7 @@ function groupScopedModels() {
       }
       if (!model || typeof model.deleteMany !== 'function' || !model.schema) return null;
       if (!model.schema.path('groupId')) return null;
+      if (model.schema.options.retainOnGroupDelete === true) return null;
       return { name, model };
     })
     .filter(Boolean)

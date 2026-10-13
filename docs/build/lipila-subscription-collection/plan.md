@@ -55,7 +55,7 @@ source plan, **stop and report in your summary**; don't "fix" either one.
 
 | ID | Title | Model | Risk | Depends on | Owns (files) | Status |
 |---|---|---|---|---|---|---|
-| U1 | Model + cleanup-script opt-out | sonnet | high | — | `models/SubscriptionPayment.js`, `models/Group.js`, `scripts/utils/groupScopedModels.js`, `tests/groupScopedModels.test.js` | todo |
+| U1 | Model + cleanup-script opt-out | sonnet | high | — | `models/SubscriptionPayment.js`, `models/Group.js`, `scripts/utils/groupScopedModels.js`, `tests/groupScopedModels.test.js` | done |
 | U2 | MSISDN + Lipila client port | sonnet | high | — | `utils/msisdn.js`, `utils/lipilaClient.js`, `tests/msisdn.test.js`, `tests/lipilaClient.test.js`, `.env.example` | todo |
 | U3 | `extendGroupSubscription` + activate refactor | sonnet | high | — | `utils/subscription.js`, `controllers/adminBillingController.js`, `tests/adminBilling.test.js` | todo |
 | U4 | Resolver + notifications | sonnet | high | U1 U2 U3 | `utils/subscriptionCollection.js`, `utils/notifyBilling.js`, `tests/subscriptionCollection.test.js` | todo |
@@ -282,3 +282,5 @@ row 18 (wrong PIN), row 19 (lost webhook: stop tunnel, approve, poll resolves).
 - 2026-10-13 plan approved by William. Step 0a done (production wallet "Chama360 Subscriptions"
   created). Branch name approved. **Pauses: stop only at points that move real money**; G1–G3 are
   reviewed and logged but don't wait for William. Build-session start time logged below.
+- 2026-10-13 07:58 build session 1 start (U1)
+- U1 done: all 3 cleanup scripts confirmed to use groupScopedModels() only. 153 tests pass.
