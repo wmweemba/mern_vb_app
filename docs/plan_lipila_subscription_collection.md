@@ -308,10 +308,9 @@ test-amount double guard (rule 7) doesn't depend on it, but the finding matters.
    `transactionsAvailable: true`. If not, **stop**: every write path here needs transactions
    (Gotcha #12).
 
-**Step 0 findings:** *(fill in: wallet created Y/N, webhook secret merchant-wide or
-per-wallet, settlement account confirmed, NODE_ENV in Coolify, 0d results)*
+**Step 0 findings:** wallet "Chama360 Subscriptions" created Y (William, 2026-10-13); webhook secret merchant-wide or per-wallet pending William; settlement account pending William; NODE_ENV in Coolify pending William; 0d: health transactionsAvailable true; one non-deleted group (Grocery Savings Group, standard, isPaid, paidUntil 2026-11-01, 25 active members) — no no-expiry, >40, or too-small groups.
 
-⏸ Report Step 0 findings. Don't start Step 1 until 0a is done.
+Status: built on branch build/lipila-subscription-collection 2026-10-13, not yet merged or deployed.
 
 ---
 
@@ -582,26 +581,26 @@ payload. Flags: `--status Successful|Failed`, `--amount`, `--bad-signature`,
 
 | # | Case | How | Pass |
 | --- | --- | --- | --- |
-| 1 | Happy path | sim Successful | attempt success, Group +1 mo, notices + receipt |
-| 2 | Trial → paid | sim on an expired-trial group | `isPaid`, `trialExpiresAt` 2099, writes unblocked (`checkTrial` passes) |
-| 3 | Lapsed paid → paid | `paidUntil` in the past | extends from **now** |
-| 4 | Paid-up renewal | `paidUntil` in the future | extends from the **old expiry**; double-payment warning only if > 7 days left |
-| 5 | Plan switch | starter group pays standard | `plan` flips, +1 mo from expiry |
-| 6 | Duplicate webhook | `--repeat 3` | one extension |
-| 7 | Bad signature / replay | flags | 401, nothing written |
-| 8 | Unknown ref / Disbursement | flags | 200, nothing written |
-| 9 | Failed | sim Failed | failed, no extension, manual request form still works |
-| 10 | Late success | Failed then Successful | activates, warning |
-| 11 | Amount mismatch | `--amount 50` | activates, flagged |
-| 12 | Race | webhook + `GET /attempts/:id` reconcile concurrently | one extension |
-| 13 | Race with admin | webhook + super-admin activate concurrently | two extensions, none lost |
-| 14 | Plan too small | 21 members, starter | 409 before any Lipila call |
-| 15 | Role guard | member / loan_officer | 403 |
-| 16 | Kill switch | `LIPILA_ENABLED` unset | Lipila UI hidden, initiate 503, manual flow unchanged |
-| 17 | Manual regression | repeat Step 3d | identical |
-| 18 | **Real** wrong PIN | *William*, K1 | failed, UI shows the PIN message, no money moved |
-| 19 | **Real** lost webhook | *William*: stop tunnel, K1, approve | poll resolves via check-status, activates once |
-| 20 | Build/tests | backend + frontend `pnpm test`, frontend `pnpm build` | pass; PWA build intact |
+| 1 | Happy path | sim Successful | ✓ simulated, Atlas dev 2026-10-13 |
+| 2 | Trial → paid | sim on an expired-trial group | ✓ simulated, Atlas dev 2026-10-13 |
+| 3 | Lapsed paid → paid | `paidUntil` in the past | ✓ simulated, Atlas dev 2026-10-13 |
+| 4 | Paid-up renewal | `paidUntil` in the future | ✓ simulated, Atlas dev 2026-10-13 |
+| 5 | Plan switch | starter group pays standard | ✓ simulated, Atlas dev 2026-10-13 |
+| 6 | Duplicate webhook | `--repeat 3` | ✓ simulated, Atlas dev 2026-10-13 |
+| 7 | Bad signature / replay | flags | ✓ simulated, Atlas dev 2026-10-13 |
+| 8 | Unknown ref / Disbursement | flags | ✓ simulated, Atlas dev 2026-10-13 |
+| 9 | Failed | sim Failed | ✓ simulated, Atlas dev 2026-10-13 |
+| 10 | Late success | Failed then Successful | ✓ simulated, Atlas dev 2026-10-13 |
+| 11 | Amount mismatch | `--amount 50` | ✓ simulated, Atlas dev 2026-10-13 |
+| 12 | Race | webhook + `GET /attempts/:id` reconcile concurrently | ✓ Jest only |
+| 13 | Race with admin | webhook + super-admin activate concurrently | ✓ Jest only |
+| 14 | Plan too small | 21 members, starter | ✓ Jest only |
+| 15 | Role guard | member / loan_officer | ✓ Jest only |
+| 16 | Kill switch | `LIPILA_ENABLED` unset | ✓ Jest only |
+| 17 | Manual regression | repeat Step 3d | pending Phase 3 E2E |
+| 18 | **Real** wrong PIN | *William*, K1 | pending William (real money) |
+| 19 | **Real** lost webhook | *William*: stop tunnel, K1, approve | pending William (real money) |
+| 20 | Build/tests | backend + frontend `pnpm test`, frontend `pnpm build` | ✓ (265 BE / 33 FE tests, build ok) |
 
 ⏸ Report the filled-in matrix and any deviations, **recorded rather than silently absorbed**.
 

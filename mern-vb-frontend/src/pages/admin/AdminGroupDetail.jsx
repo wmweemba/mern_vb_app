@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ChevronLeft } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/utils';
 import BillingActivationDrawer from '../../components/admin/BillingActivationDrawer';
+import SubscriptionPaymentsList from '../../features/admin/SubscriptionPaymentsList';
 import Select from '../../components/ui/Select';
 import TypedConfirmationModal from '../../components/ui/TypedConfirmationModal';
 
@@ -347,6 +348,10 @@ function BillingTab({ group, groupId, onRefresh }) {
         groupId={groupId}
         group={group}
         onSuccess={onRefresh}
+      />
+      <SubscriptionPaymentsList
+        key={`${group.isPaid}-${group.paidUntil}`}
+        groupId={groupId}
       />
     </div>
   );

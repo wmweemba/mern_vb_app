@@ -1,6 +1,10 @@
+const mongoose = require('mongoose');
 const Group = require('../models/Group');
+const SubscriptionPayment = require('../models/SubscriptionPayment');
 const { logAdminAction } = require('../utils/auditLog');
 const PLANS = require('../config/plans');
+const { extendGroupSubscription } = require('../utils/subscription');
+const { maskMsisdn } = require('../utils/msisdn');
 
 // GET /api/admin/billing/plans
 exports.listPlans = (req, res) => res.json(PLANS);
@@ -12,48 +16,84 @@ exports.activate = async (req, res) => {
   if (!customPaidUntil && (!durationMonths || durationMonths < 1)) {
     return res.status(400).json({ error: 'durationMonths must be >= 1 unless customPaidUntil is provided' });
   }
-
-  const group = await Group.findById(req.params.groupId);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
-
-  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil, trialExpiresAt: group.trialExpiresAt };
-
-  let newPaidUntil;
-  if (customPaidUntil) {
-    newPaidUntil = new Date(customPaidUntil);
-    if (Number.isNaN(newPaidUntil.getTime())) return res.status(400).json({ error: 'Invalid customPaidUntil' });
-  } else {
-    const now = new Date();
-    const base = (group.paidUntil && group.paidUntil > now) ? new Date(group.paidUntil) : new Date(now);
-    base.setMonth(base.getMonth() + durationMonths);
-    newPaidUntil = base;
+  if (customPaidUntil && Number.isNaN(new Date(customPaidUntil).getTime())) {
+    return res.status(400).json({ error: 'Invalid customPaidUntil' });
   }
 
-  group.isPaid = true;
-  group.paidUntil = newPaidUntil;
-  group.plan = plan;
-  group.trialExpiresAt = new Date('2099-12-31');
-  await group.save();
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      result = await extendGroupSubscription(session, { groupId: req.params.groupId, plan, durationMonths, customPaidUntil });
+    });
+  } finally {
+    session.endSession();
+  }
+  if (!result) return res.status(404).json({ error: 'Group not found' });
 
   await logAdminAction({
-    req, action: 'billing.activate', targetType: 'billing', targetId: group._id, groupId: group._id,
-    metadata: { plan, durationMonths, customPaidUntil, before, after: { isPaid: group.isPaid, paidUntil: group.paidUntil } },
+    req, action: 'billing.activate', targetType: 'billing', targetId: result.group._id, groupId: result.group._id,
+    metadata: { plan, durationMonths, customPaidUntil, before: result.before, after: { isPaid: true, paidUntil: result.paidUntil } },
   });
-  res.json({ group, plan, paidUntil: newPaidUntil });
+  res.json({ group: result.group, plan, paidUntil: result.paidUntil });
+};
+
+// GET /api/admin/groups/:groupId/billing/payments
+// Read-only. Every Lipila subscription-payment attempt for this group, all
+// statuses, newest first. Records outlive a soft-deleted group (§4.2
+// retainOnGroupDelete), so this queries SubscriptionPayment by groupId only —
+// it never re-checks Group.findById for existence/soft-delete state.
+exports.listPayments = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.groupId)) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+
+    const payments = await SubscriptionPayment.find({ groupId: req.params.groupId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = payments.map((p) => ({
+      id: p._id,
+      createdAt: p.createdAt,
+      completedAt: p.completedAt || null,
+      plan: p.plan,
+      amount: p.amount,
+      currency: p.currency,
+      status: p.status,
+      failureReason: p.failureReason || null,
+      maskedMsisdn: maskMsisdn(p.msisdn),
+      providerExternalId: p.providerExternalId || null,
+      isTestAmount: !!p.isTestAmount,
+      amountMismatch: !!p.amountMismatch,
+      wasLateSuccess: !!p.wasLateSuccess,
+      initiatedByName: p.initiatedByName || null,
+      paidUntilAfter: p.paidUntilAfter || null,
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load payments', details: err.message });
+  }
 };
 
 // POST /api/admin/groups/:groupId/billing/mark-unpaid
 exports.markUnpaid = async (req, res) => {
   const group = await Group.findById(req.params.groupId);
   if (!group) return res.status(404).json({ error: 'Group not found' });
-  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil };
+  const before = { isPaid: group.isPaid, paidUntil: group.paidUntil, trialExpiresAt: group.trialExpiresAt };
   group.isPaid = false;
   group.paidUntil = null;
+  // Activation sets trialExpiresAt to 2099, so without this a group marked
+  // unpaid kept full write access through checkTrial's trial branch. Ending
+  // the trial now makes it read-only (William, 2026-10-13). A super admin can
+  // still grant free access afterwards with the trial-expiry edit.
+  group.trialExpiresAt = new Date();
   await group.save();
 
   await logAdminAction({
     req, action: 'billing.mark_unpaid', targetType: 'billing', targetId: group._id, groupId: group._id,
-    metadata: { before },
+    metadata: { before, after: { isPaid: false, paidUntil: null, trialExpiresAt: group.trialExpiresAt } },
   });
   res.json(group);
 };

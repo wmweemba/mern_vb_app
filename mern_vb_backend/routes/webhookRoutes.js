@@ -3,6 +3,7 @@ const router = express.Router();
 const { Webhook } = require('svix');
 const GroupMember = require('../models/GroupMember');
 const PendingInvite = require('../models/PendingInvite');
+const lipilaWebhookController = require('../controllers/lipilaWebhookController');
 
 router.post('/clerk', express.raw({ type: 'application/json' }), async (req, res) => {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -82,5 +83,10 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req, res
 
   res.status(200).json({ received: true });
 });
+
+// Lipila subscription-collection webhook — body must stay a raw Buffer
+// regardless of the Content-Type Lipila sends, so signature verification
+// sees exactly the bytes that were signed.
+router.post('/lipila/subscriptions', express.raw({ type: () => true }), lipilaWebhookController.handle);
 
 module.exports = router;

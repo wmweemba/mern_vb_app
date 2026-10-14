@@ -40,6 +40,7 @@ router.patch('/groups/:groupId/settings', settings.updateSettings);
 router.get('/billing/plans', billing.listPlans);
 router.post('/groups/:groupId/billing/activate', billing.activate);
 router.post('/groups/:groupId/billing/mark-unpaid', billing.markUnpaid);
+router.get('/groups/:groupId/billing/payments', billing.listPayments);
 
 // Members per group
 router.get('/groups/:groupId/members', members.listMembers);

@@ -11,6 +11,7 @@ const groupSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: null },
   suspendedAt: { type: Date, default: null },
   suspendedReason: { type: String, default: null },
+  lastPaymentAttemptAt: { type: Date, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Group', groupSchema);

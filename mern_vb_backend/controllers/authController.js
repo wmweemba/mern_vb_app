@@ -4,6 +4,17 @@ const Group = require('../models/Group');
 const SuperAdmin = require('../models/SuperAdmin');
 const { getMemberLimitStatus } = require('../utils/planLimits');
 
+// Pure helper, exported for unit testing — mirrors middleware/checkTrial.js's
+// lapsed-paid rule: a group whose subscription has lapsed must never fall
+// through to the trialExpiresAt check (every activation sets trialExpiresAt
+// to a far-future date, which would otherwise grant trialActive forever).
+function computeTrialActive(group, now = new Date()) {
+  const paidActive = group?.isPaid && (!group?.paidUntil || group.paidUntil > now);
+  const lapsedPaid = group?.isPaid && group?.paidUntil && group.paidUntil <= now;
+  return paidActive || (!lapsedPaid && group?.trialExpiresAt > now);
+}
+exports.computeTrialActive = computeTrialActive;
+
 exports.me = async (req, res) => {
   try {
     const { userId: clerkUserId } = getAuth(req);
@@ -30,8 +41,7 @@ exports.me = async (req, res) => {
     }
 
     const group = await Group.findById(member.groupId);
-    const paidActive = group?.isPaid && (!group?.paidUntil || group.paidUntil > new Date());
-    const trialActive = paidActive || (group?.trialExpiresAt > new Date());
+    const trialActive = computeTrialActive(group);
     const limitStatus = group ? await getMemberLimitStatus(group) : null;
 
     res.json({
@@ -46,6 +56,8 @@ exports.me = async (req, res) => {
       trialExpiresAt: group?.trialExpiresAt,
       isPaid: group?.isPaid || false,
       plan: limitStatus?.plan.name || null,
+      paidUntil: group?.paidUntil || null,
+      planKey: group?.plan || null,
       memberCount: limitStatus?.activeCount ?? null,
       memberLimit: limitStatus?.plan.memberLimit ?? null,
     });
