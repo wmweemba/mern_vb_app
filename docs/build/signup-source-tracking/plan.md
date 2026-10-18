@@ -94,3 +94,4 @@ Referral rewards/payouts/partner dashboard (D11), backfilling existing groups (D
 4. Smoke: private window → https://chama360.nxhub.online/?ref=smoke-test → `localStorage.c360_signup_ref` set. Don't create a production group.
 5. Pre-existing, out of scope: 88/181 pnpm audit advisories (incl. critical) deserve their own `/sec --full` pass before the campaign.
 6. `/brain log` the milestone.
+- 2026-10-18 build/signup-source-tracking pushed to origin (William's yes). Not merged.
