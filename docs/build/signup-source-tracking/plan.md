@@ -5,7 +5,7 @@
 group creation naming the source, and show the source in the super-admin groups list and
 detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 **Repo:** /Users/williammweemba/Dev_Projects/mern_vb_app · **Branch:** build/signup-source-tracking · **Base:** c7ef533 (main)
-**Status:** awaiting-push
+**Status:** merged-to-main
 **Source spec:** `docs/plan_signup_source_tracking.md` (Opus, 2026-10-16). Decisions D1–D11 there are final. Its exact code blocks are to be used as written.
 
 ## Context
@@ -95,3 +95,4 @@ Referral rewards/payouts/partner dashboard (D11), backfilling existing groups (D
 5. Pre-existing, out of scope: 88/181 pnpm audit advisories (incl. critical) deserve their own `/sec --full` pass before the campaign.
 6. `/brain log` the milestone.
 - 2026-10-18 build/signup-source-tracking pushed to origin (William's yes). Not merged.
+- 2026-10-18 Session re-verified green before merge: backend 29/29 suites, 317/317 tests; frontend 12/12 suites, 58/58 tests; `pnpm build` ok. William approved merge to main. Fast-forward merge `c7ef533..4140010`, pushed to `origin/main` (Auto Deploy triggers both Coolify resources). Post-push `/api/health` check: `{"status":"ok","mongo":"connected","replicaSet":"rs0","transactionsAvailable":true}`. Build status: **done** — remaining items are William's own manual checks (Coolify env vars for Telegram/NODE_ENV, eyeballing the admin Source column live, the `?ref=smoke-test` private-window check) and the pre-existing `/sec --full` pnpm-audit follow-up, none of which block closing this build.
