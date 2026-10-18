@@ -5,7 +5,7 @@
 group creation naming the source, and show the source in the super-admin groups list and
 detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 **Repo:** /Users/williammweemba/Dev_Projects/mern_vb_app · **Branch:** build/signup-source-tracking · **Base:** c7ef533 (main)
-**Status:** building
+**Status:** verifying
 **Source spec:** `docs/plan_signup_source_tracking.md` (Opus, 2026-10-16). Decisions D1–D11 there are final. Its exact code blocks are to be used as written.
 
 ## Context
@@ -62,7 +62,7 @@ detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 | Gate | After | Opus reads | Note |
 |---|---|---|---|
 | G1 | U2 | `groupController.js` diff, `notifyNewGroup.js`, `groupSignupRef.test.js` | Pass 2026-10-18: diff read; alert after 201, outside txn, no await, .catch; `template` is function-scoped; admin path stores `admin`; 29 suites / 314 tests green. |
-| G2 | U5 (before Phase 3) | `git diff --stat c7ef533..HEAD`, `src/lib/signupRef.js`, `main.jsx` diff | |
+| G2 | U5 (before Phase 3) | `git diff --stat c7ef533..HEAD`, `src/lib/signupRef.js`, `main.jsx` diff | Pass 2026-10-18: 17 files, +616/-4, all within unit ownership plus the one-line listGroups fix; lib identical to spec; capture before createRoot; no console.log. |
 
 ## E2E flows
 Local only, against Atlas (dev/staging), throwaway Clerk user via `scripts/createThrowawayTestUser.js` (no `--group`, so it lands on onboarding). Never production.
@@ -81,3 +81,4 @@ Referral rewards/payouts/partner dashboard (D11), backfilling existing groups (D
 - 2026-10-18 U0 baseline: backend 27 suites/293 tests, frontend 11/43, build OK.
 - 2026-10-18 U1 done (12 tests). U2 done (9 tests incl. admin 'admin' case + notifyNewGroup unit tests; 29/314). G1 pass. U3 done (15 tests; 12/58; lib file identical to spec).
 - 2026-10-18 U4 done. Implementer found the orchestrator's projection claim wrong: `adminGroupsController.listGroups` builds each row field by field and dropped `signupRef`. Orchestrator added `signupRef: g.signupRef || null` (one line) to the map; backend 29/314 still green.
+- 2026-10-18 Phase 3 start. Local Mac clock measured ~9 s behind api.clerk.com; >5 s breaks Clerk sessions (CLAUDE.md Lipila note 13), so E2E is waiting on William to resync.
