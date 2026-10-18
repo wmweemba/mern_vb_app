@@ -5,7 +5,7 @@
 group creation naming the source, and show the source in the super-admin groups list and
 detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 **Repo:** /Users/williammweemba/Dev_Projects/mern_vb_app · **Branch:** build/signup-source-tracking · **Base:** c7ef533 (main)
-**Status:** verifying
+**Status:** awaiting-push
 **Source spec:** `docs/plan_signup_source_tracking.md` (Opus, 2026-10-16). Decisions D1–D11 there are final. Its exact code blocks are to be used as written.
 
 ## Context
@@ -84,3 +84,13 @@ Referral rewards/payouts/partner dashboard (D11), backfilling existing groups (D
 - 2026-10-18 Phase 3 start. Local Mac clock measured ~9 s behind api.clerk.com; >5 s breaks Clerk sessions (CLAUDE.md Lipila note 13), so E2E is waiting on William to resync.
 - 2026-10-18 Reviewer (opus): no P0/P1, 4 P2. U6 fix-ups done: test d now proves the .catch (verified failing with .catch removed), names truncated to 200 chars, unset-Telegram logs a line, non-production alerts tagged [env]. Skipped P2 #4 (frontend readStored returns raw stored ref; spec code kept verbatim, server re-normalises). 29/317 green.
 - 2026-10-18 U6 regression: cc965e0 made adminBilling.test.js time out in the full suite (passes alone). Retry 1/1: AbortSignal.timeout(8000) left a live 8 s timer per call; replaced with AbortController + clearTimeout in finally. Full suite 29/317 green (orchestrator re-ran). Orchestrator slip: cc965e0 was committed on a failing run (grep masked the exit code) — commits now gate on the test exit code.
+- 2026-10-18 E2E (sonnet, Playwright, Atlas dev): flows 1,2,3,5 pass (boot capture before redirect; POST body + Group.signupRef 'p-test'; storage cleared on success; '<script>' ref → nothing stored, signupRef null; first touch wins). Backend log had no notifyNewGroup errors, so both Telegram alerts were accepted. Flow 4 (admin UI) not driven: needs a SuperAdmin record; left for William to eyeball. Cleanup: both throwaway users + groups deleted, cleanupOrphanedRecords dry run clean.
+- 2026-10-18 /ship --preflight: pnpm audit 88 backend / 181 frontend advisories, all pre-existing (branch changes no dependencies). gitleaks: branch hits are the `c360_signup_ref` key-name false positive; others are untracked .env files (gitignored) and a YOUR_TOKEN placeholder. No env file tracked or staged. Perf: no new queries beyond one field on an existing insert; one localStorage read at boot.
+
+## Next session (Sonnet)
+1. Push `build/signup-source-tracking` (only on William's yes), then merge to `main` as a separate yes. Merge to main = production deploy (Auto Deploy on).
+2. Before/after merge (spec Step 6): confirm TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID on the production backend in Coolify; confirm NODE_ENV=production there too, or production alerts will carry a `[dev]`-style tag (cosmetic).
+3. William: open `/admin/groups` locally or after deploy to eyeball the Source column (flow 4 not automated).
+4. Smoke: private window → https://chama360.nxhub.online/?ref=smoke-test → `localStorage.c360_signup_ref` set. Don't create a production group.
+5. Pre-existing, out of scope: 88/181 pnpm audit advisories (incl. critical) deserve their own `/sec --full` pass before the campaign.
+6. `/brain log` the milestone.
