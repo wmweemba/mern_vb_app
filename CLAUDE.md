@@ -8,7 +8,7 @@
 **App name:** Chama360 (formerly Village Banking App, repo still named `mern_vb_app`)
 **What it does:** Village banking group management — savings, loans, fines, reports, cycle management
 **Who uses it:** Group treasurers, loan officers, admins, members in Zambia
-**Current version:** 3.19.0
+**Current version:** 3.20.0
 **Sprint context:** 30-day commercial launch sprint, April 1–30 2026. Target: 2 paying groups at ZMW 150–250/month.
 
 ---
@@ -896,5 +896,21 @@ Added 2026-10-13 (mobile money subscription renewal via Lipila PIN prompt, ships
 
 ---
 
-*Last updated: 2026-10-13 — Automated Subscription Collection (Lipila) added*
+## Signup Source Tracking — Architecture Notes
+
+Added 2026-10-18 (`docs/plan_signup_source_tracking.md`; sister plan BazaBooks PLAN-17 uses the same `?ref=` contract). Key decisions recorded here to prevent regression:
+
+1. **`Group.signupRef` (String, default null) is written once, in `groupController.createGroup`, and never updated by any other endpoint.** `adminGroupsController.createGroup` stores `'admin'`. No ref displays as `direct`; existing groups were not backfilled.
+
+2. **The ref rule `^[a-z0-9][a-z0-9-]{0,39}$` (after trim + lower-case) lives twice, deliberately:** `mern_vb_backend/utils/signupRef.js` and `mern-vb-frontend/src/lib/signupRef.js`. The server re-validates and never trusts the client value. Change both together.
+
+3. **Capture runs at module top level in `src/main.jsx`, before `createRoot`.** It cannot move into a component: `/` and `*` both `<Navigate>` away, dropping the query string before any route component would see it. Stored in `localStorage` key `c360_signup_ref` as `{ref, at}`, first touch wins for 30 days, every access in try/catch. Onboarding sends it in the `POST /groups` body and clears it on success.
+
+4. **`utils/notifyNewGroup.js` sends the new-group Telegram alert.** It is called after `res.status(201).json(...)`, outside the transaction, without `await`, and never throws — an alert failure must never block or fail group creation. No phone or email in the message.
+
+5. **`adminGroupsController.listGroups` builds its response field by field, so any new `Group` field the admin list needs must be added to that map explicitly** (this nearly shipped with Source always showing `direct`).
+
+---
+
+*Last updated: 2026-10-18 — Signup Source Tracking added*
 *Next review: April 7 (Week 1 checkpoint)*

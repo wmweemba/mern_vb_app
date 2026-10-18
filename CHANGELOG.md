@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.20.0] - 2026-10-18
+
+### Added
+- **Signup source tracking.** A `?ref=` link (e.g. `/?ref=p-maluba`) is remembered in the browser for 30 days (first touch wins) through Clerk sign-up and onboarding and stored on the new group as `Group.signupRef`; refs are validated (lower-case letters, digits, hyphens, max 40 chars) on both client and server and anything else is dropped. Super-admin-created groups are tagged `admin`; groups with no ref show as `direct`; existing groups are not backfilled. New Telegram alert to the admin chat whenever a group is created through onboarding, naming the group, creator, template, source and trial end date. Super-admin groups list and group detail now show a Source column/field.
+
 ## [3.19.0] - 2026-10-13
 
 ### Added

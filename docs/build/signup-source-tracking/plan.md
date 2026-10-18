@@ -30,7 +30,7 @@ detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 | U2 | Model, createGroup, alert | sonnet | **high** | U1 | `models/Group.js`, `controllers/groupController.js`, `controllers/adminGroupsController.js`, `utils/notifyNewGroup.js`, `tests/groupSignupRef.test.js` (all under `mern_vb_backend/`) | done |
 | U3 | Browser capture | sonnet | low | U0 | `mern-vb-frontend/src/lib/signupRef.js`, `src/main.jsx`, `src/pages/Onboarding.jsx`, `src/__tests__/signupRef.test.js` | done |
 | U4 | Super-admin visibility | sonnet | low | U2 | `mern-vb-frontend/src/pages/admin/AdminGroupsList.jsx`, `src/pages/admin/AdminGroupDetail.jsx` (+ backend admin controller projection only if one excludes the field) | done |
-| U5 | Docs + version | haiku | low | U1–U4 | `CHANGELOG.md`, root `package.json` version, `CLAUDE.md` | todo |
+| U5 | Docs + version | haiku | low | U1–U4 | `CHANGELOG.md`, root `package.json` version, `CLAUDE.md` | done |
 
 ### U0 — Baseline
 - Backend `pnpm test` and frontend `pnpm build` + `pnpm test` on the untouched branch. Record pass counts here so later failures can be attributed.
