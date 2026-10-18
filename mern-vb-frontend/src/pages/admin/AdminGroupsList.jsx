@@ -149,6 +149,7 @@ export default function AdminGroupsList() {
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-secondary font-medium">Status</th>
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-secondary font-medium">Expires</th>
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-secondary font-medium">Created</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-secondary font-medium">Source</th>
                   <th className="text-right px-4 py-3 text-xs uppercase tracking-wide text-text-secondary font-medium">Actions</th>
                 </tr>
               </thead>
@@ -171,6 +172,9 @@ export default function AdminGroupsList() {
                       </td>
                       <td className="px-4 py-3 text-text-secondary text-xs">
                         {new Date(g.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary text-xs">
+                        {g.signupRef || 'direct'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -226,6 +230,7 @@ export default function AdminGroupsList() {
                     <div className="flex justify-between"><span className="text-text-secondary">Members</span><span className="text-text-primary">{g.memberCount}</span></div>
                     <div className="flex justify-between"><span className="text-text-secondary">Expires</span><span className="text-text-primary text-xs">{expiry ? new Date(expiry).toLocaleDateString() : '—'}</span></div>
                     <div className="flex justify-between"><span className="text-text-secondary">Created</span><span className="text-text-primary text-xs">{new Date(g.createdAt).toLocaleDateString()}</span></div>
+                    <div className="flex justify-between"><span className="text-text-secondary">Source</span><span className="text-xs text-text-secondary">{g.signupRef || 'direct'}</span></div>
                   </div>
                   <button
                     onClick={() => navigate(`/admin/groups/${g._id}`)}

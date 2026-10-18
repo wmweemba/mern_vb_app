@@ -41,6 +41,7 @@ function OverviewTab({ group }) {
             ['Slug', group.slug],
             ['Clerk Admin ID', group.clerkAdminId || '—'],
             ['Created', new Date(group.createdAt).toLocaleDateString()],
+            ['Source', group.signupRef || 'direct'],
             ['Trial Expires', group.trialExpiresAt ? new Date(group.trialExpiresAt).toLocaleDateString() : '—'],
             ['Paid Until', group.paidUntil ? new Date(group.paidUntil).toLocaleDateString() : '—'],
           ].map(([k, v]) => (

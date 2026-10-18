@@ -25,11 +25,11 @@ detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 
 | ID | Title | Model | Risk | Depends on | Owns (files) | Status |
 |---|---|---|---|---|---|---|
-| U0 | Baseline | verifier | — | — | none | todo |
-| U1 | Backend ref rule | haiku | low | U0 | `mern_vb_backend/utils/signupRef.js`, `mern_vb_backend/tests/signupRef.test.js` | todo |
-| U2 | Model, createGroup, alert | sonnet | **high** | U1 | `models/Group.js`, `controllers/groupController.js`, `controllers/adminGroupsController.js`, `utils/notifyNewGroup.js`, `tests/groupSignupRef.test.js` (all under `mern_vb_backend/`) | todo |
-| U3 | Browser capture | sonnet | low | U0 | `mern-vb-frontend/src/lib/signupRef.js`, `src/main.jsx`, `src/pages/Onboarding.jsx`, `src/__tests__/signupRef.test.js` | todo |
-| U4 | Super-admin visibility | sonnet | low | U2 | `mern-vb-frontend/src/pages/admin/AdminGroupsList.jsx`, `src/pages/admin/AdminGroupDetail.jsx` (+ backend admin controller projection only if one excludes the field) | todo |
+| U0 | Baseline | verifier | — | — | none | done |
+| U1 | Backend ref rule | haiku | low | U0 | `mern_vb_backend/utils/signupRef.js`, `mern_vb_backend/tests/signupRef.test.js` | done |
+| U2 | Model, createGroup, alert | sonnet | **high** | U1 | `models/Group.js`, `controllers/groupController.js`, `controllers/adminGroupsController.js`, `utils/notifyNewGroup.js`, `tests/groupSignupRef.test.js` (all under `mern_vb_backend/`) | done |
+| U3 | Browser capture | sonnet | low | U0 | `mern-vb-frontend/src/lib/signupRef.js`, `src/main.jsx`, `src/pages/Onboarding.jsx`, `src/__tests__/signupRef.test.js` | done |
+| U4 | Super-admin visibility | sonnet | low | U2 | `mern-vb-frontend/src/pages/admin/AdminGroupsList.jsx`, `src/pages/admin/AdminGroupDetail.jsx` (+ backend admin controller projection only if one excludes the field) | done |
 | U5 | Docs + version | haiku | low | U1–U4 | `CHANGELOG.md`, root `package.json` version, `CLAUDE.md` | todo |
 
 ### U0 — Baseline
@@ -61,7 +61,7 @@ detail page. Must be live before Mon 2026-10-26 (Campaign 2).
 ## Gates
 | Gate | After | Opus reads | Note |
 |---|---|---|---|
-| G1 | U2 | `groupController.js` diff, `notifyNewGroup.js`, `groupSignupRef.test.js` | |
+| G1 | U2 | `groupController.js` diff, `notifyNewGroup.js`, `groupSignupRef.test.js` | Pass 2026-10-18: diff read; alert after 201, outside txn, no await, .catch; `template` is function-scoped; admin path stores `admin`; 29 suites / 314 tests green. |
 | G2 | U5 (before Phase 3) | `git diff --stat c7ef533..HEAD`, `src/lib/signupRef.js`, `main.jsx` diff | |
 
 ## E2E flows
@@ -78,3 +78,6 @@ Referral rewards/payouts/partner dashboard (D11), backfilling existing groups (D
 ## Log
 - 2026-10-17 session start (Opus orchestrator). No prior build dir. Uncommitted change in `docs/build/lipila-subscription-collection/plan.md` pre-dates this build — left untouched, not to be committed here.
 - 2026-10-18 plan approved by William; branch created; build start 12:17
+- 2026-10-18 U0 baseline: backend 27 suites/293 tests, frontend 11/43, build OK.
+- 2026-10-18 U1 done (12 tests). U2 done (9 tests incl. admin 'admin' case + notifyNewGroup unit tests; 29/314). G1 pass. U3 done (15 tests; 12/58; lib file identical to spec).
+- 2026-10-18 U4 done. Implementer found the orchestrator's projection claim wrong: `adminGroupsController.listGroups` builds each row field by field and dropped `signupRef`. Orchestrator added `signupRef: g.signupRef || null` (one line) to the map; backend 29/314 still green.

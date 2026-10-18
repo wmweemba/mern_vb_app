@@ -39,6 +39,7 @@ exports.listGroups = async (req, res) => {
       deletedAt: g.deletedAt,
       status,
       createdAt: g.createdAt,
+      signupRef: g.signupRef || null,
     };
   });
   res.json(result);
