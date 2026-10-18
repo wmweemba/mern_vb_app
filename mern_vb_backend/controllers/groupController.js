@@ -8,6 +8,8 @@ const BankBalance = require('../models/BankBalance');
 const { ensureFund, SOCIAL_FUND_KEY, APP_SUBSCRIPTION_KEY } = require('./fundController');
 const ContributionType = require('../models/ContributionType');
 const { openCycle } = require('../utils/cycleHelpers');
+const { normaliseRef } = require('../utils/signupRef');
+const { notifyNewGroup } = require('../utils/notifyNewGroup');
 
 exports.createGroup = async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
@@ -18,7 +20,10 @@ exports.createGroup = async (req, res) => {
     lateFineAmount, lateFineType = 'fixed',
     partialPaymentFineAmount,
     templateKey = 'village_bank',
+    signupRef,
   } = req.body;
+
+  const ref = normaliseRef(signupRef);
 
   if (!groupName || !treasurerName) {
     return res.status(400).json({ error: 'groupName and treasurerName are required' });
@@ -74,6 +79,7 @@ exports.createGroup = async (req, res) => {
         name: groupName, slug, clerkAdminId: clerkUserId,
         trialExpiresAt,
         isPaid: false,
+        signupRef: ref,
       }], { session });
 
       const [member] = await GroupMember.create([{
@@ -155,6 +161,13 @@ exports.createGroup = async (req, res) => {
     });
 
     res.status(201).json(result);
+
+    notifyNewGroup({
+      groupName,
+      treasurerName,
+      templateKey: template ? template.key : 'village_bank',
+      ref,
+    }).catch(err => console.error('[createGroup] notifyNewGroup failed:', err));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   } finally {

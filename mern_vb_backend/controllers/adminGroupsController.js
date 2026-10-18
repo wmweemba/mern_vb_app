@@ -99,7 +99,7 @@ exports.createGroup = async (req, res) => {
       const existing = await Group.findOne({ slug }).session(session);
       if (existing) throw Object.assign(new Error('Slug already taken'), { status: 409 });
 
-      const [group] = await Group.create([{ name, slug, clerkAdminId: clerkAdminId || null, trialExpiresAt }], { session });
+      const [group] = await Group.create([{ name, slug, clerkAdminId: clerkAdminId || null, trialExpiresAt, signupRef: 'admin' }], { session });
 
       await GroupMember.create([{
         clerkUserId: clerkAdminId || null, groupId: group._id, role: 'admin',
