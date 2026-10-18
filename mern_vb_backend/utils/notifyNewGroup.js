@@ -11,17 +11,29 @@ function escapeHtml(s) {
 
 async function notifyNewGroup({ groupName, treasurerName, templateKey, ref }) {
   try {
-    if (!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)) return;
+    if (!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)) {
+      console.error('[notifyNewGroup] Telegram not configured; skipping new-group alert');
+      return;
+    }
 
     const trialEndsStr = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0];
 
+    // Telegram caps messages at 4096 chars. Truncate untrusted free-text
+    // fields before escaping so a pathological input can't blow the limit.
+    const safeGroupName = String(groupName ?? '').slice(0, 200);
+    const safeTreasurerName = String(treasurerName ?? '').slice(0, 200);
+
+    const envTag = process.env.NODE_ENV !== 'production'
+      ? ` [${process.env.NODE_ENV || 'dev'}]`
+      : '';
+
     const lines = [
-      '🆕 <b>New Chama360 group</b>',
+      `🆕 <b>New Chama360 group</b>${envTag}`,
       '',
-      `<b>Group:</b> ${escapeHtml(groupName)}`,
-      `<b>Created by:</b> ${escapeHtml(treasurerName)}`,
+      `<b>Group:</b> ${escapeHtml(safeGroupName)}`,
+      `<b>Created by:</b> ${escapeHtml(safeTreasurerName)}`,
       `<b>Template:</b> ${escapeHtml(templateKey)}`,
       `<b>Source:</b> ${escapeHtml(ref || 'direct')}`,
       `<b>Trial ends:</b> ${trialEndsStr}`,

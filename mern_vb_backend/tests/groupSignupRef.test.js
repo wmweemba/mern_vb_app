@@ -136,23 +136,41 @@ describe('Group seeding — signupRef', () => {
   test('d. notifyNewGroup rejecting never blocks the 201 / the group existing (D10)', async () => {
     notifyNewGroup.mockRejectedValueOnce(new Error('telegram down'));
 
-    const res = await request(groupApp)
-      .post('/api/groups')
-      .set('Authorization', 'Bearer user_d')
-      .send({
-        groupName: 'Ref Test Group D',
-        treasurerName: 'Treasurer D',
-        signupRef: 'fb',
-      });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let unhandledRejectionFired = false;
+    const onUnhandledRejection = () => { unhandledRejectionFired = true; };
+    process.on('unhandledRejection', onUnhandledRejection);
 
-    expect(res.statusCode).toBe(201);
-    const group = await Group().findById(res.body.group.id);
-    expect(group).not.toBeNull();
-    expect(group.signupRef).toBe('fb');
+    try {
+      const res = await request(groupApp)
+        .post('/api/groups')
+        .set('Authorization', 'Bearer user_d')
+        .send({
+          groupName: 'Ref Test Group D',
+          treasurerName: 'Treasurer D',
+          signupRef: 'fb',
+        });
 
-    // Flush the rejected promise's .catch() before the test (and its implicit
-    // unhandled-rejection window) ends.
-    await new Promise((r) => setImmediate(r));
+      expect(res.statusCode).toBe(201);
+      const group = await Group().findById(res.body.group.id);
+      expect(group).not.toBeNull();
+      expect(group.signupRef).toBe('fb');
+
+      // Flush the rejected promise's .catch() before the test (and its implicit
+      // unhandled-rejection window) ends.
+      await new Promise((r) => setImmediate(r));
+
+      // Prove the .catch() in groupController actually exists and ran, not
+      // just that the request didn't blow up.
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[createGroup] notifyNewGroup failed:'),
+        expect.any(Error),
+      );
+      expect(unhandledRejectionFired).toBe(false);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   test('e. duplicate group name (409) -> notifyNewGroup NOT called', async () => {
@@ -209,15 +227,80 @@ describe('utils/notifyNewGroup — direct unit tests', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  test('env vars unset -> fetch not called', async () => {
+  test('env vars unset -> console.error and fetch not called', async () => {
     jest.resetModules();
     delete process.env.TELEGRAM_BOT_TOKEN;
     delete process.env.TELEGRAM_CHAT_ID;
     global.fetch = jest.fn();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const { notifyNewGroup: realNotify } = jest.requireActual('../utils/notifyNewGroup');
     await realNotify({ groupName: 'X', treasurerName: 'Y', templateKey: 'village_bank', ref: null });
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[notifyNewGroup] Telegram not configured; skipping new-group alert',
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('groupName longer than Telegram\'s 4096-char limit is truncated before sending', async () => {
+    jest.resetModules();
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+    process.env.TELEGRAM_CHAT_ID = 'test-chat';
+    let capturedBody;
+    global.fetch = jest.fn().mockImplementation((url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return Promise.resolve({ ok: true });
+    });
+
+    const { notifyNewGroup: realNotify } = jest.requireActual('../utils/notifyNewGroup');
+    await realNotify({
+      groupName: 'x'.repeat(5000), treasurerName: 'Y', templateKey: 'village_bank', ref: 'fb',
+    });
+
+    expect(capturedBody.text.length).toBeLessThan(4096);
+  });
+
+  test('production NODE_ENV -> no env tag on the heading line', async () => {
+    jest.resetModules();
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+    process.env.TELEGRAM_CHAT_ID = 'test-chat';
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    let capturedBody;
+    global.fetch = jest.fn().mockImplementation((url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return Promise.resolve({ ok: true });
+    });
+
+    try {
+      const { notifyNewGroup: realNotify } = jest.requireActual('../utils/notifyNewGroup');
+      await realNotify({ groupName: 'X', treasurerName: 'Y', templateKey: 'village_bank', ref: null });
+      expect(capturedBody.text.split('\n')[0]).toBe('🆕 <b>New Chama360 group</b>');
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
+  test('non-production NODE_ENV -> env tag appended to the heading line', async () => {
+    jest.resetModules();
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+    process.env.TELEGRAM_CHAT_ID = 'test-chat';
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    let capturedBody;
+    global.fetch = jest.fn().mockImplementation((url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return Promise.resolve({ ok: true });
+    });
+
+    try {
+      const { notifyNewGroup: realNotify } = jest.requireActual('../utils/notifyNewGroup');
+      await realNotify({ groupName: 'X', treasurerName: 'Y', templateKey: 'village_bank', ref: null });
+      expect(capturedBody.text.split('\n')[0]).toBe('🆕 <b>New Chama360 group</b> [development]');
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 
   test('HTML-escapes groupName and shows "direct" when ref is null', async () => {
