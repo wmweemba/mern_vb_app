@@ -40,12 +40,25 @@ async function notifyNewGroup({ groupName, treasurerName, templateKey, ref }) {
     ];
     const text = lines.join('\n');
 
-    const r = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
-      signal: AbortSignal.timeout(8000),
-    });
+    // AbortSignal.timeout(8000) leaves its internal timer running for the
+    // full 8s even after fetch settles early (every test mocks fetch to
+    // resolve instantly) — across many tests those dangling timers pile up
+    // in the shared jest worker process and starve later test files. Use a
+    // controller + setTimeout we can clearTimeout() as soon as fetch
+    // settles, same request semantics, no leaked handle.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let r;
+    try {
+      r = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!r.ok) throw new Error(`Telegram ${r.status}`);
   } catch (err) {
     console.error('[notifyNewGroup] failed:', err && err.message);
