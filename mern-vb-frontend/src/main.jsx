@@ -5,6 +5,9 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './store/auth.jsx'
+import { captureRefFromUrl } from './lib/signupRef'
+
+captureRefFromUrl(window.location.search);
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 

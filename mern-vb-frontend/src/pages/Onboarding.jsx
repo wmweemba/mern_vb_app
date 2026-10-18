@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../store/auth';
 import { API_BASE_URL } from '../lib/utils';
 import Select from '../components/ui/Select';
+import { getStoredRef, clearStoredRef } from '../lib/signupRef';
 
 const DEFAULTS = {
   cycleLengthMonths: 6,
@@ -142,7 +143,9 @@ export default function Onboarding() {
         lateFineType,
         partialPaymentFineAmount: showFineStep ? partialPaymentFineAmount : 0,
         templateKey: templateKey || 'village_bank',
+        signupRef: getStoredRef() || undefined,
       });
+      clearStoredRef();
       await refreshMembership();
       setShowWelcome(true);
     } catch (err) {
